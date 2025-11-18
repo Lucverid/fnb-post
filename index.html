@@ -5,98 +5,247 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>F&B POS & Inventory (Firebase)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #f5f5f5;
+    :root {
+      --bg-main: #020617;
+      --bg-card: #ffffff;
+      --primary: #facc15;      /* kuning */
+      --accent-dark: #020617;  /* hitam gelap */
+      --danger: #dc2626;
+      --text-main: #0f172a;
+      --muted: #6b7280;
     }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: radial-gradient(circle at top, #facc15 0, #020617 40%, #020617 100%);
+      min-height: 100vh;
+      color: var(--text-main);
+    }
+
     .container {
       max-width: 1000px;
       margin: 0 auto;
       padding: 16px;
     }
+
     h1, h2, h3 {
       margin: 8px 0;
     }
-    .card {
-      background: white;
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+    h1 {
+      color: #fefce8;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 22px;
     }
+
+    .subtitle {
+      text-align: center;
+      color: #fef9c3;
+      font-size: 12px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    /* Card khusus login agar fokus dan responsif */
+    #authCard {
+      max-width: 780px;
+      margin: 0 auto 20px auto;
+    }
+
+    .card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--accent-dark);
+    }
+
+    .card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--accent-dark);
+    }
+
     .row {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
     }
+
     .col {
       flex: 1;
-      min-width: 220px;
+      min-width: 230px;
     }
+
     .input-group {
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
+
     label {
       display: block;
-      font-size: 13px;
+      font-size: 12px;
       margin-bottom: 4px;
+      color: var(--muted);
+      font-weight: 500;
     }
+
     input, button, select {
-      padding: 8px;
+      padding: 9px 10px;
       width: 100%;
-      box-sizing: border-box;
-      border-radius: 6px;
-      border: 1px solid #ddd;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
       font-size: 14px;
+      outline: none;
+      background: #f9fafb;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .08s ease;
+      box-sizing: border-box;
     }
+
+    input:focus,
+    select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.6);
+      background: #ffffff;
+    }
+
     button {
       cursor: pointer;
       border: none;
       font-weight: 600;
+      margin-top: 4px;
     }
+
     button.primary {
-      background: #2563eb;
-      color: white;
-    }
-    button.danger {
-      background: #dc2626;
-      color: white;
-    }
-    button.secondary {
-      background: #e5e7eb;
+      background: var(--primary);
       color: #111827;
+      box-shadow: 0 8px 18px rgba(250, 204, 21, 0.4);
     }
+
+    button.primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: white;
+      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.35);
+    }
+
+    button.secondary {
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    button.secondary:hover {
+      filter: brightness(1.05);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
     }
+
     th, td {
       border: 1px solid #e5e7eb;
       padding: 6px;
       text-align: left;
     }
+
     th {
-      background: #f3f4f6;
+      background: #f9fafb;
     }
+
     .badge {
       display: inline-block;
       padding: 2px 6px;
       border-radius: 999px;
       font-size: 11px;
     }
+
     .badge-low {
-      background: #fee2e2;
+      background: #fef2f2;
       color: #b91c1c;
     }
+
     .badge-ok {
-      background: #dcfce7;
-      color: #166534;
+      background: #ecfdf3;
+      color: #15803d;
     }
+
     .hidden {
-      display: none;
+      display: none !important;
     }
+
+    /* TOP BAR setelah login */
+    .topbar {
+      background: rgba(15, 23, 42, 0.96);
+      border-radius: 999px;
+      padding: 8px 14px;
+      margin: 0 auto 14px auto;
+      max-width: 780px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #f9fafb;
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .topbar-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .topbar-user {
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .btn-logout {
+      width: auto;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: #f9fafb;
+      color: #111827;
+      font-size: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.8);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.6);
+      cursor: pointer;
+    }
+
+    .btn-logout:hover {
+      background: #facc15;
+      border-color: #facc15;
+      color: #111827;
+    }
+
     /* Toast Notification */
     .toast-container {
       position: fixed;
@@ -104,26 +253,70 @@
       right: 16px;
       z-index: 9999;
     }
+
     .toast {
-      background: #111827;
+      background: #020617;
       color: white;
       padding: 10px 14px;
       border-radius: 999px;
       margin-bottom: 8px;
       font-size: 13px;
-      opacity: 0.95;
+      opacity: 0.97;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      backdrop-filter: blur(10px);
     }
+
     .toast-success { background: #16a34a; }
     .toast-error { background: #dc2626; }
     .toast-info { background: #2563eb; }
 
     /* Mobile tweaks */
-    @media (max-width: 600px) {
+    @media (max-width: 768px) {
       .container {
-        padding: 8px;
+        padding: 14px 10px 24px;
       }
-      table {
+
+      #authCard {
+        padding: 16px 14px 14px;
+        margin-top: 6px;
+      }
+
+      h1 {
+        font-size: 19px;
+      }
+
+      .subtitle {
         font-size: 11px;
+      }
+
+      .card h2 {
+        font-size: 16px;
+      }
+
+      .card h3 {
+        font-size: 14px;
+      }
+
+      button {
+        font-size: 13px;
+      }
+
+      .topbar {
+        border-radius: 14px;
+        padding: 8px 10px;
+      }
+
+      .topbar-left {
+        max-width: 70%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #authCard {
+        border-radius: 16px;
+      }
+      .row {
+        gap: 10px;
       }
     }
   </style>
@@ -132,7 +325,18 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <div class="container">
-    <h1>F&B POS & Inventory (Firebase)</h1>
+    <h1>F&B POS & Inventory</h1>
+    <p class="subtitle">Sistem kasir & stok F&amp;B — tema kuning, hitam, putih. Nyaman di HP &amp; laptop.</p>
+
+    <!-- TOP BAR SETELAH LOGIN -->
+    <div id="topbar" class="topbar hidden">
+      <div class="topbar-left">
+        <span class="topbar-title">Dashboard F&amp;B</span>
+        <span class="topbar-user" id="topbarUser"></span>
+      </div>
+      <button class="btn-logout" id="btnLogout">Logout</button>
+    </div>
+
     <p id="currentUserInfo">Belum login</p>
 
     <!-- LOGIN / REGISTER -->
@@ -171,12 +375,11 @@
           <button class="secondary" id="btnRegister">Register</button>
         </div>
       </div>
-      <button class="danger hidden" id="btnLogout">Logout</button>
     </div>
 
     <!-- INVENTORY & STOCK OPNAME -->
     <div class="card hidden" id="appCard">
-      <h2>Inventory & Stok Opname</h2>
+      <h2>Inventory &amp; Stok Opname</h2>
 
       <div class="row">
         <!-- Add / Edit Product -->
@@ -268,15 +471,15 @@
     } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
     // ====== 2. Firebase Config (punyamu) ======
- const firebaseConfig = {
-  apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
-  authDomain: "app-387dc.firebaseapp.com",
-  projectId: "app-387dc",
-  storageBucket: "app-387dc.firebasestorage.app",
-  messagingSenderId: "227151496412",
-  appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
-  measurementId: "G-9E282TKXSJ"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
+      authDomain: "app-387dc.firebaseapp.com",
+      projectId: "app-387dc",
+      storageBucket: "app-387dc.firebasestorage.app",
+      messagingSenderId: "227151496412",
+      appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
+      measurementId: "G-9E282TKXSJ"
+    };
 
     // ====== 3. Init Firebase ======
     const app = initializeApp(firebaseConfig);
@@ -303,6 +506,8 @@
     const authCard = document.getElementById("authCard");
     const appCard = document.getElementById("appCard");
     const opnameCard = document.getElementById("opnameCard");
+    const topbar = document.getElementById("topbar");
+    const topbarUser = document.getElementById("topbarUser");
 
     const loginEmail = document.getElementById("loginEmail");
     const loginPassword = document.getElementById("loginPassword");
@@ -376,18 +581,33 @@
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
-        currentUserInfo.textContent = `Login sebagai: ${user.email}`;
-        authCard.querySelector("h2").textContent = "Akun";
-        btnLogout.classList.remove("hidden");
+        // Sembunyikan info "Belum login"
+        currentUserInfo.textContent = "";
+
+        // Topbar + user
+        topbar.classList.remove("hidden");
+        topbarUser.textContent = `Login sebagai ${user.email}`;
+
+        // Sembunyikan form login/register
+        authCard.classList.add("hidden");
+
+        // Tampilkan dashboard
         appCard.classList.remove("hidden");
         opnameCard.classList.remove("hidden");
+
         await loadProducts();
       } else {
         currentUserInfo.textContent = "Belum login";
-        authCard.querySelector("h2").textContent = "Login / Register";
-        btnLogout.classList.add("hidden");
+
+        // Sembunyikan dashboard & topbar
+        topbar.classList.add("hidden");
         appCard.classList.add("hidden");
         opnameCard.classList.add("hidden");
+
+        // Tampilkan kembali form login/register
+        authCard.classList.remove("hidden");
+
+        // Bersihkan tabel
         productTableBody.innerHTML = "";
         opnameTableBody.innerHTML = "";
       }
@@ -542,43 +762,42 @@
       });
     }
 
-   async function saveOpnameForProduct(product) {
-  const input = document.getElementById(`op_fisik_${product.id}`);
-  const selisihCell = document.getElementById(`op_selisih_${product.id}`);
-  const fisik = Number(input.value);
+    async function saveOpnameForProduct(product) {
+      const input = document.getElementById(`op_fisik_${product.id}`);
+      const selisihCell = document.getElementById(`op_selisih_${product.id}`);
+      const fisik = Number(input.value);
 
-  if (Number.isNaN(fisik)) {
-    return showToast("Isi stok fisik terlebih dahulu", "error");
-  }
+      if (Number.isNaN(fisik)) {
+        return showToast("Isi stok fisik terlebih dahulu", "error");
+      }
 
-  const sistem = Number(product.stock ?? 0);
-  const selisih = fisik - sistem;
-  selisihCell.textContent = selisih.toString();
+      const sistem = Number(product.stock ?? 0);
+      const selisih = fisik - sistem;
+      selisihCell.textContent = selisih.toString();
 
-  try {
-    // Simpan riwayat stok opname per produk
-    await addDoc(colOpname, {
-      productId: product.id,
-      productName: product.name,
-      stockSystem: sistem,
-      stockPhysical: fisik,
-      difference: selisih,
-      opnameDate: serverTimestamp(),
-      userId: currentUser ? currentUser.uid : null
-    });
+      try {
+        // Simpan riwayat stok opname per produk
+        await addDoc(colOpname, {
+          productId: product.id,
+          productName: product.name,
+          stockSystem: sistem,
+          stockPhysical: fisik,
+          difference: selisih,
+          opnameDate: serverTimestamp(),
+          userId: currentUser ? currentUser.uid : null
+        });
 
-    // Update stok produk ke stok fisik
-    const ref = doc(db, "products", product.id);
-    await updateDoc(ref, { stock: fisik });
+        // Update stok produk ke stok fisik
+        const ref = doc(db, "products", product.id);
+        await updateDoc(ref, { stock: fisik });
 
-    showToast("Stok opname tersimpan & stok terupdate", "success");
-    await loadProducts();
-  } catch (err) {
-    console.error(err);
-    showToast("Gagal menyimpan opname: " + err.message, "error");
-  }
-}
-
+        showToast("Stok opname tersimpan & stok terupdate", "success");
+        await loadProducts();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan opname: " + err.message, "error");
+      }
+    }
 
     // ====== 11. Peringatan Mingguan (reminder opname) ======
     function checkWeeklyReminder() {
@@ -605,10 +824,7 @@
       });
     }
 
-    // TODO NEXT:
-    // - Modul penjualan (sales) yang simpan ke collection "sales"
-    // - Dashboard penjualan harian/bulanan dari collection "sales"
-    // - Export ke Excel (pakai SheetJS)
+  
   </script>
 </body>
 </html>
