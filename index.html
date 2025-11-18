@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>F&B POS & Inventory (Firebase)</title>
+  <title>TIANLALA TASIKMALAYA</title>
 
   <!-- Chart.js untuk grafik -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -358,8 +358,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <div class="container">
-    <h1>F&B POS & Inventory</h1>
-    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — tema kuning, hitam, putih. Nyaman di HP &amp; laptop.</p>
+    <h1>TIANLALA TASIKMALAYA</h1>
+    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — Agis</p>
 
     <!-- TOP BAR SETELAH LOGIN -->
     <div id="topbar" class="topbar hidden">
@@ -414,16 +414,41 @@
 
       <div class="row">
         <div class="col">
-          <h3>Tambah / Edit Produk</h3>
+          <h3>Tambah / Edit Item</h3>
           <input type="hidden" id="editProductId" />
           <div class="input-group">
-            <label>Nama Produk</label>
+            <label>Nama Item</label>
             <input id="productName" placeholder="Contoh: Nasi Goreng" />
           </div>
+
           <div class="input-group">
-            <label>Harga Jual</label>
+            <label>Jenis Item</label>
+            <select id="productType">
+              <option value="bahan_baku">Bahan Baku</option>
+              <option value="menu">Menu</option>
+              <option value="kemasan">Kemasan / Packaging</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Kategori (opsional)</label>
+            <select id="productCategory">
+              <option value="makanan">Makanan</option>
+              <option value="minuman">Minuman</option>
+              <option value="lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <div class="input-group" id="priceGroup">
+            <label>Harga Jual (Menu &amp; Kemasan)</label>
             <input id="productPrice" type="number" placeholder="15000" />
           </div>
+
+          <div class="input-group">
+            <label>Satuan (contoh: pcs, porsi, cup)</label>
+            <input id="productUnit" placeholder="contoh: pcs, porsi, cup" />
+          </div>
+
           <div class="input-group">
             <label>Stok Awal</label>
             <input id="productStock" type="number" placeholder="10" />
@@ -432,23 +457,56 @@
             <label>Minimal Stok (peringatan stok menipis)</label>
             <input id="productMinStock" type="number" placeholder="5" />
           </div>
-          <button class="primary" id="btnSaveProduct">Simpan Produk</button>
+          <button class="primary" id="btnSaveProduct">Simpan Item</button>
           <button class="secondary" id="btnResetForm">Reset Form</button>
         </div>
 
         <div class="col">
-          <h3>Daftar Produk</h3>
-          <div class="input-group">
-            <label>Cari Produk</label>
-            <input id="productSearch" placeholder="Ketik nama produk..." />
+          <h3>Daftar Item</h3>
+
+          <div class="row" style="margin-bottom:6px;">
+            <div class="col">
+              <div class="input-group" style="margin-bottom:6px;">
+                <label>Cari Item</label>
+                <input id="productSearch" placeholder="Ketik nama item..." />
+              </div>
+            </div>
+            <div class="col">
+              <div class="input-group" style="margin-bottom:6px;">
+                <label>Filter Jenis</label>
+                <select id="productFilterType">
+                  <option value="">Semua</option>
+                  <option value="bahan_baku">Bahan Baku</option>
+                  <option value="menu">Menu</option>
+                  <option value="kemasan">Kemasan</option>
+                </select>
+              </div>
+            </div>
+            <div class="col">
+              <div class="input-group" style="margin-bottom:6px;">
+                <label>Sort</label>
+                <select id="productSort">
+                  <option value="name-asc">Nama A-Z</option>
+                  <option value="name-desc">Nama Z-A</option>
+                  <option value="price-asc">Harga termurah</option>
+                  <option value="price-desc">Harga termahal</option>
+                  <option value="stock-asc">Stok terendah</option>
+                  <option value="stock-desc">Stok tertinggi</option>
+                </select>
+              </div>
+            </div>
           </div>
+
           <div class="table-scroll">
             <table>
               <thead>
                 <tr>
                   <th>Nama</th>
+                  <th>Jenis</th>
+                  <th>Kategori</th>
                   <th>Harga</th>
                   <th>Stok</th>
+                  <th>Satuan</th>
                   <th>Status</th>
                   <th>Aksi</th>
                 </tr>
@@ -686,7 +744,10 @@
     const btnLogout = document.getElementById("btnLogout");
 
     const productName = document.getElementById("productName");
+    const productType = document.getElementById("productType");
+    const productCategory = document.getElementById("productCategory");
     const productPrice = document.getElementById("productPrice");
+    const productUnit = document.getElementById("productUnit");
     const productStock = document.getElementById("productStock");
     const productMinStock = document.getElementById("productMinStock");
     const editProductId = document.getElementById("editProductId");
@@ -694,7 +755,10 @@
     const btnResetForm = document.getElementById("btnResetForm");
     const productTableBody = document.getElementById("productTableBody");
     const productSearch = document.getElementById("productSearch");
+    const productFilterType = document.getElementById("productFilterType");
+    const productSort = document.getElementById("productSort");
     const opnameTableBody = document.getElementById("opnameTableBody");
+    const priceGroup = document.getElementById("priceGroup");
 
     const saleProductSelect = document.getElementById("saleProductSelect");
     const saleQty = document.getElementById("saleQty");
@@ -729,6 +793,7 @@
     let allSalesCache = [];
     let currentUser = null;
 
+    // === AUTH ===
     btnRegister.addEventListener("click", async () => {
       const email = registerEmail.value.trim();
       const pass = registerPassword.value;
@@ -800,139 +865,244 @@
       }
     });
 
+    // === INVENTORY ===
+    function updatePriceVisibility() {
+      const type = productType.value;
+      if (type === "bahan_baku") {
+        priceGroup.classList.add("hidden");
+        productPrice.value = "";
+      } else {
+        priceGroup.classList.remove("hidden");
+      }
+    }
+
+    productType.addEventListener("change", updatePriceVisibility);
+    updatePriceVisibility();
+
     async function loadProducts() {
       const snap = await getDocs(colProducts);
       const products = [];
       snap.forEach((docSnap) => products.push({ id: docSnap.id, ...docSnap.data() }));
       productsCache = products;
 
-      // render daftar produk dengan search
-      renderProductTable(products, productSearch ? productSearch.value : "");
+      renderProductTable();
 
-      // bagian lain tetap full list (tidak terfilter search)
       renderProductOptionsForSales(products);
       renderOpnameTable(products);
       showLowStockNotifications(products);
       updateSaleCalculation();
     }
 
-    function renderProductTable(products, searchTerm = "") {
+    function getCurrentProductFilterState() {
+      return {
+        searchTerm: (productSearch?.value || "").toLowerCase().trim(),
+        type: productFilterType?.value || "",
+        sort: productSort?.value || "name-asc"
+      };
+    }
+
+    function renderProductTable() {
       productTableBody.innerHTML = "";
-      const term = (searchTerm || "").toLowerCase().trim();
+      const { searchTerm, type, sort } = getCurrentProductFilterState();
 
-      products
-        .filter((p) => {
-          if (!term) return true;
-          const name = (p.name || "").toLowerCase();
-          return name.includes(term);
-        })
-        .forEach((p) => {
-          const tr = document.createElement("tr");
+      let list = [...productsCache];
 
-          const statusCell = document.createElement("td");
-          const badge = document.createElement("span");
-          badge.classList.add("badge");
-          const min = p.minStock ?? 0;
-          if (p.stock <= min) {
-            badge.classList.add("badge-low");
-            badge.textContent = "Menipis";
-          } else {
-            badge.classList.add("badge-ok");
-            badge.textContent = "Aman";
-          }
-          statusCell.appendChild(badge);
+      // filter search
+      if (searchTerm) {
+        list = list.filter((p) =>
+          (p.name || "").toLowerCase().includes(searchTerm)
+        );
+      }
 
-          tr.innerHTML = `
-            <td>${p.name}</td>
-            <td>Rp ${Number(p.price || 0).toLocaleString("id-ID")}</td>
-            <td>${p.stock ?? 0}</td>
-          `;
-          tr.appendChild(statusCell);
+      // filter jenis
+      if (type) {
+        list = list.filter((p) => (p.type || "bahan_baku") === type);
+      }
 
-          const tdActions = document.createElement("td");
-          const editBtn = document.createElement("button");
-          editBtn.textContent = "Edit";
-          editBtn.classList.add("secondary");
-          editBtn.style.marginRight = "4px";
-          editBtn.onclick = () => fillFormForEdit(p);
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "Hapus";
-          delBtn.classList.add("danger");
-          delBtn.onclick = () => deleteProduct(p.id);
-          tdActions.appendChild(editBtn);
-          tdActions.appendChild(delBtn);
-          tr.appendChild(tdActions);
+      // sorting
+      list.sort((a, b) => {
+        const priceA = Number(a.price || 0);
+        const priceB = Number(b.price || 0);
+        const stockA = Number(a.stock || 0);
+        const stockB = Number(b.stock || 0);
+        const nameA = (a.name || "").toLowerCase();
+        const nameB = (b.name || "").toLowerCase();
 
-          productTableBody.appendChild(tr);
-        });
+        switch (sort) {
+          case "name-desc":
+            return nameA < nameB ? 1 : nameA > nameB ? -1 : 0;
+          case "price-asc":
+            return priceA - priceB;
+          case "price-desc":
+            return priceB - priceA;
+          case "stock-asc":
+            return stockA - stockB;
+          case "stock-desc":
+            return stockB - stockA;
+          case "name-asc":
+          default:
+            return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
+        }
+      });
 
-      // jika tidak ada hasil
+      list.forEach((p) => {
+        const tr = document.createElement("tr");
+
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.classList.add("badge");
+        const min = p.minStock ?? 0;
+        if (p.stock <= min) {
+          badge.classList.add("badge-low");
+          badge.textContent = "Menipis";
+        } else {
+          badge.classList.add("badge-ok");
+          badge.textContent = "Aman";
+        }
+        statusCell.appendChild(badge);
+
+        const typeMap = {
+          bahan_baku: "Bahan Baku",
+          menu: "Menu",
+          kemasan: "Kemasan"
+        };
+        const typeLabel = typeMap[p.type || "bahan_baku"] || "Bahan Baku";
+
+        const catLabelMap = {
+          makanan: "Makanan",
+          minuman: "Minuman",
+          lainnya: "Lainnya"
+        };
+        const catLabel = catLabelMap[(p.category || "").toLowerCase()] || "-";
+
+        const priceDisplay =
+          (p.type || "bahan_baku") === "bahan_baku"
+            ? "-"
+            : "Rp " + Number(p.price || 0).toLocaleString("id-ID");
+
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${typeLabel}</td>
+          <td>${catLabel}</td>
+          <td>${priceDisplay}</td>
+          <td>${p.stock ?? 0}</td>
+          <td>${p.unit || "-"}</td>
+        `;
+        tr.appendChild(statusCell);
+
+        const tdActions = document.createElement("td");
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.classList.add("secondary");
+        editBtn.style.marginRight = "4px";
+        editBtn.onclick = () => fillFormForEdit(p);
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Hapus";
+        delBtn.classList.add("danger");
+        delBtn.onclick = () => deleteProduct(p.id);
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        productTableBody.appendChild(tr);
+      });
+
       if (!productTableBody.hasChildNodes()) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Produk tidak ditemukan</td>`;
+        tr.innerHTML = `<td colspan="8" style="text-align:center;color:#9ca3af;padding:8px;">Item tidak ditemukan</td>`;
         productTableBody.appendChild(tr);
       }
     }
 
     if (productSearch) {
-      productSearch.addEventListener("input", () => {
-        renderProductTable(productsCache, productSearch.value);
-      });
+      productSearch.addEventListener("input", renderProductTable);
+    }
+    if (productFilterType) {
+      productFilterType.addEventListener("change", renderProductTable);
+    }
+    if (productSort) {
+      productSort.addEventListener("change", renderProductTable);
     }
 
     function fillFormForEdit(product) {
       editProductId.value = product.id;
       productName.value = product.name || "";
-      productPrice.value = product.price || "";
+      productType.value = product.type || "bahan_baku";
+      productCategory.value = (product.category || "makanan").toLowerCase();
       productStock.value = product.stock || "";
+      productUnit.value = product.unit || "";
       productMinStock.value = product.minStock || "";
-      showToast("Mode edit produk aktif", "info");
+
+      if ((product.type || "bahan_baku") === "bahan_baku") {
+        productPrice.value = "";
+      } else {
+        productPrice.value = product.price || "";
+      }
+
+      updatePriceVisibility();
+      showToast("Mode edit item aktif", "info");
     }
 
     btnResetForm.addEventListener("click", () => {
       editProductId.value = "";
       productName.value = "";
+      productType.value = "bahan_baku";
+      productCategory.value = "makanan";
       productPrice.value = "";
       productStock.value = "";
+      productUnit.value = "";
       productMinStock.value = "";
+      updatePriceVisibility();
     });
 
     btnSaveProduct.addEventListener("click", async () => {
       const name = productName.value.trim();
-      const price = Number(productPrice.value || 0);
+      const type = productType.value || "bahan_baku";
+      const category = productCategory.value || "lainnya";
+      let price = Number(productPrice.value || 0);
       const stock = Number(productStock.value || 0);
+      const unit = productUnit.value.trim();
       const minStock = Number(productMinStock.value || 0);
-      if (!name) return showToast("Nama produk wajib diisi", "error");
+      if (!name) return showToast("Nama item wajib diisi", "error");
+
+      // bahan baku tidak punya harga jual
+      if (type === "bahan_baku") {
+        price = 0;
+      }
+
       try {
         const id = editProductId.value;
         if (id) {
           const ref = doc(db, "products", id);
-          await updateDoc(ref, { name, price, stock, minStock });
-          showToast("Produk berhasil diupdate", "success");
+          await updateDoc(ref, { name, type, category, price, stock, unit, minStock });
+          showToast("Item berhasil diupdate", "success");
         } else {
           await addDoc(colProducts, {
             name,
+            type,
+            category,
             price,
             stock,
+            unit,
             minStock,
             createdAt: serverTimestamp()
           });
-          showToast("Produk berhasil ditambahkan", "success");
+          showToast("Item berhasil ditambahkan", "success");
         }
         btnResetForm.click();
         await loadProducts();
       } catch (err) {
         console.error(err);
-        showToast("Gagal menyimpan produk: " + err.message, "error");
+        showToast("Gagal menyimpan item: " + err.message, "error");
       }
     });
 
     async function deleteProduct(id) {
-      if (!confirm("Yakin hapus produk ini?")) return;
+      if (!confirm("Yakin hapus item ini?")) return;
       try {
         const ref = doc(db, "products", id);
         await deleteDoc(ref);
-        showToast("Produk dihapus", "success");
+        showToast("Item dihapus", "success");
         await loadProducts();
       } catch (err) {
         console.error(err);
@@ -991,12 +1161,20 @@
 
     function renderProductOptionsForSales(products) {
       saleProductSelect.innerHTML = '<option value="">Pilih produk</option>';
-      products.forEach((p) => {
-        const opt = document.createElement("option");
-        opt.value = p.id;
-        opt.textContent = `${p.name} (Rp ${Number(p.price || 0).toLocaleString("id-ID")})`;
-        saleProductSelect.appendChild(opt);
-      });
+      products
+        .filter((p) => (p.type || "bahan_baku") !== "bahan_baku") // bahan baku tidak dijual langsung
+        .forEach((p) => {
+          const type = p.type || "menu";
+          const prefix =
+            type === "menu" ? "[MENU]" :
+            type === "kemasan" ? "[KEMASAN]" : "[ITEM]";
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = `${prefix} ${p.name} (Rp ${Number(p.price || 0).toLocaleString(
+            "id-ID"
+          )})`;
+          saleProductSelect.appendChild(opt);
+        });
     }
 
     function findProductById(id) {
@@ -1162,6 +1340,7 @@
       `;
     }
 
+    // === SALES DATA (RIWAYAT + CHART) ===
     async function loadSalesData() {
       const snap = await getDocs(colSales);
       const sales = [];
@@ -1259,7 +1438,6 @@
         return ta - tb;
       });
 
-      // Tabel riwayat
       filtered.forEach((s) => {
         const tr = document.createElement("tr");
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
@@ -1280,7 +1458,6 @@
       });
       historyTotal.textContent = "Rp " + total.toLocaleString("id-ID");
 
-      // Produk terlaris (aggregate)
       const map = {};
       filtered.forEach((s) => {
         const name = s.productName || "Tanpa nama";
@@ -1399,6 +1576,7 @@
       }
     }
 
+    // Reminder stok opname
     function checkWeeklyReminder() {
       const now = new Date();
       const day = now.getDay();
