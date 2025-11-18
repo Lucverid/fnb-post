@@ -1,9 +1,8 @@
-<script type="module">
 /* ---------------------------------------------------------
    1. FIREBASE INIT
 --------------------------------------------------------- */
-import { 
-  initializeApp 
+import {
+  initializeApp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
 import {
@@ -53,26 +52,26 @@ const authCard = document.getElementById("authCard");
 const topbar = document.getElementById("topbar");
 const topbarUser = document.getElementById("topbarUser");
 
-const inventoryCard   = document.getElementById("inventoryCard");
-const recipeCard      = document.getElementById("recipeCard");
-const posCard         = document.getElementById("posCard");
-const dashboardCard   = document.getElementById("dashboardCard");
-const opnameCard      = document.getElementById("opnameCard");
+const inventoryCard = document.getElementById("inventoryCard");
+const recipeCard = document.getElementById("recipeCard");
+const posCard = document.getElementById("posCard");
+const dashboardCard = document.getElementById("dashboardCard");
+const opnameCard = document.getElementById("opnameCard");
 
-const btnLogin    = document.getElementById("btnLogin");
+const btnLogin = document.getElementById("btnLogin");
 const btnRegister = document.getElementById("btnRegister");
-const btnLogout   = document.getElementById("btnLogout");
+const btnLogout = document.getElementById("btnLogout");
 
-const loginEmail    = document.getElementById("loginEmail");
+const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
 
-const registerEmail    = document.getElementById("registerEmail");
+const registerEmail = document.getElementById("registerEmail");
 const registerPassword = document.getElementById("registerPassword");
-const registerRole     = document.getElementById("registerRole");
+const registerRole = document.getElementById("registerRole");
 
 const toastContainer = document.getElementById("toastContainer");
 
-function toast(msg){
+function toast(msg) {
   const div = document.createElement("div");
   div.className = "toast";
   div.innerText = msg;
@@ -86,8 +85,8 @@ function toast(msg){
 --------------------------------------------------------- */
 btnRegister.addEventListener("click", async () => {
   const email = registerEmail.value.trim();
-  const pass  = registerPassword.value.trim();
-  const role  = registerRole.value;
+  const pass = registerPassword.value.trim();
+  const role = registerRole.value;
 
   if (!email || !pass) return toast("Isi email & password.");
 
@@ -113,7 +112,7 @@ btnRegister.addEventListener("click", async () => {
 --------------------------------------------------------- */
 btnLogin.addEventListener("click", async () => {
   const email = loginEmail.value.trim();
-  const pass  = loginPassword.value.trim();
+  const pass = loginPassword.value.trim();
 
   if (!email || !pass) return toast("Email & password wajib.");
 
@@ -135,7 +134,7 @@ btnLogout.addEventListener("click", async () => {
 
 
 /* ---------------------------------------------------------
-   7. ROLE SYSTEM (admin / kasir)
+   7. GET USER ROLE
 --------------------------------------------------------- */
 async function getUserRole(uid) {
   const q = query(collection(db, "users"), where("uid", "==", uid));
@@ -150,7 +149,7 @@ async function getUserRole(uid) {
 --------------------------------------------------------- */
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    // LOGOUT MODE
+    // Logout mode
     authCard.classList.remove("hidden");
     topbar.classList.add("hidden");
 
@@ -162,15 +161,13 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // LOGIN MODE
+  // Login mode
   const role = await getUserRole(user.uid);
-  const email = user.email;
 
   topbar.classList.remove("hidden");
-  topbarUser.innerHTML = `${email} (${role})`;
+  topbarUser.innerHTML = `${user.email} (${role})`;
   authCard.classList.add("hidden");
 
-  /* ROLE BASED UI */
   if (role === "admin") {
     inventoryCard.classList.remove("hidden");
     recipeCard.classList.remove("hidden");
@@ -187,6 +184,4 @@ onAuthStateChanged(auth, async (user) => {
 
     posCard.classList.remove("hidden");
   }
-
 });
-</script>
