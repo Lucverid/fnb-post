@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>F&B POS & Inventory (Firebase)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    h1, h2, h3 {
+      margin: 8px 0;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .col {
+      flex: 1;
+      min-width: 220px;
+    }
+    .input-group {
+      margin-bottom: 8px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    input, button, select {
+      padding: 8px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      font-weight: 600;
+    }
+    button.primary {
+      background: #2563eb;
+      color: white;
+    }
+    button.danger {
+      background: #dc2626;
+      color: white;
+    }
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+    }
+    .badge-low {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .badge-ok {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .hidden {
+      display: none;
+    }
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+    }
+    .toast {
+      background: #111827;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      opacity: 0.95;
+    }
+    .toast-success { background: #16a34a; }
+    .toast-error { background: #dc2626; }
+    .toast-info { background: #2563eb; }
+
+    /* Mobile tweaks */
+    @media (max-width: 600px) {
+      .container {
+        padding: 8px;
+      }
+      table {
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="container">
+    <h1>F&B POS & Inventory (Firebase)</h1>
+    <p id="currentUserInfo">Belum login</p>
+
+    <!-- LOGIN / REGISTER -->
+    <div class="card" id="authCard">
+      <h2>Login / Register</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Login</h3>
+          <div class="input-group">
+            <label>Email</label>
+            <input id="loginEmail" type="email" placeholder="admin@contoh.com" />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input id="loginPassword" type="password" placeholder="••••••••" />
+          </div>
+          <button class="primary" id="btnLogin">Login</button>
+        </div>
+        <div class="col">
+          <h3>Register User</h3>
+          <div class="input-group">
+            <label>Email</label>
+            <input id="registerEmail" type="email" placeholder="kasir@contoh.com" />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input id="registerPassword" type="password" placeholder="min. 6 karakter" />
+          </div>
+          <div class="input-group">
+            <label>Role</label>
+            <select id="registerRole">
+              <option value="admin">Admin</option>
+              <option value="kasir">Kasir</option>
+            </select>
+          </div>
+          <button class="secondary" id="btnRegister">Register</button>
+        </div>
+      </div>
+      <button class="danger hidden" id="btnLogout">Logout</button>
+    </div>
+
+    <!-- INVENTORY & STOCK OPNAME -->
+    <div class="card hidden" id="appCard">
+      <h2>Inventory & Stok Opname</h2>
+
+      <div class="row">
+        <!-- Add / Edit Product -->
+        <div class="col">
+          <h3>Tambah / Edit Produk</h3>
+          <input type="hidden" id="editProductId" />
+          <div class="input-group">
+            <label>Nama Produk</label>
+            <input id="productName" placeholder="Contoh: Nasi Goreng" />
+          </div>
+          <div class="input-group">
+            <label>Harga Jual</label>
+            <input id="productPrice" type="number" placeholder="15000" />
+          </div>
+          <div class="input-group">
+            <label>Stok Awal</label>
+            <input id="productStock" type="number" placeholder="10" />
+          </div>
+          <div class="input-group">
+            <label>Minimal Stok (peringatan stok menipis)</label>
+            <input id="productMinStock" type="number" placeholder="5" />
+          </div>
+          <button class="primary" id="btnSaveProduct">Simpan Produk</button>
+          <button class="secondary" id="btnResetForm">Reset Form</button>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="col">
+          <h3>Daftar Produk</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Harga</th>
+                <th>Stok</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="productTableBody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STOCK OPNAME SECTION -->
+    <div class="card hidden" id="opnameCard">
+      <h2>Stok Opname Mingguan</h2>
+      <p>Gunakan ini setiap Senin untuk input stok fisik. Riwayat akan disimpan di Firebase.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Produk</th>
+            <th>Stok Sistem</th>
+            <th>Stok Fisik</th>
+            <th>Selisih</th>
+            <th>Simpan</th>
+          </tr>
+        </thead>
+        <tbody id="opnameTableBody">
+          <!-- Filled by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FIREBASE + APP LOGIC -->
+  <script type="module">
+    // ====== 1. Import Firebase SDK via CDN (modular) ======
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      updateDoc,
+      deleteDoc,
+      doc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+    // ====== 2. Firebase Config (punyamu) ======
+    const firebaseConfig = {
+      apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
+      authDomain: "app-387dc.firebaseapp.com",
+      projectId: "app-387dc",
+      storageBucket: "app-387dc.firebasestorage.app",
+      messagingSenderId: "227151496412",
+      appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
+      measurementId: "G-9E282TKXSJ"
+    };
+
+    // ====== 3. Init Firebase ======
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ====== 4. Helpers: Toast Notification ======
+    const toastContainer = document.getElementById("toastContainer");
+    function showToast(message, type = "info", timeout = 3000) {
+      const div = document.createElement("div");
+      div.classList.add("toast");
+      if (type === "success") div.classList.add("toast-success");
+      if (type === "error") div.classList.add("toast-error");
+      if (type === "info") div.classList.add("toast-info");
+      div.innerText = message;
+      toastContainer.appendChild(div);
+      setTimeout(() => {
+        div.remove();
+      }, timeout);
+    }
+
+    // ====== 5. DOM Elements ======
+    const currentUserInfo = document.getElementById("currentUserInfo");
+    const authCard = document.getElementById("authCard");
+    const appCard = document.getElementById("appCard");
+    const opnameCard = document.getElementById("opnameCard");
+
+    const loginEmail = document.getElementById("loginEmail");
+    const loginPassword = document.getElementById("loginPassword");
+    const registerEmail = document.getElementById("registerEmail");
+    const registerPassword = document.getElementById("registerPassword");
+    const registerRole = document.getElementById("registerRole");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnRegister = document.getElementById("btnRegister");
+    const btnLogout = document.getElementById("btnLogout");
+
+    const productName = document.getElementById("productName");
+    const productPrice = document.getElementById("productPrice");
+    const productStock = document.getElementById("productStock");
+    const productMinStock = document.getElementById("productMinStock");
+    const editProductId = document.getElementById("editProductId");
+    const btnSaveProduct = document.getElementById("btnSaveProduct");
+    const btnResetForm = document.getElementById("btnResetForm");
+    const productTableBody = document.getElementById("productTableBody");
+    const opnameTableBody = document.getElementById("opnameTableBody");
+
+    // ====== 6. Data Collections ======
+    const colProducts = collection(db, "products");
+    const colUsers = collection(db, "users");
+    const colOpname = collection(db, "stock_opname");
+
+    // ====== 7. AUTH: Register + Login + Logout ======
+    btnRegister.addEventListener("click", async () => {
+      const email = registerEmail.value.trim();
+      const pass = registerPassword.value;
+      const role = registerRole.value;
+
+      if (!email || !pass) return showToast("Email & password wajib diisi", "error");
+
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        // Simpan role user di collection users
+        await addDoc(colUsers, {
+          uid: cred.user.uid,
+          email,
+          role,
+          createdAt: serverTimestamp()
+        });
+        showToast("User berhasil dibuat!", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal register: " + err.message, "error");
+      }
+    });
+
+    btnLogin.addEventListener("click", async () => {
+      const email = loginEmail.value.trim();
+      const pass = loginPassword.value;
+
+      if (!email || !pass) return showToast("Isi email & password", "error");
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        showToast("Login berhasil", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Login gagal: " + err.message, "error");
+      }
+    });
+
+    btnLogout.addEventListener("click", async () => {
+      await signOut(auth);
+    });
+
+    // ====== 8. AUTH STATE LISTENER ======
+    let currentUser = null;
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      if (user) {
+        currentUserInfo.textContent = `Login sebagai: ${user.email}`;
+        authCard.querySelector("h2").textContent = "Akun";
+        btnLogout.classList.remove("hidden");
+        appCard.classList.remove("hidden");
+        opnameCard.classList.remove("hidden");
+        await loadProducts();
+      } else {
+        currentUserInfo.textContent = "Belum login";
+        authCard.querySelector("h2").textContent = "Login / Register";
+        btnLogout.classList.add("hidden");
+        appCard.classList.add("hidden");
+        opnameCard.classList.add("hidden");
+        productTableBody.innerHTML = "";
+        opnameTableBody.innerHTML = "";
+      }
+    });
+
+    // ====== 9. CRUD PRODUCT ======
+    async function loadProducts() {
+      productTableBody.innerHTML = "";
+      const snap = await getDocs(colProducts);
+      const products = [];
+      snap.forEach((docSnap) => {
+        products.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      // Render table
+      products.forEach((p) => {
+        const tr = document.createElement("tr");
+
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.classList.add("badge");
+        const min = p.minStock ?? 0;
+        if (p.stock <= min) {
+          badge.classList.add("badge-low");
+          badge.textContent = "Menipis";
+        } else {
+          badge.classList.add("badge-ok");
+          badge.textContent = "Aman";
+        }
+        statusCell.appendChild(badge);
+
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>Rp ${Number(p.price || 0).toLocaleString("id-ID")}</td>
+          <td>${p.stock ?? 0}</td>
+        `;
+        tr.appendChild(statusCell);
+
+        const tdActions = document.createElement("td");
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.classList.add("secondary");
+        editBtn.style.marginRight = "4px";
+        editBtn.onclick = () => fillFormForEdit(p);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Hapus";
+        delBtn.classList.add("danger");
+        delBtn.onclick = () => deleteProduct(p.id);
+
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        productTableBody.appendChild(tr);
+      });
+
+      // Juga render tabel stok opname
+      renderOpnameTable(products);
+      // Cek stok menipis dan tampilkan notifikasi modern
+      showLowStockNotifications(products);
+    }
+
+    function fillFormForEdit(product) {
+      editProductId.value = product.id;
+      productName.value = product.name || "";
+      productPrice.value = product.price || "";
+      productStock.value = product.stock || "";
+      productMinStock.value = product.minStock || "";
+      showToast("Mode edit produk aktif", "info");
+    }
+
+    btnResetForm.addEventListener("click", () => {
+      editProductId.value = "";
+      productName.value = "";
+      productPrice.value = "";
+      productStock.value = "";
+      productMinStock.value = "";
+    });
+
+    btnSaveProduct.addEventListener("click", async () => {
+      const name = productName.value.trim();
+      const price = Number(productPrice.value || 0);
+      const stock = Number(productStock.value || 0);
+      const minStock = Number(productMinStock.value || 0);
+
+      if (!name) return showToast("Nama produk wajib diisi", "error");
+
+      try {
+        const id = editProductId.value;
+        if (id) {
+          // Update
+          const ref = doc(db, "products", id);
+          await updateDoc(ref, {
+            name,
+            price,
+            stock,
+            minStock
+          });
+          showToast("Produk berhasil diupdate", "success");
+        } else {
+          // Create
+          await addDoc(colProducts, {
+            name,
+            price,
+            stock,
+            minStock,
+            createdAt: serverTimestamp()
+          });
+          showToast("Produk berhasil ditambahkan", "success");
+        }
+        btnResetForm.click();
+        await loadProducts();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan produk: " + err.message, "error");
+      }
+    });
+
+    async function deleteProduct(id) {
+      if (!confirm("Yakin hapus produk ini?")) return;
+      try {
+        const ref = doc(db, "products", id);
+        await deleteDoc(ref);
+        showToast("Produk dihapus", "success");
+        await loadProducts();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal hapus: " + err.message, "error");
+      }
+    }
+
+    // ====== 10. STOCK OPNAME MINGGUAN ======
+    function renderOpnameTable(products) {
+      opnameTableBody.innerHTML = "";
+      products.forEach((p) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.stock ?? 0}</td>
+          <td><input type="number" id="op_fisik_${p.id}" placeholder="Stok fisik" /></td>
+          <td id="op_selisih_${p.id}">-</td>
+        `;
+        const tdAction = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Simpan";
+        btn.classList.add("primary");
+        btn.onclick = () => saveOpnameForProduct(p);
+        tdAction.appendChild(btn);
+        tr.appendChild(tdAction);
+        opnameTableBody.appendChild(tr);
+      });
+    }
+
+    async function saveOpnameForProduct(product) {
+      const input = document.getElementById(`op_fisik_${product.id}`);
+      const selisihCell = document.getElementById(`op_selisih_${product.id}`);
+      const fisik = Number(input.value);
+
+      if (Number.isNaN(fisik)) {
+        return showToast("Isi stok fisik terlebih dahulu", "error");
+      }
+
+      const sistem = Number(product.stock ?? 0);
+      const selisih = fisik - sistem;
+      selisihCell.textContent = selisih.toString();
+
+      try {
+        // Simpan riwayat stok opname per produk
+        await addDoc(colOpname, {
+          productId: product.id,
+          productName: product.name,
+          stockSystem: sistem,
+          stockPhysical: fisik,
+          difference: selisih,
+          opnameDate: serverTimestamp(),
+          userId: currentUser ? currentUser.uid : null
+        });
+
+        // Update stok produk ke stok fisik
+        const ref = doc(db, "products", product.id);
+        await updateDoc(ref, { stock: fisik });
+
+        showToast("Stok opname tersimpan & stok terupdate", "success");
+        await loadProducts();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan opname: " + err.message, "error");
+      }
+    }
+
+    // ====== 11. Peringatan Mingguan (reminder opname) ======
+    function checkWeeklyReminder() {
+      const now = new Date();
+      const day = now.getDay(); // 0 = Minggu, 1 = Senin, dst
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      // Minggu jam 05:00 → ingatkan bahwa Senin besok stok opname
+      if (day === 0 && hour === 5 && minute === 0) {
+        showToast("Reminder: Besok Senin jadwal stok opname!", "info", 8000);
+      }
+    }
+    // Cek tiap menit
+    setInterval(checkWeeklyReminder, 60000);
+
+    // ====== 12. Peringatan Stok Menipis ======
+    function showLowStockNotifications(products) {
+      products.forEach((p) => {
+        const min = p.minStock ?? 0;
+        if (p.stock <= min) {
+          showToast(`Stok menipis: ${p.name} (sisa ${p.stock})`, "error");
+        }
+      });
+    }
+
+    // TODO NEXT:
+    // - Modul penjualan (sales) yang simpan ke collection "sales"
+    // - Dashboard penjualan harian/bulanan dari collection "sales"
+    // - Export ke Excel (pakai SheetJS)
+  </script>
+</body>
+</html>
