@@ -438,18 +438,24 @@
 
         <div class="col">
           <h3>Daftar Produk</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Nama</th>
-                <th>Harga</th>
-                <th>Stok</th>
-                <th>Status</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="productTableBody"></tbody>
-          </table>
+          <div class="input-group">
+            <label>Cari Produk</label>
+            <input id="productSearch" placeholder="Ketik nama produk..." />
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Harga</th>
+                  <th>Stok</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -537,7 +543,7 @@
       </div>
     </div>
 
-    <!-- DASHBOARD GRAFIK + RIWAYAT PENJUALAN -->
+    <!-- DASHBOARD GRAFIK + RIWAYAT PENJUALAN + PRODUK TERLARIS -->
     <div class="card hidden" id="chartCard">
       <h2>Dashboard Penjualan</h2>
       <div class="row">
@@ -578,6 +584,20 @@
             </tr>
           </thead>
           <tbody id="historyTableBody"></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:14px;">Produk Terlaris (berdasarkan tanggal di atas)</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Produk</th>
+              <th>Total Qty</th>
+              <th>Total Omzet</th>
+            </tr>
+          </thead>
+          <tbody id="topProductsTableBody"></tbody>
         </table>
       </div>
     </div>
@@ -673,6 +693,7 @@
     const btnSaveProduct = document.getElementById("btnSaveProduct");
     const btnResetForm = document.getElementById("btnResetForm");
     const productTableBody = document.getElementById("productTableBody");
+    const productSearch = document.getElementById("productSearch");
     const opnameTableBody = document.getElementById("opnameTableBody");
 
     const saleProductSelect = document.getElementById("saleProductSelect");
@@ -690,6 +711,7 @@
     const historyDate = document.getElementById("historyDate");
     const historyTableBody = document.getElementById("historyTableBody");
     const historyTotal = document.getElementById("historyTotal");
+    const topProductsTableBody = document.getElementById("topProductsTableBody");
 
     const printArea = document.getElementById("printArea");
 
@@ -769,6 +791,7 @@
         salesTotalToday.textContent = "Rp 0";
         historyTableBody.innerHTML = "";
         historyTotal.textContent = "Rp 0";
+        topProductsTableBody.innerHTML = "";
         if (historyDate) historyDate.value = "";
         if (printArea) {
           printArea.innerHTML = '<p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>';
@@ -778,55 +801,83 @@
     });
 
     async function loadProducts() {
-      productTableBody.innerHTML = "";
       const snap = await getDocs(colProducts);
       const products = [];
       snap.forEach((docSnap) => products.push({ id: docSnap.id, ...docSnap.data() }));
       productsCache = products;
 
-      products.forEach((p) => {
-        const tr = document.createElement("tr");
-        const statusCell = document.createElement("td");
-        const badge = document.createElement("span");
-        badge.classList.add("badge");
-        const min = p.minStock ?? 0;
-        if (p.stock <= min) {
-          badge.classList.add("badge-low");
-          badge.textContent = "Menipis";
-        } else {
-          badge.classList.add("badge-ok");
-          badge.textContent = "Aman";
-        }
-        statusCell.appendChild(badge);
+      // render daftar produk dengan search
+      renderProductTable(products, productSearch ? productSearch.value : "");
 
-        tr.innerHTML = `
-          <td>${p.name}</td>
-          <td>Rp ${Number(p.price || 0).toLocaleString("id-ID")}</td>
-          <td>${p.stock ?? 0}</td>
-        `;
-        tr.appendChild(statusCell);
-
-        const tdActions = document.createElement("td");
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Edit";
-        editBtn.classList.add("secondary");
-        editBtn.style.marginRight = "4px";
-        editBtn.onclick = () => fillFormForEdit(p);
-        const delBtn = document.createElement("button");
-        delBtn.textContent = "Hapus";
-        delBtn.classList.add("danger");
-        delBtn.onclick = () => deleteProduct(p.id);
-        tdActions.appendChild(editBtn);
-        tdActions.appendChild(delBtn);
-        tr.appendChild(tdActions);
-
-        productTableBody.appendChild(tr);
-      });
-
+      // bagian lain tetap full list (tidak terfilter search)
       renderProductOptionsForSales(products);
       renderOpnameTable(products);
       showLowStockNotifications(products);
       updateSaleCalculation();
+    }
+
+    function renderProductTable(products, searchTerm = "") {
+      productTableBody.innerHTML = "";
+      const term = (searchTerm || "").toLowerCase().trim();
+
+      products
+        .filter((p) => {
+          if (!term) return true;
+          const name = (p.name || "").toLowerCase();
+          return name.includes(term);
+        })
+        .forEach((p) => {
+          const tr = document.createElement("tr");
+
+          const statusCell = document.createElement("td");
+          const badge = document.createElement("span");
+          badge.classList.add("badge");
+          const min = p.minStock ?? 0;
+          if (p.stock <= min) {
+            badge.classList.add("badge-low");
+            badge.textContent = "Menipis";
+          } else {
+            badge.classList.add("badge-ok");
+            badge.textContent = "Aman";
+          }
+          statusCell.appendChild(badge);
+
+          tr.innerHTML = `
+            <td>${p.name}</td>
+            <td>Rp ${Number(p.price || 0).toLocaleString("id-ID")}</td>
+            <td>${p.stock ?? 0}</td>
+          `;
+          tr.appendChild(statusCell);
+
+          const tdActions = document.createElement("td");
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "Edit";
+          editBtn.classList.add("secondary");
+          editBtn.style.marginRight = "4px";
+          editBtn.onclick = () => fillFormForEdit(p);
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Hapus";
+          delBtn.classList.add("danger");
+          delBtn.onclick = () => deleteProduct(p.id);
+          tdActions.appendChild(editBtn);
+          tdActions.appendChild(delBtn);
+          tr.appendChild(tdActions);
+
+          productTableBody.appendChild(tr);
+        });
+
+      // jika tidak ada hasil
+      if (!productTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Produk tidak ditemukan</td>`;
+        productTableBody.appendChild(tr);
+      }
+    }
+
+    if (productSearch) {
+      productSearch.addEventListener("input", () => {
+        renderProductTable(productsCache, productSearch.value);
+      });
     }
 
     function fillFormForEdit(product) {
@@ -1136,11 +1187,7 @@
       const salesToday = allSales.filter((s) => {
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         if (!t) return false;
-        return (
-          t.getFullYear() === y &&
-          t.getMonth() === m &&
-          t.getDate() === d
-        );
+        return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
       });
 
       salesToday.sort((a, b) => {
@@ -1187,6 +1234,7 @@
       if (!val) {
         historyTableBody.innerHTML = "";
         historyTotal.textContent = "Rp 0";
+        topProductsTableBody.innerHTML = "";
         return;
       }
 
@@ -1196,16 +1244,13 @@
       const d = Number(day);
 
       historyTableBody.innerHTML = "";
+      topProductsTableBody.innerHTML = "";
       let total = 0;
 
       const filtered = allSalesCache.filter((s) => {
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         if (!t) return false;
-        return (
-          t.getFullYear() === y &&
-          t.getMonth() === m &&
-          t.getDate() === d
-        );
+        return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
       });
 
       filtered.sort((a, b) => {
@@ -1214,6 +1259,7 @@
         return ta - tb;
       });
 
+      // Tabel riwayat
       filtered.forEach((s) => {
         const tr = document.createElement("tr");
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
@@ -1232,8 +1278,40 @@
         `;
         historyTableBody.appendChild(tr);
       });
-
       historyTotal.textContent = "Rp " + total.toLocaleString("id-ID");
+
+      // Produk terlaris (aggregate)
+      const map = {};
+      filtered.forEach((s) => {
+        const name = s.productName || "Tanpa nama";
+        const qty = Number(s.qty || 0);
+        const rowTotal = Number(s.total ?? s.subtotal ?? 0);
+        if (!map[name]) {
+          map[name] = { qty: 0, total: 0 };
+        }
+        map[name].qty += qty;
+        map[name].total += rowTotal;
+      });
+
+      const topList = Object.entries(map)
+        .map(([name, v]) => ({ name, qty: v.qty, total: v.total }))
+        .sort((a, b) => b.qty - a.qty);
+
+      topList.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.qty}</td>
+          <td>Rp ${item.total.toLocaleString("id-ID")}</td>
+        `;
+        topProductsTableBody.appendChild(tr);
+      });
+
+      if (topList.length === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada penjualan di tanggal ini</td>`;
+        topProductsTableBody.appendChild(tr);
+      }
     }
 
     if (historyDate) {
