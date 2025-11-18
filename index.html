@@ -200,13 +200,25 @@
       color: #e5e7eb;
     }
 
-    .shell-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
+    <div class="shell-header">
+  <div class="shell-left">
+    <div class="shell-logo">F&B</div>
+    <div class="shell-title-wrap">
+      <!-- Judul diganti jadi login sebagai -->
+      <div class="shell-title" id="topbarUser">Login sebagai -</div>
+      <!-- Subjudul jadi status online/offline -->
+      <div class="shell-sub" id="connectionStatus">Status: -</div>
+    </div>
+  </div>
+
+  <!-- Kanan: kotak pengingat -->
+  <div class="shell-reminder">
+    <div class="shell-reminder-title">Pengingat</div>
+    <ul class="shell-reminder-list" id="reminderList">
+      <li>Tidak ada pengingat.</li>
+    </ul>
+  </div>
+</div>
 
     .shell-left { display: flex; align-items: center; gap: 10px; }
 
@@ -620,22 +632,27 @@
 
       <div class="shell-body">
         <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-          <nav class="sidebar-menu">
-            <button class="sidebar-link active" data-section="sales">
-              <span class="sidebar-icon">🧾</span><span>Kasir</span>
-            </button>
-            <button class="sidebar-link sidebar-admin" data-section="inventory">
-              <span class="sidebar-icon">📦</span><span>Inventory & Resep</span>
-            </button>
-            <button class="sidebar-link sidebar-admin" data-section="dashboard">
-              <span class="sidebar-icon">📊</span><span>Dashboard</span>
-            </button>
-            <button class="sidebar-link sidebar-admin" data-section="opname">
-              <span class="sidebar-icon">📋</span><span>Stok Opname</span>
-            </button>
-          </nav>
-        </aside>
+      <aside class="sidebar" id="sidebar">
+  <nav class="sidebar-menu">
+    <button class="sidebar-link active" data-section="sales">
+      <span class="sidebar-icon">🧾</span><span>Kasir</span>
+    </button>
+    <button class="sidebar-link sidebar-admin" data-section="inventory">
+      <span class="sidebar-icon">📦</span><span>Inventory & Resep</span>
+    </button>
+    <button class="sidebar-link sidebar-admin" data-section="dashboard">
+      <span class="sidebar-icon">📊</span><span>Dashboard</span>
+    </button>
+    <button class="sidebar-link sidebar-admin" data-section="opname">
+      <span class="sidebar-icon">📋</span><span>Stok Opname</span>
+    </button>
+  </nav>
+
+  <!-- Footer sidebar: Logout di bawah -->
+  <div class="sidebar-footer">
+    <button class="btn-logout" id="btnLogout">Logout</button>
+  </div>
+</aside>
 
         <!-- Main -->
         <main class="shell-main">
