@@ -542,42 +542,43 @@
       });
     }
 
-    async function saveOpnameForProduct(product) {
-      const input = document.getElementById(`op_fisik_${product.id}`);
-      const selisihCell = document.getElementById(`op_selisih_${product.id}`);
-      const fisik = Number(input.value);
+   async function saveOpnameForProduct(product) {
+  const input = document.getElementById(`op_fisik_${product.id}`);
+  const selisihCell = document.getElementById(`op_selisih_${product.id}`);
+  const fisik = Number(input.value);
 
-      if (Number.isNaN(fisik)) {
-        return showToast("Isi stok fisik terlebih dahulu", "error");
-      }
+  if (Number.isNaN(fisik)) {
+    return showToast("Isi stok fisik terlebih dahulu", "error");
+  }
 
-      const sistem = Number(product.stock ?? 0);
-      const selisih = fisik - sistem;
-      selisihCell.textContent = selisih.toString();
+  const sistem = Number(product.stock ?? 0);
+  const selisih = fisik - sistem;
+  selisihCell.textContent = selisih.toString();
 
-      try {
-        // Simpan riwayat stok opname per produk
-        await addDoc(colOpname, {
-          productId: product.id,
-          productName: product.name,
-          stockSystem: sistem,
-          stockPhysical: fisik,
-          difference: selisih,
-          opnameDate: serverTimestamp(),
-          userId: currentUser ? currentUser.uid : null
-        });
+  try {
+    // Simpan riwayat stok opname per produk
+    await addDoc(colOpname, {
+      productId: product.id,
+      productName: product.name,
+      stockSystem: sistem,
+      stockPhysical: fisik,
+      difference: selisih,
+      opnameDate: serverTimestamp(),
+      userId: currentUser ? currentUser.uid : null
+    });
 
-        // Update stok produk ke stok fisik
-        const ref = doc(db, "products", product.id);
-        await updateDoc(ref, { stock: fisik });
+    // Update stok produk ke stok fisik
+    const ref = doc(db, "products", product.id);
+    await updateDoc(ref, { stock: fisik });
 
-        showToast("Stok opname tersimpan & stok terupdate", "success");
-        await loadProducts();
-      } catch (err) {
-        console.error(err);
-        showToast("Gagal menyimpan opname: " + err.message, "error");
-      }
-    }
+    showToast("Stok opname tersimpan & stok terupdate", "success");
+    await loadProducts();
+  } catch (err) {
+    console.error(err);
+    showToast("Gagal menyimpan opname: " + err.message, "error");
+  }
+}
+
 
     // ====== 11. Peringatan Mingguan (reminder opname) ======
     function checkWeeklyReminder() {
