@@ -151,14 +151,14 @@
     button.secondary:hover { filter: brightness(1.05); }
 
     table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      min-width: 600px;
-    }
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 520px; /* lebih kecil supaya HP nggak terlalu geser */
+}
 
     th, td {
       border: 1px solid #e5e7eb;
@@ -409,6 +409,27 @@
       cursor:not-allowed;
     }
 
+/* === Override teks abu-abu di dalam card putih === */
+.card p,
+.card label,
+.card th,
+.card td,
+.card input,
+.card select,
+.card span {
+  color: #111827 !important;  /* hitam */
+}
+
+/* teks kecil bantuin tetap sedikit lebih soft */
+.menu-selected-label {
+  color: #111827 !important;
+}
+
+/* placeholder tetap abu-abu muda biar kebedaan */
+.card input::placeholder,
+.card select::placeholder {
+  color: #9ca3af !important;
+}
     @media print {
       body * { visibility:hidden; }
       #printArea, #printArea * { visibility:visible; }
@@ -482,6 +503,46 @@
       .row { gap:10px; }
       table { min-width: 420px; }
     }
+@media (max-width: 768px) {
+  .container { 
+    padding: 12px 8px 24px; 
+  }
+
+  .card { 
+    padding: 14px 12px; 
+    border-radius: 16px;
+  }
+
+  table { 
+    font-size: 12px; 
+    min-width: 460px; 
+  }
+
+  .metrics-row {
+    flex-direction: column;
+  }
+
+  .metric-card {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  #authCard { border-radius:16px; }
+  .row { gap: 10px; }
+
+  table {
+    min-width: 380px;  /* biar hampir full tanpa scroll panjang */
+  }
+
+  .shell-header {
+    gap: 4px;
+  }
+
+  .btn-logout {
+    align-self: flex-start;
+  }
+}
   </style>
 </head>
 <body>
