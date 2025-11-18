@@ -1,2106 +1,2182 @@
-<!DOCTYPE html>  <html lang="id">  
-<head>  
-  <meta charset="UTF-8" />  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />  
-  <title>F&B POS & Inventory (Firebase)</title>    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>    <style>  
-    :root {  
-      --bg-main: #020617;  
-      --bg-card: #ffffff;  
-      --primary: #facc15;  
-      --accent-dark: #020617;  
-      --danger: #dc2626;  
-      --text-main: #0f172a;  
-      --muted: #6b7280;  
-    }  
-  
-    * { box-sizing: border-box; }  
-  
-    body {  
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;  
-      margin: 0;  
-      background: radial-gradient(circle at top, #facc15 0, #020617 40%, #020617 100%);  
-      min-height: 100vh;  
-      color: var(--text-main);  
-    }  
-  
-    .container {  
-      max-width: 1100px;  
-      margin: 0 auto;  
-      padding: 16px;  
-    }  
-  
-    h1, h2, h3 { margin: 8px 0; }  
-  
-    h1 {  
-      color: #fefce8;  
-      font-weight: 800;  
-      letter-spacing: .04em;  
-      text-align: center;  
-      text-transform: uppercase;  
-      font-size: 22px;  
-    }  
-  
-    .subtitle {  
-      text-align: center;  
-      color: #fef9c3;  
-      font-size: 12px;  
-      margin-bottom: 18px;  
-    }  
-  
-    .card {  
-      background: var(--bg-card);  
-      border-radius: 18px;  
-      padding: 18px 18px 16px;  
-      margin-bottom: 16px;  
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.6);  
-      border: 1px solid rgba(148, 163, 184, 0.35);  
-    }  
-  
-    #authCard {  
-      max-width: 780px;  
-      margin: 0 auto 20px auto;  
-    }  
-  
-    .card h2 {  
-      font-size: 18px;  
-      font-weight: 600;  
-      margin-bottom: 8px;  
-      color: var(--accent-dark);  
-    }  
-  
-    .card h3 {  
-      font-size: 15px;  
-      font-weight: 600;  
-      margin-bottom: 8px;  
-      color: var(--accent-dark);  
-    }  
-  
-    .row {  
-      display: flex;  
-      flex-wrap: wrap;  
-      gap: 12px;  
-    }  
-  
-    .col {  
-      flex: 1;  
-      min-width: 230px;  
-    }  
-  
-    .input-group { margin-bottom: 10px; }  
-  
-    label {  
-      display: block;  
-      font-size: 12px;  
-      margin-bottom: 4px;  
-      color: var(--muted);  
-      font-weight: 500;  
-    }  
-  
-    input, button, select {  
-      padding: 9px 10px;  
-      width: 100%;  
-      border-radius: 10px;  
-      border: 1px solid #e5e7eb;  
-      font-size: 14px;  
-      outline: none;  
-      background: #f9fafb;  
-      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .08s ease;  
-    }  
-  
-    input:focus, select:focus {  
-      border-color: var(--primary);  
-      box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.6);  
-      background: #ffffff;  
-    }  
-  
-    button {  
-      cursor: pointer;  
-      border: none;  
-      font-weight: 600;  
-      margin-top: 4px;  
-    }  
-  
-    button.primary {  
-      background: var(--primary);  
-      color: #111827;  
-      box-shadow: 0 8px 18px rgba(250, 204, 21, 0.4);  
-    }  
-  
-    button.primary:hover {  
-      transform: translateY(-1px);  
-      filter: brightness(1.05);  
-    }  
-  
-    button.danger {  
-      background: var(--danger);  
-      color: white;  
-      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.35);  
-    }  
-  
-    button.secondary {  
-      background: #111827;  
-      color: #f9fafb;  
-    }  
-  
-    button.secondary:hover { filter: brightness(1.05); }  
-  
-    table {  
-      width: 100%;  
-      border-collapse: collapse;  
-      font-size: 13px;  
-      background: white;  
-      border-radius: 12px;  
-      overflow: hidden;  
-    }  
-  
-    th, td {  
-      border: 1px solid #e5e7eb;  
-      padding: 6px;  
-      text-align: left;  
-    }  
-  
-    th { background: #f9fafb; }  
-  
-    .table-scroll {  
-      max-height: 210px;  
-      overflow-y: auto;  
-      border-radius: 12px;  
-      background: white;  
-    }  
-  
-    .badge {  
-      display: inline-block;  
-      padding: 2px 6px;  
-      border-radius: 999px;  
-      font-size: 11px;  
-    }  
-  
-    .badge-low  { background: #fef2f2; color: #b91c1c; }  
-    .badge-ok   { background: #ecfdf3; color: #15803d; }  
-    .badge-zero { background: #fee2e2; color: #991b1b; }  
-  
-    .hidden { display: none !important; }  
-  
-    /* ===== HEADER + SIDEBAR LAYOUT ===== */  
-    .shell {  
-      background: rgba(15, 23, 42, 0.96);  
-      border-radius: 24px;  
-      padding: 10px 10px 14px;  
-      margin-bottom: 16px;  
-      box-shadow: 0 18px 40px rgba(0,0,0,0.7);  
-      border: 1px solid rgba(148,163,184,0.45);  
-      color: #e5e7eb;  
-    }  
-  
-    .shell-header {  
-      display: flex;  
-      align-items: center;  
-      justify-content: space-between;  
-      gap: 12px;  
-      margin-bottom: 10px;  
-    }  
-  
-    .shell-left { display: flex; align-items: center; gap: 10px; }  
-  
-    .shell-logo {  
-      width: 34px;  
-      height: 34px;  
-      border-radius: 14px;  
-      background: linear-gradient(135deg,#facc15,#f97316);  
-      display:flex;  
-      align-items:center;  
-      justify-content:center;  
-      font-weight:800;  
-      color:#111827;  
-      font-size:13px;  
-    }  
-  
-    .shell-title-wrap { display:flex; flex-direction:column; }  
-  
-    .shell-title  { font-size:13px; font-weight:600; }  
-    .shell-sub    { font-size:11px; color:#9ca3af; }  
-  
-    .shell-user {  
-      font-size:11px;  
-      color:#e5e7eb;  
-    }  
-  
-    .shell-status {  
-      font-size:11px;  
-      margin-top:2px;  
-    }  
-  
-    .status-online { color:#bbf7d0; }  
-    .status-offline { color:#fecaca; }  
-    .status-sync { color:#fee2e2; }  
-  
-    .btn-logout {  
-      width:auto;  
-      padding:7px 14px;  
-      border-radius:999px;  
-      background:#f9fafb;  
-      color:#111827;  
-      font-size:12px;  
-      border:1px solid rgba(15,23,42,0.8);  
-      box-shadow:0 4px 12px rgba(15,23,42,0.6);  
-      cursor:pointer;  
-    }  
-  
-    .btn-logout:hover {  
-      background:#facc15;  
-      border-color:#facc15;  
-      color:#111827;  
-    }  
-  
-    .shell-body {  
-      display:flex;  
-      align-items:flex-start;  
-      gap:14px;  
-      margin-top:4px;  
-    }  
-  
-    .sidebar {  
-      width:220px;  
-      flex-shrink:0;  
-      background:#020617;  
-      border-radius:18px;  
-      padding:12px 10px;  
-      border:1px solid rgba(148,163,184,0.5);  
-    }  
-  
-    .sidebar-menu { display:flex; flex-direction:column; gap:6px; }  
-  
-    .sidebar-link {  
-      display:flex;  
-      align-items:center;  
-      gap:8px;  
-      padding:7px 10px;  
-      border-radius:999px;  
-      border:none;  
-      background:transparent;  
-      color:#e5e7eb;  
-      font-size:12px;  
-      cursor:pointer;  
-      text-align:left;  
-    }  
-  
-    .sidebar-link:hover { background:rgba(148,163,184,0.3); }  
-  
-    .sidebar-link.active {  
-      background:#facc15;  
-      color:#111827;  
-    }  
-  
-    .sidebar-icon { width:18px; text-align:center; }  
-  
-    .shell-main { flex:1; }  
-  
-    .shell-header-mobile {  
-      display:none;  
-      align-items:center;  
-      justify-content:space-between;  
-      margin-bottom:8px;  
-    }  
-  
-    .btn-sidebar-toggle {  
-      border:1px solid rgba(148,163,184,0.7);  
-      background:rgba(15,23,42,0.98);  
-      color:#e5e7eb;  
-      border-radius:999px;  
-      padding:7px 9px;  
-      display:flex;  
-      flex-direction:column;  
-      justify-content:center;  
-      gap:3px;  
-      cursor:pointer;  
-    }  
-  
-    .btn-sidebar-line {  
-      width:16px;  
-      height:2px;  
-      border-radius:999px;  
-      background:#e5e7eb;  
-    }  
-  
-    .app-shell-hidden { display:none !important; }  
-  
-    /* DASHBOARD METRIC CARDS */  
-    .metrics-row {  
-      display:flex;  
-      flex-wrap:wrap;  
-      gap:10px;  
-      margin-bottom:10px;  
-    }  
-  
-    .metric-card {  
-      flex:1;  
-      min-width:150px;  
-      border-radius:14px;  
-      padding:10px 12px;  
-      display:flex;  
-      align-items:center;  
-      gap:10px;  
-      cursor:pointer;  
-      border:1px solid rgba(148,163,184,0.5);  
-    }  
-  
-    .metric-icon {  
-      width:34px;  
-      height:34px;  
-      border-radius:12px;  
-      display:flex;  
-      align-items:center;  
-      justify-content:center;  
-      font-size:18px;  
-    }  
-  
-    .metric-text { display:flex; flex-direction:column; }  
-  
-    .metric-label { font-size:12px; color:#4b5563; }  
-    .metric-value { font-size:16px; font-weight:700; }  
-  
-    .metric-empty {  
-      background:#fef2f2;  
-    }  
-    .metric-empty .metric-icon {  
-      background:#fee2e2;  
-    }  
-  
-    .metric-low {  
-      background:#fffbeb;  
-    }  
-    .metric-low .metric-icon {  
-      background:#fef3c7;  
-    }  
-  
-    .metric-ok {  
-      background:#ecfdf3;  
-    }  
-    .metric-ok .metric-icon {  
-      background:#dcfce7;  
-    }  
-  
-    /* Kasir */  
-    .menu-selected-label {  
-      font-size:13px;  
-      margin:4px 0 6px;  
-      color:#4b5563;  
-    }  
-    .menu-selected-label strong { color:#111827; }  
-  
-    .sale-pilih-btn {  
-      padding:4px 10px;  
-      font-size:12px;  
-      border-radius:999px;  
-      border:none;  
-      cursor:pointer;  
-    }  
-    .sale-pilih-ok {  
-      background:#facc15;  
-      color:#111827;  
-      box-shadow:0 3px 8px rgba(250,204,21,0.5);  
-    }  
-    .sale-pilih-disabled {  
-      background:#e5e7eb;  
-      color:#9ca3af;  
-      cursor:not-allowed;  
-    }  
-  
-    @media print {  
-      body * { visibility:hidden; }  
-      #printArea, #printArea * { visibility:visible; }  
-      #printArea { position:absolute; inset:0; margin:0; padding:4px; }  
-    }  
-  
-    .toast-container {  
-      position:fixed;  
-      top:16px;  
-      right:16px;  
-      z-index:9999;  
-    }  
-    .toast {  
-      background:#020617;  
-      color:white;  
-      padding:10px 14px;  
-      border-radius:999px;  
-      margin-bottom:8px;  
-      font-size:13px;  
-      opacity:0.97;  
-      border:1px solid rgba(148,163,184,0.7);  
-      backdrop-filter:blur(10px);  
-    }  
-    .toast-success { background:#16a34a; }  
-    .toast-error   { background:#dc2626; }  
-    .toast-info    { background:#2563eb; }  
-  
-    @media (max-width: 900px) {  
-      .shell {  
-        padding:10px 12px 12px;  
-      }  
-      .shell-body {  
-        flex-direction:column;  
-      }  
-      .sidebar {  
-        width:100%;  
-        display:none;  
-      }  
-      .shell.shell--sidebar-open .sidebar {  
-        display:block;  
-      }  
-      .shell-header-mobile {  
-        display:flex;  
-      }  
-    }  
-  
-    @media (max-width: 768px) {  
-      .container { padding:14px 10px 24px; }  
-      #authCard {  
-        padding:16px 14px 14px;  
-        margin-top:6px;  
-      }  
-      h1 { font-size:19px; }  
-      .subtitle { font-size:11px; }  
-      .card h2 { font-size:16px; }  
-      .card h3 { font-size:14px; }  
-      button { font-size:13px; }  
-    }  
-  
-    @media (max-width: 480px) {  
-      #authCard { border-radius:16px; }  
-      .row { gap:10px; }  
-    }  
-  </style>  </head>  
-<body>  
-  <div class="toast-container" id="toastContainer"></div>    <div class="container">  
-    <h1>F&B POS & Inventory</h1>  
-    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — tema kuning, hitam, putih. Nyaman di HP &amp; laptop.</p>  <!-- LOGIN / REGISTER -->  
-<div class="card" id="authCard">  
-  <h2>Login / Register</h2>  
-  <div class="row">  
-    <div class="col">  
-      <h3>Login</h3>  
-      <div class="input-group">  
-        <label>Email</label>  
-        <input id="loginEmail" type="email" placeholder="admin@contoh.com" />  
-      </div>  
-      <div class="input-group">  
-        <label>Password</label>  
-        <input id="loginPassword" type="password" placeholder="••••••••" />  
-      </div>  
-      <button class="primary" id="btnLogin">Login</button>  
-    </div>  
-    <div class="col">  
-      <h3>Register User</h3>  
-      <div class="input-group">  
-        <label>Email</label>  
-        <input id="registerEmail" type="email" placeholder="kasir@contoh.com" />  
-      </div>  
-      <div class="input-group">  
-        <label>Password</label>  
-        <input id="registerPassword" type="password" placeholder="min. 6 karakter" />  
-      </div>  
-      <div class="input-group">  
-        <label>Role</label>  
-        <select id="registerRole">  
-          <option value="admin">Admin</option>  
-          <option value="kasir">Kasir</option>  
-        </select>  
-      </div>  
-      <button class="secondary" id="btnRegister">Register</button>  
-    </div>  
-  </div>  
-</div>  
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>F&B POS & Inventory (Firebase)</title>
 
-<!-- SHELL (HEADER + SIDEBAR + MAIN) -->  
-<div id="appShell" class="shell app-shell-hidden">  
-  <!-- header mobile -->  
-  <div class="shell-header-mobile">  
-    <button id="btnSidebarToggle" class="btn-sidebar-toggle" aria-label="Menu">  
-      <span class="btn-sidebar-line"></span>  
-      <span class="btn-sidebar-line"></span>  
-      <span class="btn-sidebar-line"></span>  
-    </button>  
-    <span style="font-size:12px;color:#e5e7eb;">Menu Navigasi</span>  
-  </div>  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <div class="shell-header">  
-    <div class="shell-left">  
-      <div class="shell-logo">F&B</div>  
-      <div class="shell-title-wrap">  
-        <div class="shell-title">F&amp;B POS &amp; Inventory</div>  
-        <div class="shell-sub">Dashboard F&amp;B</div>  
-      </div>  
-    </div>  
-    <div>  
-      <div class="shell-user" id="topbarUser"></div>  
-      <div class="shell-status" id="connectionStatus"></div>  
-    </div>  
-    <button class="btn-logout" id="btnLogout">Logout</button>  
-  </div>  
+  <style>
+    :root {
+      --bg-main: #020617;
+      --bg-card: #ffffff;
+      --primary: #facc15;
+      --accent-dark: #020617;
+      --danger: #dc2626;
+      --text-main: #0f172a;
+      --muted: #6b7280;
+    }
 
-  <div class="shell-body">  
-    <!-- Sidebar -->  
-    <aside class="sidebar" id="sidebar">  
-      <nav class="sidebar-menu">  
-        <button class="sidebar-link active" data-section="sales">  
-          <span class="sidebar-icon">🧾</span><span>Kasir</span>  
-        </button>  
-        <button class="sidebar-link sidebar-admin" data-section="inventory">  
-          <span class="sidebar-icon">📦</span><span>Inventory & Resep</span>  
-        </button>  
-        <button class="sidebar-link sidebar-admin" data-section="dashboard">  
-          <span class="sidebar-icon">📊</span><span>Dashboard</span>  
-        </button>  
-        <button class="sidebar-link sidebar-admin" data-section="opname">  
-          <span class="sidebar-icon">📋</span><span>Stok Opname</span>  
-        </button>  
-      </nav>  
-    </aside>  
+    * { box-sizing: border-box; }
 
-    <!-- Main -->  
-    <main class="shell-main">  
-      <!-- Kasir -->  
-      <div class="card hidden" id="salesCard">  
-        <h2>Penjualan (Kasir)</h2>  
-        <div class="row">  
-          <div class="col">  
-            <h3>Input Item ke Transaksi</h3>  
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: radial-gradient(circle at top, #facc15 0, #020617 40%, #020617 100%);
+      min-height: 100vh;
+      color: var(--text-main);
+    }
 
-            <div class="input-group">  
-              <label>Cari Menu</label>  
-              <input id="saleSearch" type="text" placeholder="Ketik nama menu..." />  
-            </div>  
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px;
+    }
 
-            <div class="table-scroll">  
-              <table>  
-                <thead>  
-                  <tr><th>Menu</th><th>Harga</th><th>Aksi</th></tr>  
-                </thead>  
-                <tbody id="saleMenuTableBody"></tbody>  
-              </table>  
-            </div>  
+    h1, h2, h3 { margin: 8px 0; }
 
-            <p class="menu-selected-label">  
-              Menu terpilih: <strong id="saleSelectedName">Belum ada</strong>  
-            </p>  
-            <input type="hidden" id="saleSelectedId" />  
+    h1 {
+      color: #fefce8;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 22px;
+    }
 
-            <div class="input-group">  
-              <label>Qty</label>  
-              <input id="saleQty" type="number" min="1" value="1" />  
-            </div>  
+    .subtitle {
+      text-align: center;
+      color: #fef9c3;
+      font-size: 12px;
+      margin-bottom: 18px;
+    }
 
-            <div class="input-group">  
-              <label>Subtotal Item (harga × qty)</label>  
-              <input id="saleSubtotal" type="number" disabled />  
-            </div>  
+    .card {
+      background: var(--bg-card);
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
 
-            <button class="secondary" id="btnAddToCart">Tambah ke Daftar</button>  
+    #authCard {
+      max-width: 780px;
+      margin: 0 auto 20px auto;
+    }
 
-            <h3 style="margin-top:14px;">Daftar Item dalam Transaksi</h3>  
-            <div class="table-scroll">  
-              <table>  
-                <thead>  
-                  <tr><th>Menu</th><th>Qty</th><th>Harga</th><th>Subtotal</th><th>Aksi</th></tr>  
-                </thead>  
-                <tbody id="cartTableBody"></tbody>  
-              </table>  
-            </div>  
-            <p style="margin-top:6px;font-size:13px;">  
-              Subtotal transaksi: <strong id="cartSubtotalLabel">Rp 0</strong>  
-            </p>  
+    .card h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--accent-dark);
+    }
 
-            <hr style="margin:10px 0;border:none;border-top:1px dashed #e5e7eb;" />  
+    .card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--accent-dark);
+    }
 
-            <div class="input-group">  
-              <label>Diskon (%)</label>  
-              <input id="saleDiscount" type="number" min="0" max="100" value="0" />  
-            </div>  
-            <div class="input-group">  
-              <label>Voucher (nominal)</label>  
-              <input id="saleVoucher" type="number" min="0" value="0" />  
-            </div>  
-            <div class="input-group">  
-              <label>Total Bayar (setelah diskon &amp; voucher)</label>  
-              <input id="saleTotal" type="number" disabled />  
-            </div>  
-            <div class="input-group">  
-              <label>Uang Bayar</label>  
-              <input id="salePay" type="number" placeholder="Masukkan uang pembayaran" />  
-            </div>  
-            <div class="input-group">  
-              <label>Kembalian</label>  
-              <input id="saleChange" type="number" disabled />  
-            </div>  
-            <button class="primary" id="btnSaveSale">Simpan Penjualan</button>  
-          </div>  
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
 
-          <div class="col">  
-            <h3>Penjualan Hari Ini</h3>  
-            <p style="font-size:12px;color:#6b7280;margin-top:0;margin-bottom:6px;">  
-              Ringkasan transaksi berdasarkan tanggal hari ini.  
-            </p>  
-            <div class="table-scroll">  
-              <table>  
-                <thead>  
-                  <tr><th>Waktu</th><th>Detail</th><th>Qty</th><th>Total</th></tr>  
-                </thead>  
-                <tbody id="salesTableBody"></tbody>  
-              </table>  
-            </div>  
-            <p style="margin-top:8px;font-size:13px;">  
-              Total hari ini: <strong id="salesTotalToday">Rp 0</strong>  
-            </p>  
+    .col {
+      flex: 1;
+      min-width: 230px;
+    }
 
-            <h3 style="margin-top:10px;">Struk Terakhir</h3>  
-            <div id="printArea" style="border:1px dashed #d4d4d8;border-radius:8px;padding:8px;background:#f9fafb;">  
-              <p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>  
-            </div>  
-            <button class="secondary" style="margin-top:8px;" onclick="window.print()">Print Struk</button>  
-          </div>  
-        </div>  
-      </div>  
+    .input-group { margin-bottom: 10px; }
 
-      <!-- Inventory + Resep -->  
-      <div class="card hidden" id="appCard">  
-        <h2>Inventory &amp; Resep</h2>  
-        <div class="row">  
-          <div class="col">  
-            <h3>Tambah / Edit Item</h3>  
-            <input type="hidden" id="editProductId" />  
+    label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-weight: 500;
+    }
 
-            <div class="input-group">  
-              <label>Nama Item</label>  
-              <input id="productName" placeholder="Contoh: Beras, Teh Hitam, Nasi Goreng" />  
-            </div>  
-            <div class="input-group">  
-              <label>Jenis Item</label>  
-              <select id="productType">  
-                <option value="bahan_baku">Bahan Baku</option>  
-                <option value="menu">Menu / Hidangan</option>  
-              </select>  
-            </div>  
-            <div class="input-group">  
-              <label>Kategori Produk</label>  
-              <select id="productCategory">  
-                <option value="makanan">Makanan</option>  
-                <option value="minuman">Minuman</option>  
-                <option value="lainnya">Lainnya</option>  
-              </select>  
-            </div>  
-            <div class="input-group" id="priceGroup">  
-              <label>Harga Jual (MENU)</label>  
-              <input id="productPrice" type="number" placeholder="15000" />  
-            </div>  
-            <div class="input-group" id="stockGroup">  
-              <label>Stok Awal (BAHAN BAKU)</label>  
-              <input id="productStock" type="number" placeholder="10" />  
-            </div>  
-            <div class="input-group" id="minStockGroup">  
-              <label>Minimal Stok (warning bahan baku)</label>  
-              <input id="productMinStock" type="number" placeholder="5" />  
-            </div>  
-            <div class="input-group">  
-              <label>Satuan Stok (kg, g, ml, pcs, porsi, dll)</label>  
-              <input id="productUnit" placeholder="contoh: kg / g / ml / pcs / porsi" />  
-            </div>  
-            <button class="primary" id="btnSaveProduct">Simpan Item</button>  
-            <button class="secondary" id="btnResetForm">Reset Form</button>  
-          </div>  
+    input, button, select {
+      padding: 9px 10px;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      font-size: 14px;
+      outline: none;
+      background: #f9fafb;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease, transform .08s ease;
+    }
 
-          <div class="col">  
-            <h3>Daftar Item</h3>  
-            <div class="row" style="margin-bottom:6px;">  
-              <div class="col">  
-                <div class="input-group" style="margin-bottom:6px;">  
-                  <label>Cari Item</label>  
-                  <input id="productSearch" placeholder="Ketik nama item..." />  
-                </div>  
-              </div>  
-              <div class="col">  
-                <div class="input-group" style="margin-bottom:6px;">  
-                  <label>Filter Kategori</label>  
-                  <select id="productFilterCategory">  
-                    <option value="">Semua</option>  
-                    <option value="makanan">Makanan</option>  
-                    <option value="minuman">Minuman</option>  
-                    <option value="lainnya">Lainnya</option>  
-                  </select>  
-                </div>  
-              </div>  
-              <div class="col">  
-                <div class="input-group" style="margin-bottom:6px;">  
-                  <label>Sort</label>  
-                  <select id="productSort">  
-                    <option value="name-asc">Nama A-Z</option>  
-                    <option value="name-desc">Nama Z-A</option>  
-                    <option value="price-asc">Harga termurah</option>  
-                    <option value="price-desc">Harga termahal</option>  
-                    <option value="stock-asc">Stok terendah</option>  
-                    <option value="stock-desc">Stok tertinggi</option>  
-                  </select>  
-                </div>  
-              </div>  
-            </div>  
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.6);
+      background: #ffffff;
+    }
 
-            <div class="table-scroll">  
-              <table>  
-                <thead>  
-                  <tr>  
-                    <th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th>  
-                    <th>Stok</th><th>Satuan</th><th>Status</th><th>Aksi</th>  
-                  </tr>  
-                </thead>  
-                <tbody id="productTableBody"></tbody>  
-              </table>  
-            </div>  
-          </div>  
-        </div>  
+    button {
+      cursor: pointer;
+      border: none;
+      font-weight: 600;
+      margin-top: 4px;
+    }
 
-        <hr style="margin:12px 0;border:none;border-top:1px dashed #e5e7eb;" />  
+    button.primary {
+      background: var(--primary);
+      color: #111827;
+      box-shadow: 0 8px 18px rgba(250, 204, 21, 0.4);
+    }
 
-        <h3>Resep Menu (BOM - Bahan Baku per Porsi)</h3>  
-        <div class="row">  
-          <div class="col">  
-            <div class="input-group">  
-              <label>Pilih Menu</label>  
-              <select id="recipeMenuSelect">  
-                <option value="">Pilih menu...</option>  
-              </select>  
-            </div>  
-            <div class="input-group">  
-              <label>Bahan Baku</label>  
-              <select id="recipeIngredientSelect">  
-                <option value="">Pilih bahan...</option>  
-              </select>  
-            </div>  
-            <div class="input-group">  
-              <label>Qty per 1 Porsi</label>  
-              <input id="recipeQty" type="number" min="0" step="0.01" placeholder="0.1 / 15 / 1" />  
-            </div>  
-            <button class="primary" id="btnAddRecipe">Tambah ke Resep</button>  
-          </div>  
+    button.primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
 
-          <div class="col">  
-            <h3 style="margin-top:0;">Komposisi Menu Terpilih</h3>  
-            <div class="table-scroll">  
-              <table>  
-                <thead>  
-                  <tr><th>Bahan</th><th>Qty / Porsi</th><th>Aksi</th></tr>  
-                </thead>  
-                <tbody id="recipeTableBody"></tbody>  
-              </table>  
-            </div>  
-          </div>  
-        </div>  
-      </div>  
+    button.danger {
+      background: var(--danger);
+      color: white;
+      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.35);
+    }
 
-      <!-- Dashboard -->  
-      <div class="card hidden" id="chartCard">  
-        <h2>Dashboard Penjualan & Stok</h2>  
+    button.secondary {
+      background: #111827;
+      color: #f9fafb;
+    }
 
-        <!-- METRIC STOCK -->  
-        <div class="metrics-row">  
-          <div class="metric-card metric-empty" id="cardEmpty">  
-            <div class="metric-icon">❌</div>  
-            <div class="metric-text">  
-              <span class="metric-label">Barang Habis</span>  
-              <span class="metric-value" id="metricEmptyCount">0</span>  
-            </div>  
-          </div>  
-          <div class="metric-card metric-low" id="cardLow">  
-            <div class="metric-icon">⚠️</div>  
-            <div class="metric-text">  
-              <span class="metric-label">Hampir Habis</span>  
-              <span class="metric-value" id="metricLowCount">0</span>  
-            </div>  
-          </div>  
-          <div class="metric-card metric-ok" id="cardOk">  
-            <div class="metric-icon">✅</div>  
-            <div class="metric-text">  
-              <span class="metric-label">Stok Aman</span>  
-              <span class="metric-value" id="metricOkCount">0</span>  
-            </div>  
-          </div>  
-        </div>  
+    button.secondary:hover { filter: brightness(1.05); }
 
-        <div class="row">  
-          <div class="col">  
-            <h3>Penjualan Harian</h3>  
-            <canvas id="dailyChart" height="160"></canvas>  
-          </div>  
-          <div class="col">  
-            <h3>Penjualan Bulanan</h3>  
-            <canvas id="monthlyChart" height="160"></canvas>  
-          </div>  
-        </div>  
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      min-width: 600px;
+    }
 
-        <hr style="margin:12px 0;border:none;border-top:1px dashed #e5e7eb;" />  
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 6px;
+      text-align: left;
+    }
 
-        <h3>Riwayat Penjualan (Filter Tanggal)</h3>  
-        <div class="row">  
-          <div class="col">  
-            <div class="input-group">  
-              <label>Pilih Tanggal</label>  
-              <input id="historyDate" type="date" />  
-            </div>  
-          </div>  
-          <div class="col">  
-            <p style="font-size:13px;margin-top:24px;">  
-              Total tanggal ini: <strong id="historyTotal">Rp 0</strong>  
-            </p>  
-          </div>  
-        </div>  
-        <div class="table-scroll">  
-          <table>  
-            <thead>  
-              <tr><th>Waktu</th><th>Detail</th><th>Qty</th><th>Total</th></tr>  
-            </thead>  
-            <tbody id="historyTableBody"></tbody>  
-          </table>  
-        </div>  
+    th { background: #f9fafb; }
 
-        <h3 style="margin-top:14px;">Menu Terlaris (berdasarkan tanggal di atas)</h3>  
-        <div class="table-scroll">  
-          <table>  
-            <thead>  
-              <tr><th>Menu</th><th>Total Qty</th><th>Total Omzet</th></tr>  
-            </thead>  
-            <tbody id="topProductsTableBody"></tbody>  
-          </table>  
-        </div>  
-      </div>  
+    .table-scroll {
+      max-height: 210px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border-radius: 12px;
+      background: white;
+    }
 
-      <!-- Opname -->  
-      <div class="card hidden" id="opnameCard">  
-        <h2>Stok Opname Mingguan</h2>  
-        <p>Gunakan ini setiap Senin untuk input stok fisik bahan baku. Riwayat akan disimpan di Firebase.</p>  
-        <table>  
-          <thead>  
-            <tr><th>Bahan Baku</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Simpan</th></tr>  
-          </thead>  
-          <tbody id="opnameTableBody"></tbody>  
-        </table>  
-      </div>  
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+    }
 
-    </main>  
-  </div>  
-</div>
+    .badge-low  { background: #fef2f2; color: #b91c1c; }
+    .badge-ok   { background: #ecfdf3; color: #15803d; }
+    .badge-zero { background: #fee2e2; color: #991b1b; }
 
-  </div>    <!-- LOGIC + FIREBASE -->    <script type="module">  
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";  
-    import {  
-      getAuth,  
-      onAuthStateChanged,  
-      createUserWithEmailAndPassword,  
-      signInWithEmailAndPassword,  
-      signOut  
-    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";  
-    import {  
-      getFirestore,  
-      collection,  
-      addDoc,  
-      getDocs,  
-      updateDoc,  
-      deleteDoc,  
-      doc,  
-      serverTimestamp,  
-      query,  
-      where  
-    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";  
-  
-    const firebaseConfig = {  
-      apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",  
-      authDomain: "app-387dc.firebaseapp.com",  
-      projectId: "app-387dc",  
-      storageBucket: "app-387dc.firebasestorage.app",  
-      messagingSenderId: "227151496412",  
-      appId: "1:227151496412:web:ac35b7ecd7f39905cba019",  
-      measurementId: "G-9E282TKXSJ"  
-    };  
-  
-    const app = initializeApp(firebaseConfig);  
-    const auth = getAuth(app);  
-    const db = getFirestore(app);  
-  
-    const toastContainer = document.getElementById("toastContainer");  
-    function showToast(message, type = "info", timeout = 3000) {  
-      const div = document.createElement("div");  
-      div.classList.add("toast");  
-      if (type === "success") div.classList.add("toast-success");  
-      if (type === "error") div.classList.add("toast-error");  
-      if (type === "info") div.classList.add("toast-info");  
-      div.innerText = message;  
-      toastContainer.appendChild(div);  
-      setTimeout(() => div.remove(), timeout);  
-    }  
-  
-    const authCard = document.getElementById("authCard");  
-    const appShell = document.getElementById("appShell");  
-  
-    const topbarUser = document.getElementById("topbarUser");  
-    const connectionStatus = document.getElementById("connectionStatus");  
-  
-    const btnSidebarToggle = document.getElementById("btnSidebarToggle");  
-    const sidebarLinks = document.querySelectorAll(".sidebar-link");  
-  
-    const loginEmail = document.getElementById("loginEmail");  
-    const loginPassword = document.getElementById("loginPassword");  
-    const registerEmail = document.getElementById("registerEmail");  
-    const registerPassword = document.getElementById("registerPassword");  
-    const registerRole = document.getElementById("registerRole");  
-    const btnLogin = document.getElementById("btnLogin");  
-    const btnRegister = document.getElementById("btnRegister");  
-    const btnLogout = document.getElementById("btnLogout");  
-  
-    const salesCard = document.getElementById("salesCard");  
-    const appCard = document.getElementById("appCard");  
-    const chartCard = document.getElementById("chartCard");  
-    const opnameCard = document.getElementById("opnameCard");  
-  
-    const productName = document.getElementById("productName");  
-    const productType = document.getElementById("productType");  
-    const productCategory = document.getElementById("productCategory");  
-    const productPrice = document.getElementById("productPrice");  
-    const productStock = document.getElementById("productStock");  
-    const productUnit = document.getElementById("productUnit");  
-    const productMinStock = document.getElementById("productMinStock");  
-    const editProductId = document.getElementById("editProductId");  
-    const btnSaveProduct = document.getElementById("btnSaveProduct");  
-    const btnResetForm = document.getElementById("btnResetForm");  
-    const productTableBody = document.getElementById("productTableBody");  
-    const productSearch = document.getElementById("productSearch");  
-    const productFilterCategory = document.getElementById("productFilterCategory");  
-    const productSort = document.getElementById("productSort");  
-    const opnameTableBody = document.getElementById("opnameTableBody");  
-    const priceGroup = document.getElementById("priceGroup");  
-    const stockGroup = document.getElementById("stockGroup");  
-    const minStockGroup = document.getElementById("minStockGroup");  
-  
-    const recipeMenuSelect = document.getElementById("recipeMenuSelect");  
-    const recipeIngredientSelect = document.getElementById("recipeIngredientSelect");  
-    const recipeQty = document.getElementById("recipeQty");  
-    const btnAddRecipe = document.getElementById("btnAddRecipe");  
-    const recipeTableBody = document.getElementById("recipeTableBody");  
-  
-    const saleSearch = document.getElementById("saleSearch");  
-    const saleMenuTableBody = document.getElementById("saleMenuTableBody");  
-    const saleSelectedId = document.getElementById("saleSelectedId");  
-    const saleSelectedName = document.getElementById("saleSelectedName");  
-    const saleQty = document.getElementById("saleQty");  
-    const saleSubtotal = document.getElementById("saleSubtotal");  
-    const saleDiscount = document.getElementById("saleDiscount");  
-    const saleVoucher = document.getElementById("saleVoucher");  
-    const saleTotal = document.getElementById("saleTotal");  
-    const salePay = document.getElementById("salePay");  
-    const saleChange = document.getElementById("saleChange");  
-    const btnSaveSale = document.getElementById("btnSaveSale");  
-    const btnAddToCart = document.getElementById("btnAddToCart");  
-    const cartTableBody = document.getElementById("cartTableBody");  
-    const cartSubtotalLabel = document.getElementById("cartSubtotalLabel");  
-    const salesTableBody = document.getElementById("salesTableBody");  
-    const salesTotalToday = document.getElementById("salesTotalToday");  
-  
-    const historyDate = document.getElementById("historyDate");  
-    const historyTableBody = document.getElementById("historyTableBody");  
-    const historyTotal = document.getElementById("historyTotal");  
-    const topProductsTableBody = document.getElementById("topProductsTableBody");  
-  
-    const printArea = document.getElementById("printArea");  
-  
-    const dailyCanvas = document.getElementById("dailyChart");  
-    const monthlyCanvas = document.getElementById("monthlyChart");  
-    let dailyChart = null;  
-    let monthlyChart = null;  
-  
-    const metricEmptyCount = document.getElementById("metricEmptyCount");  
-    const metricLowCount   = document.getElementById("metricLowCount");  
-    const metricOkCount    = document.getElementById("metricOkCount");  
-    const cardEmpty = document.getElementById("cardEmpty");  
-    const cardLow   = document.getElementById("cardLow");  
-    const cardOk    = document.getElementById("cardOk");  
-  
-    const colProducts = collection(db, "products");  
-    const colUsers = collection(db, "users");  
-    const colOpname = collection(db, "stock_opname");  
-    const colSales = collection(db, "sales");  
-    const colRecipes = collection(db, "recipes");  
-  
-    let productsCache = [];  
-    let allSalesCache = [];  
-    let recipesCache = [];  
-    let currentUser = null;  
-    let currentUserRole = null;  
-    let currentCart = [];  
-    let activeSection = "sales";  
-  
-    let productStatusFilter = "all"; // all | empty | low | ok  
-  
-    const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";  
-  
-    function isOnline() { return navigator.onLine; }  
-  
-    function loadOfflineSalesQueue() {  
-      try {  
-        const raw = localStorage.getItem(OFFLINE_SALES_KEY);  
-        if (!raw) return [];  
-        const parsed = JSON.parse(raw);  
-        return Array.isArray(parsed) ? parsed : [];  
-      } catch (e) {  
-        console.error("Gagal parse offline:", e);  
-        return [];  
-      }  
-    }  
-  
-    function saveOfflineSalesQueue(list) {  
-      try {  
-        localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));  
-      } catch (e) {  
-        console.error("Gagal simpan offline:", e);  
-      }  
-    }  
-  
-    function pushOfflineSale(entry) {  
-      const list = loadOfflineSalesQueue();  
-      list.push(entry);  
-      saveOfflineSalesQueue(list);  
-      updateConnectionStatusLabel();  
-    }  
-  
-    function updateConnectionStatusLabel() {  
-      if (!connectionStatus) return;  
-      const queue = loadOfflineSalesQueue();  
-      if (isOnline()) {  
-        connectionStatus.className = "shell-status status-online";  
-        if (queue.length > 0) {  
-          connectionStatus.classList.add("status-sync");  
-          connectionStatus.textContent = `🟢 Online • ${queue.length} transaksi offline siap disinkronkan`;  
-        } else {  
-          connectionStatus.textContent = "🟢 Online";  
-        }  
-      } else {  
-        connectionStatus.className = "shell-status status-offline";  
-        connectionStatus.textContent = "🔴 Offline • Transaksi akan disimpan di perangkat";  
-      }  
-    }  
-  
-    async function syncOfflineSalesIfOnline() {  
-      if (!isOnline()) {  
-        updateConnectionStatusLabel();  
-        return;  
-      }  
-      let queue = loadOfflineSalesQueue();  
-      if (!queue.length) {  
-        updateConnectionStatusLabel();  
-        return;  
-      }  
-  
-      showToast(`Menyinkronkan ${queue.length} transaksi offline...`, "info", 6000);  
-      connectionStatus.className = "shell-status status-sync";  
-      connectionStatus.textContent = `🔄 Sinkronisasi ${queue.length} transaksi...`;  
-  
-      const remaining = [];  
-  
-      for (const entry of queue) {  
-        try {  
-          const saleDoc = entry.saleDoc;  
-          const usageArray = entry.usageArray || [];  
-  
-          const saleToSave = {  
-            ...saleDoc,  
-            createdAt: serverTimestamp(),  
-            offlineSynced: true  
-          };  
-          delete saleToSave.createdAtLocal;  
-  
-          await addDoc(colSales, saleToSave);  
-  
-          for (const u of usageArray) {  
-            const ing = findProductById(u.ingredientId);  
-            if (!ing) continue;  
-            const newStockIng = Number(ing.stock || 0) - Number(u.need || 0);  
-            const refIng = doc(db, "products", ing.id);  
-            await updateDoc(refIng, { stock: newStockIng });  
-          }  
-        } catch (e) {  
-          console.error("Gagal sync offline:", e);  
-          remaining.push(entry);  
-        }  
-      }  
-  
-      saveOfflineSalesQueue(remaining);  
-      await loadProducts();  
-      await loadSalesData();  
-      await loadRecipes();  
-  
-      if (remaining.length === 0) {  
-        showToast("Semua transaksi offline berhasil disinkronkan ✅", "success", 5000);  
-      } else {  
-        showToast(`${remaining.length} transaksi offline belum tersinkron. Akan dicoba lagi nanti.`, "error", 6000);  
-      }  
-  
-      updateConnectionStatusLabel();  
-    }  
-  
-    // NAV  
-    function showSection(section) {  
-      activeSection = section;  
-      sidebarLinks.forEach(btn => {  
-        if (btn.dataset.section === section) btn.classList.add("active");  
-        else btn.classList.remove("active");  
-      });  
-  
-      salesCard.classList.add("hidden");  
-      appCard.classList.add("hidden");  
-      chartCard.classList.add("hidden");  
-      opnameCard.classList.add("hidden");  
-  
-      if (section === "sales") salesCard.classList.remove("hidden");  
-      if (section === "inventory") appCard.classList.remove("hidden");  
-      if (section === "dashboard") chartCard.classList.remove("hidden");  
-      if (section === "opname") opnameCard.classList.remove("hidden");  
-  
-      if (window.innerWidth <= 900 && appShell) {  
-        appShell.classList.remove("shell--sidebar-open");  
-      }  
-    }  
-  
-    if (btnSidebarToggle && appShell) {  
-      btnSidebarToggle.addEventListener("click", () => {  
-        appShell.classList.toggle("shell--sidebar-open");  
-      });  
-    }  
-  
-    sidebarLinks.forEach(btn => {  
-      btn.addEventListener("click", () => {  
-        const sec = btn.dataset.section;  
-        if (sec) showSection(sec);  
-      });  
-    });  
-  
-    // kartu dashboard klik -> filter inventory  
-    function setProductStatusFilter(status) {  
-      productStatusFilter = status; // 'all'|'empty'|'low'|'ok'  
-      renderProductTable();  
-    }  
-    if (cardEmpty) {  
-      cardEmpty.addEventListener("click", () => {  
-        showSection("inventory");  
-        setProductStatusFilter("empty");  
-      });  
-    }  
-    if (cardLow) {  
-      cardLow.addEventListener("click", () => {  
-        showSection("inventory");  
-        setProductStatusFilter("low");  
-      });  
-    }  
-    if (cardOk) {  
-      cardOk.addEventListener("click", () => {  
-        showSection("inventory");  
-        setProductStatusFilter("ok");  
-      });  
-    }  
-  
-    // ROLE HELPER  
-    async function getUserRole(uid) {  
-      try {  
-        const q = query(colUsers, where("uid", "==", uid));  
-        const snap = await getDocs(q);  
-        if (snap.empty) return null;  
-        let role = null;  
-        snap.forEach(docSnap => {  
-          const data = docSnap.data();  
-          if (data.role) role = data.role;  
-        });  
-        return role;  
-      } catch (err) {  
-        console.error("Gagal ambil role:", err);  
-        return null;  
-      }  
-    }  
-  
-    // AUTH  
-    btnRegister.addEventListener("click", async () => {  
-      const email = registerEmail.value.trim();  
-      const pass = registerPassword.value;  
-      const role = registerRole.value;  
-      if (!email || !pass) return showToast("Email & password wajib diisi", "error");  
-      try {  
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);  
-        await addDoc(colUsers, { uid: cred.user.uid, email, role, createdAt: serverTimestamp() });  
-        showToast("User berhasil dibuat!", "success");  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal register: " + err.message, "error");  
-      }  
-    });  
-  
-    btnLogin.addEventListener("click", async () => {  
-      const email = loginEmail.value.trim();  
-      const pass = loginPassword.value;  
-      if (!email || !pass) return showToast("Isi email & password", "error");  
-      try {  
-        await signInWithEmailAndPassword(auth, email, pass);  
-        showToast("Login berhasil", "success");  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Login gagal: " + err.message, "error");  
-      }  
-    });  
-  
-    btnLogout.addEventListener("click", async () => { await signOut(auth); });  
-  
-    onAuthStateChanged(auth, async (user) => {  
-      currentUser = user;  
-      if (user) {  
-        let role = await getUserRole(user.uid);  
-        if (!role) role = "kasir";  
-        currentUserRole = role;  
-  
-        authCard.classList.add("hidden");  
-        appShell.classList.remove("app-shell-hidden");  
-  
-        topbarUser.textContent = `Login sebagai ${user.email} (${role})`;  
-  
-        document.querySelectorAll(".sidebar-admin").forEach(el => {  
-          el.style.display = role === "admin" ? "flex" : "none";  
-        });  
-  
-        showSection("sales");  
-        updateConnectionStatusLabel();  
-  
-        await loadProducts();  
-        await loadRecipes();  
-        await loadSalesData();  
-        await syncOfflineSalesIfOnline();  
-  
-        const now = new Date();  
-        if (now.getDay() === 1 && role === "admin") {  
-          showToast("Reminder: Hari ini jadwal stok opname mingguan ✅", "info", 8000);  
-        }  
-      } else {  
-        currentUserRole = null;  
-        appShell.classList.add("app-shell-hidden");  
-        authCard.classList.remove("hidden");  
-        productsCache = [];  
-        allSalesCache = [];  
-        recipesCache = [];  
-        currentCart = [];  
-        renderCartTable();  
-        cartSubtotalLabel.textContent = "Rp 0";  
-        salesTableBody.innerHTML = "";  
-        salesTotalToday.textContent = "Rp 0";  
-        historyTableBody.innerHTML = "";  
-        historyTotal.textContent = "Rp 0";  
-        topProductsTableBody.innerHTML = "";  
-        if (historyDate) historyDate.value = "";  
-        if (printArea) printArea.innerHTML = '<p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>';  
-        destroyCharts();  
-      }  
-    });  
-  
-    window.addEventListener("online", () => {  
-      showToast("Koneksi kembali online. Menyinkronkan transaksi offline (jika ada)...", "info", 5000);  
-      updateConnectionStatusLabel();  
-      syncOfflineSalesIfOnline();  
-    });  
-    window.addEventListener("offline", () => {  
-      showToast("Kamu masuk MODE OFFLINE. Transaksi akan disimpan di perangkat.", "error", 6000);  
-      updateConnectionStatusLabel();  
-    });  
-  
-    // Produk  
-    function updateFormVisibilityByType() {  
-      const type = productType.value;  
-      if (type === "bahan_baku") {  
-        priceGroup.style.display = "none";  
-        stockGroup.style.display = "block";  
-        minStockGroup.style.display = "block";  
-      } else {  
-        priceGroup.style.display = "block";  
-        stockGroup.style.display = "none";  
-        minStockGroup.style.display = "none";  
-      }  
-    }  
-    updateFormVisibilityByType();  
-    productType.addEventListener("change", updateFormVisibilityByType);  
-  
-    async function loadProducts() {  
-      const snap = await getDocs(colProducts);  
-      const products = [];  
-      snap.forEach(docSnap => products.push({ id: docSnap.id, ...docSnap.data() }));  
-      productsCache = products;  
-  
-      renderProductTable();  
-      renderOpnameTable(products);  
-      showLowStockNotifications(products);  
-      updateStockMetricCards(products);  
-  
-      renderRecipeMenuOptions();  
-      renderRecipeIngredientOptions();  
-  
-      renderMenuTableForSales();  
-      updateItemSubtotal();  
-      recomputeCartSummary();  
-    }  
-  
-    function getCurrentProductFilterState() {  
-      return {  
-        searchTerm: (productSearch?.value || "").toLowerCase().trim(),  
-        category: productFilterCategory?.value || "",  
-        sort: productSort?.value || "name-asc",  
-        status: productStatusFilter  
-      };  
-    }  
-  
-    function renderProductTable() {  
-      productTableBody.innerHTML = "";  
-      const { searchTerm, category, sort, status } = getCurrentProductFilterState();  
-      let list = [...productsCache];  
-  
-      if (searchTerm) {  
-        list = list.filter(p => (p.name || "").toLowerCase().includes(searchTerm));  
-      }  
-      if (category) {  
-        list = list.filter(p => (p.category || "").toLowerCase() === category);  
-      }  
-  
-      list = list.filter(p => {  
-        if ((p.type || "bahan_baku") !== "bahan_baku") return true; // status filter hanya bahan baku  
-        const stock = Number(p.stock || 0);  
-        const min = Number(p.minStock || 0);  
-        if (status === "empty") return stock <= 0;  
-        if (status === "low")   return stock > 0 && stock <= min;  
-        if (status === "ok")    return stock > min;  
-        return true;  
-      });  
-  
-      list.sort((a, b) => {  
-        const priceA = Number(a.price || 0);  
-        const priceB = Number(b.price || 0);  
-        const stockA = Number(a.stock || 0);  
-        const stockB = Number(b.stock || 0);  
-        const nameA = (a.name || "").toLowerCase();  
-        const nameB = (b.name || "").toLowerCase();  
-        switch (sort) {  
-          case "name-desc":  return nameA < nameB ? 1 : nameA > nameB ? -1 : 0;  
-          case "price-asc":  return priceA - priceB;  
-          case "price-desc": return priceB - priceA;  
-          case "stock-asc":  return stockA - stockB;  
-          case "stock-desc": return stockB - stockA;  
-          default:           return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;  
-        }  
-      });  
-  
-      const typeLabelMap = { bahan_baku: "Bahan Baku", menu: "Menu" };  
-      const catLabelMap  = { makanan: "Makanan", minuman: "Minuman", lainnya: "Lainnya" };  
-  
-      list.forEach(p => {  
-        const tr = document.createElement("tr");  
-  
-        const statusCell = document.createElement("td");  
-        const badge = document.createElement("span");  
-        badge.classList.add("badge");  
-        const min = Number(p.minStock || 0);  
-        const stock = Number(p.stock || 0);  
-  
-        if ((p.type || "bahan_baku") === "bahan_baku") {  
-          if (stock <= 0) {  
-            badge.classList.add("badge-zero");  
-            badge.textContent = "Habis";  
-          } else if (stock <= min) {  
-            badge.classList.add("badge-low");  
-            badge.textContent = "Menipis";  
-          } else {  
-            badge.classList.add("badge-ok");  
-            badge.textContent = "Aman";  
-          }  
-        } else {  
-          badge.classList.add("badge-ok");  
-          badge.textContent = "-";  
-        }  
-        statusCell.appendChild(badge);  
-  
-        const typeLabel = typeLabelMap[p.type] || "Bahan Baku";  
-        const catLabel  = catLabelMap[(p.category || "").toLowerCase()] || "-";  
-  
-        const isBahan = (p.type || "bahan_baku") === "bahan_baku";  
-        const priceDisplay = isBahan ? "-" : `Rp ${Number(p.price || 0).toLocaleString("id-ID")}`;  
-        const stockDisplay = isBahan ? (p.stock ?? 0) : "-";  
-  
-        tr.innerHTML = `  
-          <td>${p.name}</td>  
-          <td>${typeLabel}</td>  
-          <td>${catLabel}</td>  
-          <td>${priceDisplay}</td>  
-          <td>${stockDisplay}</td>  
-          <td>${p.unit || "-"}</td>  
-        `;  
-        tr.appendChild(statusCell);  
-  
-        const tdActions = document.createElement("td");  
-        const editBtn = document.createElement("button");  
-        editBtn.textContent = "Edit";  
-        editBtn.classList.add("secondary");  
-        editBtn.style.marginRight = "4px";  
-        editBtn.onclick = () => fillFormForEdit(p);  
-        const delBtn = document.createElement("button");  
-        delBtn.textContent = "Hapus";  
-        delBtn.classList.add("danger");  
-        delBtn.onclick = () => deleteProduct(p.id);  
-        tdActions.appendChild(editBtn);  
-        tdActions.appendChild(delBtn);  
-        tr.appendChild(tdActions);  
-  
-        productTableBody.appendChild(tr);  
-      });  
-  
-      if (!productTableBody.hasChildNodes()) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="8" style="text-align:center;color:#9ca3af;padding:8px;">Item tidak ditemukan</td>`;  
-        productTableBody.appendChild(tr);  
-      }  
-    }  
-  
-    if (productSearch) productSearch.addEventListener("input", renderProductTable);  
-    if (productFilterCategory) productFilterCategory.addEventListener("change", () => { productStatusFilter="all"; renderProductTable(); });  
-    if (productSort) productSort.addEventListener("change", renderProductTable);  
-  
-    function fillFormForEdit(p) {  
-      editProductId.value = p.id;  
-      productName.value = p.name || "";  
-      productType.value = p.type || "bahan_baku";  
-      productCategory.value = (p.category || "makanan").toLowerCase();  
-      productPrice.value = p.price || "";  
-      productStock.value = p.stock || "";  
-      productUnit.value = p.unit || "";  
-      productMinStock.value = p.minStock || "";  
-      updateFormVisibilityByType();  
-      showToast("Mode edit item aktif", "info");  
-    }  
-  
-    btnResetForm.addEventListener("click", () => {  
-      editProductId.value = "";  
-      productName.value = "";  
-      productType.value = "bahan_baku";  
-      productCategory.value = "makanan";  
-      productPrice.value = "";  
-      productStock.value = "";  
-      productUnit.value = "";  
-      productMinStock.value = "";  
-      updateFormVisibilityByType();  
-    });  
-  
-    btnSaveProduct.addEventListener("click", async () => {  
-      const name = productName.value.trim();  
-      const type = productType.value || "bahan_baku";  
-      const category = productCategory.value || "lainnya";  
-      let price = Number(productPrice.value || 0);  
-      let stock = Number(productStock.value || 0);  
-      const unit = productUnit.value.trim();  
-      let minStock = Number(productMinStock.value || 0);  
-      if (!name) return showToast("Nama item wajib diisi", "error");  
-  
-      if (type === "bahan_baku") {  
-        price = 0;  
-      } else {  
-        stock = 0;  
-        minStock = 0;  
-      }  
-  
-      try {  
-        const id = editProductId.value;  
-        if (id) {  
-          const ref = doc(db, "products", id);  
-          await updateDoc(ref, { name, type, category, price, stock, unit, minStock });  
-          showToast("Item berhasil diupdate", "success");  
-        } else {  
-          await addDoc(colProducts, { name, type, category, price, stock, unit, minStock, createdAt: serverTimestamp() });  
-          showToast("Item berhasil ditambahkan", "success");  
-        }  
-        btnResetForm.click();  
-        await loadProducts();  
-        await loadRecipes();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal menyimpan item: " + err.message, "error");  
-      }  
-    });  
-  
-    async function deleteProduct(id) {  
-      if (!confirm("Yakin hapus item ini?")) return;  
-      try {  
-        const ref = doc(db, "products", id);  
-        await deleteDoc(ref);  
-        showToast("Item dihapus", "success");  
-        await loadProducts();  
-        await loadRecipes();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal hapus: " + err.message, "error");  
-      }  
-    }  
-  
-    function renderOpnameTable(products) {  
-      opnameTableBody.innerHTML = "";  
-      const bahanBaku = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");  
-      bahanBaku.forEach(p => {  
-        const unit = p.unit || "";  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `  
-          <td>${p.name}</td>  
-          <td>${p.stock ?? 0} ${unit}</td>  
-          <td><input type="number" id="op_fisik_${p.id}" placeholder="Stok fisik ${unit ? "(" + unit + ")" : ""}" /></td>  
-          <td id="op_selisih_${p.id}">-</td>  
-        `;  
-        const tdAction = document.createElement("td");  
-        const btn = document.createElement("button");  
-        btn.textContent = "Simpan";  
-        btn.classList.add("primary");  
-        btn.onclick = () => saveOpnameForProduct(p);  
-        tdAction.appendChild(btn);  
-        tr.appendChild(tdAction);  
-        opnameTableBody.appendChild(tr);  
-      });  
-      if (!opnameTableBody.hasChildNodes()) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada bahan baku</td>`;  
-        opnameTableBody.appendChild(tr);  
-      }  
-    }  
-  
-    async function saveOpnameForProduct(p) {  
-      const input = document.getElementById(`op_fisik_${p.id}`);  
-      const selisihCell = document.getElementById(`op_selisih_${p.id}`);  
-      const fisik = Number(input.value);  
-      if (Number.isNaN(fisik)) return showToast("Isi stok fisik terlebih dahulu", "error");  
-      const sistem = Number(p.stock ?? 0);  
-      const selisih = fisik - sistem;  
-      selisihCell.textContent = selisih.toString();  
-      try {  
-        await addDoc(colOpname, {  
-          productId: p.id,  
-          productName: p.name,  
-          stockSystem: sistem,  
-          stockPhysical: fisik,  
-          difference: selisih,  
-          unit: p.unit || "",  
-          opnameDate: serverTimestamp(),  
-          userId: currentUser ? currentUser.uid : null  
-        });  
-        const ref = doc(db, "products", p.id);  
-        await updateDoc(ref, { stock: fisik });  
-        showToast("Stok opname tersimpan & stok terupdate", "success");  
-        await loadProducts();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal menyimpan opname: " + err.message, "error");  
-      }  
-    }  
-  
-    // RESEP  
-    async function loadRecipes() {  
-      const snap = await getDocs(colRecipes);  
-      const list = [];  
-      snap.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));  
-      recipesCache = list;  
-      renderRecipeTableForSelectedMenu();  
-    }  
-  
-    function renderRecipeMenuOptions() {  
-      const current = recipeMenuSelect.value;  
-      recipeMenuSelect.innerHTML = '<option value="">Pilih menu...</option>';  
-      const menus = productsCache.filter(p => (p.type || "bahan_baku") === "menu");  
-      menus.forEach(m => {  
-        const opt = document.createElement("option");  
-        opt.value = m.id;  
-        opt.textContent = m.name;  
-        recipeMenuSelect.appendChild(opt);  
-      });  
-      if (current && menus.some(m => m.id === current)) recipeMenuSelect.value = current;  
-      renderRecipeTableForSelectedMenu();  
-    }  
-  
-    function renderRecipeIngredientOptions() {  
-      recipeIngredientSelect.innerHTML = '<option value="">Pilih bahan...</option>';  
-      const ing = productsCache.filter(p => (p.type || "bahan_baku") === "bahan_baku");  
-      ing.forEach(b => {  
-        const opt = document.createElement("option");  
-        const unit = b.unit || "";  
-        opt.value = b.id;  
-        opt.textContent = `${b.name} ${unit ? "(" + unit + ")" : ""} - stok: ${b.stock ?? 0}`;  
-        recipeIngredientSelect.appendChild(opt);  
-      });  
-    }  
-  
-    function renderRecipeTableForSelectedMenu() {  
-      recipeTableBody.innerHTML = "";  
-      const menuId = recipeMenuSelect.value;  
-      if (!menuId) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Pilih menu dulu untuk melihat komposisi</td>`;  
-        recipeTableBody.appendChild(tr);  
-        return;  
-      }  
-      const rows = recipesCache.filter(r => r.menuId === menuId);  
-      rows.forEach(r => {  
-        const unit = r.ingredientUnit || "";  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td>${r.ingredientName || "-"}</td><td>${r.qtyUsed} ${unit}</td>`;  
-        const tdAct = document.createElement("td");  
-        const btn = document.createElement("button");  
-        btn.textContent = "Hapus";  
-        btn.classList.add("danger");  
-        btn.style.fontSize = "11px";  
-        btn.onclick = () => deleteRecipe(r.id);  
-        tdAct.appendChild(btn);  
-        tr.appendChild(tdAct);  
-        recipeTableBody.appendChild(tr);  
-      });  
-      if (!recipeTableBody.hasChildNodes()) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada bahan untuk menu ini</td>`;  
-        recipeTableBody.appendChild(tr);  
-      }  
-    }  
-    recipeMenuSelect.addEventListener("change", renderRecipeTableForSelectedMenu);  
-  
-    btnAddRecipe.addEventListener("click", async () => {  
-      const menuId = recipeMenuSelect.value;  
-      const ingredientId = recipeIngredientSelect.value;  
-      const qty = Number(recipeQty.value || 0);  
-      if (!menuId) return showToast("Pilih menu dulu", "error");  
-      if (!ingredientId) return showToast("Pilih bahan baku dulu", "error");  
-      if (!(qty > 0)) return showToast("Qty harus lebih dari 0", "error");  
-      const menu = findProductById(menuId);  
-      const ing = findProductById(ingredientId);  
-      if (!menu || !ing) return showToast("Data menu/bahan tidak valid", "error");  
-      try {  
-        await addDoc(colRecipes, {  
-          menuId,  
-          menuName: menu.name,  
-          ingredientId,  
-          ingredientName: ing.name,  
-          ingredientUnit: ing.unit || "",  
-          qtyUsed: qty,  
-          createdAt: serverTimestamp(),  
-          userId: currentUser ? currentUser.uid : null  
-        });  
-        showToast("Resep ditambahkan", "success");  
-        recipeQty.value = "";  
-        await loadRecipes();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal menyimpan resep: " + err.message, "error");  
-      }  
-    });  
-  
-    async function deleteRecipe(id) {  
-      if (!confirm("Hapus bahan dari resep?")) return;  
-      try {  
-        const ref = doc(db, "recipes", id);  
-        await deleteDoc(ref);  
-        showToast("Resep dihapus", "success");  
-        await loadRecipes();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal hapus resep: " + err.message, "error");  
-      }  
-    }  
-  
-    // Helper product  
-    function findProductById(id) {  
-      return productsCache.find(p => p.id === id) || null;  
-    }  
-  
-    // KASIR: menu table (tanpa dropdown)  
-    function renderMenuTableForSales() {  
-      saleMenuTableBody.innerHTML = "";  
-      const term = (saleSearch.value || "").toLowerCase().trim();  
-      const menus = productsCache.filter(p => (p.type || "bahan_baku") === "menu");  
-      menus.forEach(m => {  
-        if (term && !(m.name || "").toLowerCase().includes(term)) return;  
-        const tr = document.createElement("tr");  
-        const canSellOnePortion = checkMenuEnoughStockForQty(m.id, 1);  
-        tr.innerHTML = `  
-          <td>${m.name}</td>  
-          <td>Rp ${Number(m.price || 0).toLocaleString("id-ID")}</td>  
-        `;  
-        const tdAct = document.createElement("td");  
-        const btn = document.createElement("button");  
-        btn.classList.add("sale-pilih-btn");  
-        if (canSellOnePortion) {  
-          btn.classList.add("sale-pilih-ok");  
-          btn.textContent = "Pilih";  
-          btn.onclick = () => {  
-            saleSelectedId.value = m.id;  
-            saleSelectedName.textContent = m.name;  
-            updateItemSubtotal();  
-          };  
-        } else {  
-          btn.classList.add("sale-pilih-disabled");  
-          btn.textContent = "Stok kurang";  
-        }  
-        tdAct.appendChild(btn);  
-        tr.appendChild(tdAct);  
-        saleMenuTableBody.appendChild(tr);  
-      });  
-  
-      if (!saleMenuTableBody.hasChildNodes()) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Menu tidak ditemukan</td>`;  
-        saleMenuTableBody.appendChild(tr);  
-      }  
-    }  
-    saleSearch.addEventListener("input", renderMenuTableForSales);  
-  
-    function updateItemSubtotal() {  
-      const id = saleSelectedId.value;  
-      const q = Number(saleQty.value || 0);  
-      const p = findProductById(id);  
-      if (!p || q <= 0) { saleSubtotal.value = ""; return; }  
-      saleSubtotal.value = Number(p.price || 0) * q;  
-    }  
-    saleQty.addEventListener("input", updateItemSubtotal);  
-  
-    function renderCartTable() {  
-      cartTableBody.innerHTML = "";  
-      if (currentCart.length === 0) {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada item dalam transaksi</td>`;  
-        cartTableBody.appendChild(tr);  
-        return;  
-      }  
-      currentCart.forEach((item, index) => {  
-        const tr = document.createElement("tr");  
-        tr.innerHTML = `  
-          <td>${item.productName}</td>  
-          <td>${item.qty}</td>  
-          <td>Rp ${Number(item.price || 0).toLocaleString("id-ID")}</td>  
-          <td>Rp ${Number(item.subtotal || 0).toLocaleString("id-ID")}</td>  
-        `;  
-        const tdAct = document.createElement("td");  
-        const btn = document.createElement("button");  
-        btn.textContent = "Hapus";  
-        btn.classList.add("danger");  
-        btn.style.fontSize = "11px";  
-        btn.onclick = () => {  
-          currentCart.splice(index, 1);  
-          renderCartTable();  
-          recomputeCartSummary();  
-        };  
-        tdAct.appendChild(btn);  
-        tr.appendChild(tdAct);  
-        cartTableBody.appendChild(tr);  
-      });  
-    }  
-  
-    function getCartSubtotal() {  
-      return currentCart.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);  
-    }  
-  
-    function recomputeCartSummary() {  
-      const subtotal = getCartSubtotal();  
-      cartSubtotalLabel.textContent = "Rp " + subtotal.toLocaleString("id-ID");  
-  
-      let disc = Number(saleDiscount.value || 0);  
-      if (disc < 0) disc = 0;  
-      if (disc > 100) disc = 100;  
-      saleDiscount.value = disc;  
-  
-      let voucher = Number(saleVoucher.value || 0);  
-      if (voucher < 0) voucher = 0;  
-      saleVoucher.value = voucher;  
-  
-      const discVal = subtotal * disc / 100;  
-      let total = subtotal - discVal - voucher;  
-      if (total < 0) total = 0;  
-      saleTotal.value = total;  
-  
-      const pay = Number(salePay.value || 0);  
-      if (!total || !pay || pay < total) {  
-        saleChange.value = 0;  
-      } else {  
-        saleChange.value = pay - total;  
-      }  
-    }  
-  
-    saleDiscount.addEventListener("input", recomputeCartSummary);  
-    saleVoucher.addEventListener("input", recomputeCartSummary);  
-    salePay.addEventListener("input", recomputeCartSummary);  
-  
-    btnAddToCart.addEventListener("click", () => {  
-      const productId = saleSelectedId.value;  
-      const qty = Number(saleQty.value || 0);  
-      const product = findProductById(productId);  
-      if (!productId || !product) return showToast("Pilih menu dulu", "error");  
-      if (qty <= 0) return showToast("Qty harus lebih dari 0", "error");  
-  
-      // cek cukup stok bahan untuk qty ini  
-      if (!checkMenuEnoughStockForQty(productId, qty)) {  
-        return showToast("Stok bahan baku tidak cukup untuk jumlah ini", "error", 5000);  
-      }  
-  
-      const price = Number(product.price || 0);  
-      const subtotal = price * qty;  
-  
-      const existing = currentCart.find(i => i.productId === productId);  
-      if (existing) {  
-        existing.qty += qty;  
-        existing.subtotal += subtotal;  
-      } else {  
-        currentCart.push({ productId, productName: product.name, price, qty, subtotal });  
-      }  
-  
-      saleQty.value = 1;  
-      updateItemSubtotal();  
-      renderCartTable();  
-      recomputeCartSummary();  
-    });  
-  
-    // hitung kebutuhan bahan dari keranjang  
-    function buildIngredientUsageFromCart() {  
-      const usageMap = {};  
-      currentCart.forEach(item => {  
-        const product = findProductById(item.productId);  
-        if (!product || (product.type || "bahan_baku") !== "menu") return;  
-        const related = recipesCache.filter(r => r.menuId === product.id);  
-        related.forEach(r => {  
-          const ing = findProductById(r.ingredientId);  
-          if (!ing) return;  
-          const need = Number(r.qtyUsed || 0) * Number(item.qty || 0);  
-          if (!usageMap[ing.id]) {  
-            usageMap[ing.id] = { name: ing.name, unit: ing.unit || "", need: 0 };  
-          }  
-          usageMap[ing.id].need += need;  
-        });  
-      });  
-      return usageMap;  
-    }  
-  
-    // cek stok untuk qty tertentu, digunakan di tombol "Pilih"  
-    function checkMenuEnoughStockForQty(menuId, qty) {  
-      const menu = findProductById(menuId);  
-      if (!menu) return false;  
-      const recipes = recipesCache.filter(r => r.menuId === menuId);  
-      if (recipes.length === 0) return true; // tidak pakai bahan baku  
-      for (const r of recipes) {  
-        const ing = findProductById(r.ingredientId);  
-        if (!ing) continue;  
-        const need = Number(r.qtyUsed || 0) * Number(qty || 0);  
-        const have = Number(ing.stock || 0);  
-        if (have < need) return false;  
-      }  
-      return true;  
-    }  
-  
-    async function saveSale() {  
-      if (currentCart.length === 0) return showToast("Tambahkan item ke daftar dulu", "error");  
-  
-      const subtotal = getCartSubtotal();  
-      if (subtotal <= 0) return showToast("Subtotal transaksi tidak valid", "error");  
-  
-      let disc = Number(saleDiscount.value || 0);  
-      let voucher = Number(saleVoucher.value || 0);  
-      if (disc < 0) disc = 0;  
-      if (disc > 100) disc = 100;  
-      if (voucher < 0) voucher = 0;  
-  
-      const discVal = subtotal * disc / 100;  
-      let total = subtotal - discVal - voucher;  
-      if (total < 0) total = 0;  
-      const pay = Number(salePay.value || 0);  
-      const change = Number(saleChange.value || 0);  
-      if (pay < total) return showToast("Uang bayar kurang!", "error");  
-  
-      const usageMap = buildIngredientUsageFromCart();  
-      const shortages = [];  
-  
-      Object.entries(usageMap).forEach(([ingId, info]) => {  
-        const ing = findProductById(ingId);  
-        if (!ing) return;  
-        const have = Number(ing.stock || 0);  
-        const need = info.need;  
-        if (have < need) {  
-          shortages.push({ name: ing.name, have, need, unit: ing.unit || "" });  
-        }  
-      });  
-  
-      if (shortages.length > 0) {  
-        const msg = shortages.map(s => `${s.name}: butuh ${s.need} ${s.unit}, ada ${s.have} ${s.unit}`).join("; ");  
-        showToast("Transaksi ditolak, stok akan minus: " + msg, "error", 8000);  
-        return;  
-      }  
-  
-      const saleDocBase = {  
-        items: currentCart.map(item => ({  
-          productId: item.productId,  
-          productName: item.productName,  
-          price: item.price,  
-          qty: item.qty,  
-          subtotal: item.subtotal  
-        })),  
-        subtotal,  
-        discountPercent: disc,  
-        discountValue: discVal,  
-        voucherValue: voucher,  
-        total,  
-        pay,  
-        change,  
-        userId: currentUser ? currentUser.uid : null  
-      };  
-  
-      const usageArray = Object.entries(usageMap).map(([ingredientId, info]) => ({  
-        ingredientId,  
-        need: info.need  
-      }));  
-  
-      const saleForReceipt = { ...saleDocBase, date: new Date() };  
-      renderReceipt(saleForReceipt);  
-  
-      if (!isOnline()) {  
-        const offlineEntry = {  
-          saleDoc: { ...saleDocBase, createdAtLocal: new Date().toISOString(), offline: true },  
-          usageArray  
-        };  
-        pushOfflineSale(offlineEntry);  
-        showToast("Transaksi disimpan OFFLINE & akan dikirim saat online ✅", "info", 6000);  
-        resetSaleForm();  
-        return;  
-      }  
-  
-      try {  
-        const saleDocOnline = { ...saleDocBase, createdAt: serverTimestamp() };  
-        await addDoc(colSales, saleDocOnline);  
-  
-        for (const [ingId, info] of Object.entries(usageMap)) {  
-          const ing = findProductById(ingId);  
-          if (!ing) continue;  
-          const newStockIng = Number(ing.stock || 0) - info.need;  
-          const refIng = doc(db, "products", ing.id);  
-          await updateDoc(refIng, { stock: newStockIng });  
-        }  
-  
-        showToast("Penjualan tersimpan & stok bahan baku berkurang", "success");  
-        resetSaleForm();  
-        await loadProducts();  
-        await loadSalesData();  
-        await loadRecipes();  
-      } catch (err) {  
-        console.error(err);  
-        showToast("Gagal menyimpan online. Disimpan sebagai transaksi offline.", "error", 6000);  
-        const offlineEntry = {  
-          saleDoc: { ...saleDocBase, createdAtLocal: new Date().toISOString(), offline: true },  
-          usageArray  
-        };  
-        pushOfflineSale(offlineEntry);  
-        resetSaleForm();  
-      }  
-    }  
-    btnSaveSale.addEventListener("click", saveSale);  
-  
-    function resetSaleForm() {  
-      currentCart = [];  
-      renderCartTable();  
-      cartSubtotalLabel.textContent = "Rp 0";  
-      saleDiscount.value = 0;  
-      saleVoucher.value = 0;  
-      salePay.value = "";  
-      saleChange.value = "";  
-      saleTotal.value = "";  
-      saleQty.value = 1;  
-      saleSubtotal.value = "";  
-      saleSelectedId.value = "";  
-      saleSelectedName.textContent = "Belum ada";  
-      updateItemSubtotal();  
-    }  
-  
-    function renderReceipt(sale) {  
-      if (!printArea) return;  
-      const { items, subtotal, discountPercent, discountValue, voucherValue, total, pay, change, date } = sale;  
-      const d = date || new Date();  
-      const tanggal = d.toLocaleDateString("id-ID");  
-      const waktu = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });  
-      const itemsHtml = (items || []).map(it =>  
-        `<p>${it.productName} x${it.qty} @ Rp ${Number(it.price || 0).toLocaleString("id-ID")} = Rp ${Number(it.subtotal || 0).toLocaleString("id-ID")}</p>`  
-      ).join("");  
-  
-      printArea.innerHTML = `  
-        <h4>STRUK PENJUALAN</h4>  
-        <p>F&amp;B POS</p>  
-        <p>${tanggal} ${waktu}</p>  
-        <hr />  
-        ${itemsHtml || '<p>Tidak ada item.</p>'}  
-        <hr />  
-        <p>Subtotal: Rp ${Number(subtotal || 0).toLocaleString("id-ID")}</p>  
-        <p>Diskon: ${Number(discountPercent || 0)}% (Rp ${Number(discountValue || 0).toLocaleString("id-ID")})</p>  
-        <p>Voucher: Rp ${Number(voucherValue || 0).toLocaleString("id-ID")}</p>  
-        <hr />  
-        <p><strong>Total Bayar: Rp ${Number(total || 0).toLocaleString("id-ID")}</strong></p>  
-        <p>Uang Bayar: Rp ${Number(pay || 0).toLocaleString("id-ID")}</p>  
-        <p>Kembalian: Rp ${Number(change || 0).toLocaleString("id-ID")}</p>  
-        <hr />  
-        <p style="text-align:center;">Terima kasih 🙏</p>  
-      `;  
-    }  
-  
-    // SALES DATA / DASHBOARD  
-    async function loadSalesData() {  
-      const snap = await getDocs(colSales);  
-      const sales = [];  
-      snap.forEach(docSnap => sales.push({ id: docSnap.id, ...docSnap.data() }));  
-      allSalesCache = sales;  
-      renderSalesToday(sales);  
-      renderSalesCharts(sales);  
-      setDefaultHistoryDate();  
-      renderHistoryByDate();  
-      return sales;  
-    }  
-  
-    function getSaleItemsArray(s) {  
-      if (Array.isArray(s.items) && s.items.length > 0) return s.items;  
-      if (s.productId) {  
-        const price = Number(s.price || 0);  
-        const qty = Number(s.qty || 0);  
-        const subtotal = Number(s.total ?? s.subtotal ?? price * qty);  
-        return [{ productId: s.productId, productName: s.productName || "Item", price, qty, subtotal }];  
-      }  
-      return [];  
-    }  
-  
-    function renderSalesToday(allSales) {  
-      salesTableBody.innerHTML = "";  
-      salesTotalToday.textContent = "Rp 0";  
-  
-      const now = new Date();  
-      const y = now.getFullYear();  
-      const m = now.getMonth();  
-      const d = now.getDate();  
-      let totalToday = 0;  
-  
-      const salesToday = allSales.filter(s => {  
-        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;  
-        if (!t) return false;  
-        return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;  
-      });  
-  
-      salesToday.sort((a,b) => {  
-        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;  
-        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;  
-        return ta - tb;  
-      });  
-  
-      salesToday.forEach(s => {  
-        const items = getSaleItemsArray(s);  
-        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;  
-        const timeStr = t ? `${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}` : "-";  
-        const total = Number(s.total ?? s.subtotal ?? 0);  
-        totalToday += total;  
-        const totalQty = items.reduce((sum,it)=> sum + Number(it.qty || 0), 0);  
+    .hidden { display: none !important; }
+
+    /* ===== SHELL HEADER + SIDEBAR ===== */
+    .shell {
+      background: rgba(15, 23, 42, 0.96);
+      border-radius: 24px;
+      padding: 10px 10px 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.7);
+      border: 1px solid rgba(148,163,184,0.45);
+      color: #e5e7eb;
+    }
+
+    .shell-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .shell-left { display: flex; align-items: center; gap: 10px; }
+
+    .shell-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 14px;
+      background: linear-gradient(135deg,#facc15,#f97316);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:800;
+      color:#111827;
+      font-size:13px;
+    }
+
+    .shell-title-wrap { display:flex; flex-direction:column; }
+
+    .shell-title  { font-size:13px; font-weight:600; }
+    .shell-sub    { font-size:11px; color:#9ca3af; }
+
+    .shell-user {
+      font-size:11px;
+      color:#e5e7eb;
+      text-align:right;
+    }
+
+    .shell-status {
+      font-size:11px;
+      margin-top:2px;
+      text-align:right;
+    }
+
+    .status-online { color:#bbf7d0; }
+    .status-offline { color:#fecaca; }
+    .status-sync { color:#fee2e2; }
+
+    .btn-logout {
+      width:auto;
+      padding:7px 14px;
+      border-radius:999px;
+      background:#f9fafb;
+      color:#111827;
+      font-size:12px;
+      border:1px solid rgba(15,23,42,0.8);
+      box-shadow:0 4px 12px rgba(15,23,42,0.6);
+      cursor:pointer;
+    }
+
+    .btn-logout:hover {
+      background:#facc15;
+      border-color:#facc15;
+      color:#111827;
+    }
+
+    .shell-body {
+      display:flex;
+      align-items:flex-start;
+      gap:14px;
+      margin-top:4px;
+    }
+
+    .sidebar {
+      width:220px;
+      flex-shrink:0;
+      background:#020617;
+      border-radius:18px;
+      padding:12px 10px;
+      border:1px solid rgba(148,163,184,0.5);
+    }
+
+    .sidebar-menu { display:flex; flex-direction:column; gap:6px; }
+
+    .sidebar-link {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:none;
+      background:transparent;
+      color:#e5e7eb;
+      font-size:12px;
+      cursor:pointer;
+      text-align:left;
+    }
+
+    .sidebar-link:hover { background:rgba(148,163,184,0.3); }
+
+    .sidebar-link.active {
+      background:#facc15;
+      color:#111827;
+    }
+
+    .sidebar-icon { width:18px; text-align:center; }
+
+    .shell-main { flex:1; }
+
+    .shell-header-mobile {
+      display:none;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:8px;
+    }
+
+    .btn-sidebar-toggle {
+      border:1px solid rgba(148,163,184,0.7);
+      background:rgba(15,23,42,0.98);
+      color:#e5e7eb;
+      border-radius:999px;
+      padding:7px 9px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      gap:3px;
+      cursor:pointer;
+    }
+
+    .btn-sidebar-line {
+      width:16px;
+      height:2px;
+      border-radius:999px;
+      background:#e5e7eb;
+    }
+
+    .app-shell-hidden { display:none !important; }
+
+    /* DASHBOARD METRIC CARDS */
+    .metrics-row {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-bottom:10px;
+    }
+
+    .metric-card {
+      flex:1;
+      min-width:150px;
+      border-radius:14px;
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      cursor:pointer;
+      border:1px solid rgba(148,163,184,0.5);
+      color: #111827; /* teks hitam */
+      background:#ffffff;
+    }
+
+    .metric-icon {
+      width:34px;
+      height:34px;
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+    }
+
+    .metric-text { display:flex; flex-direction:column; }
+
+    .metric-label { font-size:12px; color:#111827; }
+    .metric-value { font-size:16px; font-weight:700; }
+
+    .metric-empty .metric-icon {
+      background:#fee2e2;
+    }
+
+    .metric-low .metric-icon {
+      background:#fef3c7;
+    }
+
+    .metric-ok .metric-icon {
+      background:#dcfce7;
+    }
+
+    /* Kasir */
+    .menu-selected-label {
+      font-size:13px;
+      margin:4px 0 6px;
+      color:#4b5563;
+    }
+    .menu-selected-label strong { color:#111827; }
+
+    .sale-pilih-btn {
+      padding:4px 10px;
+      font-size:12px;
+      border-radius:999px;
+      border:none;
+      cursor:pointer;
+    }
+    .sale-pilih-ok {
+      background:#facc15;
+      color:#111827;
+      box-shadow:0 3px 8px rgba(250,204,21,0.5);
+    }
+    .sale-pilih-disabled {
+      background:#e5e7eb;
+      color:#9ca3af;
+      cursor:not-allowed;
+    }
+
+    @media print {
+      body * { visibility:hidden; }
+      #printArea, #printArea * { visibility:visible; }
+      #printArea { position:absolute; inset:0; margin:0; padding:4px; }
+    }
+
+    .toast-container {
+      position:fixed;
+      top:16px;
+      right:16px;
+      z-index:9999;
+    }
+    .toast {
+      background:#020617;
+      color:white;
+      padding:10px 14px;
+      border-radius:999px;
+      margin-bottom:8px;
+      font-size:13px;
+      opacity:0.97;
+      border:1px solid rgba(148,163,184,0.7);
+      backdrop-filter:blur(10px);
+    }
+    .toast-success { background:#16a34a; }
+    .toast-error   { background:#dc2626; }
+    .toast-info    { background:#2563eb; }
+
+    @media (max-width: 900px) {
+      .shell {
+        padding:10px 12px 12px;
+      }
+      .shell-body {
+        flex-direction:column;
+      }
+      .sidebar {
+        width:100%;
+        display:none;
+      }
+      .shell.shell--sidebar-open .sidebar {
+        display:block;
+      }
+      .shell-header-mobile {
+        display:flex;
+      }
+      .shell-header {
+        flex-direction:column;
+        align-items:flex-start;
+        gap:6px;
+      }
+      .shell-user, .shell-status {
+        text-align:left;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding:14px 10px 24px; }
+      #authCard {
+        padding:16px 14px 14px;
+        margin-top:6px;
+      }
+      h1 { font-size:19px; }
+      .subtitle { font-size:11px; }
+      .card h2 { font-size:16px; }
+      .card h3 { font-size:14px; }
+      button { font-size:13px; }
+      table { font-size:12px; min-width: 500px; }
+    }
+
+    @media (max-width: 480px) {
+      #authCard { border-radius:16px; }
+      .row { gap:10px; }
+      table { min-width: 420px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="container">
+    <h1>F&B POS & Inventory</h1>
+    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — tema kuning, hitam, putih. Nyaman di HP &amp; laptop.</p>
+
+    <!-- LOGIN / REGISTER -->
+    <div class="card" id="authCard">
+      <h2>Login / Register</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Login</h3>
+          <div class="input-group">
+            <label>Email</label>
+            <input id="loginEmail" type="email" placeholder="admin@contoh.com" />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input id="loginPassword" type="password" placeholder="••••••••" />
+          </div>
+          <button class="primary" id="btnLogin">Login</button>
+        </div>
+        <div class="col">
+          <h3>Register User</h3>
+          <div class="input-group">
+            <label>Email</label>
+            <input id="registerEmail" type="email" placeholder="kasir@contoh.com" />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input id="registerPassword" type="password" placeholder="min. 6 karakter" />
+          </div>
+          <div class="input-group">
+            <label>Role</label>
+            <select id="registerRole">
+              <option value="admin">Admin</option>
+              <option value="kasir">Kasir</option>
+            </select>
+          </div>
+          <button class="secondary" id="btnRegister">Register</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHELL (HEADER + SIDEBAR + MAIN) -->
+    <div id="appShell" class="shell app-shell-hidden">
+      <!-- header mobile -->
+      <div class="shell-header-mobile">
+        <button id="btnSidebarToggle" class="btn-sidebar-toggle" aria-label="Menu">
+          <span class="btn-sidebar-line"></span>
+          <span class="btn-sidebar-line"></span>
+          <span class="btn-sidebar-line"></span>
+        </button>
+        <span style="font-size:12px;color:#e5e7eb;">Menu Navigasi</span>
+      </div>
+
+      <div class="shell-header">
+        <div class="shell-left">
+          <div class="shell-logo">F&B</div>
+          <div class="shell-title-wrap">
+            <div class="shell-title">F&amp;B POS &amp; Inventory</div>
+            <div class="shell-sub">Dashboard F&amp;B</div>
+          </div>
+        </div>
+        <div style="flex:1;"></div>
+        <div>
+          <div class="shell-user" id="topbarUser"></div>
+          <div class="shell-status" id="connectionStatus"></div>
+        </div>
+        <button class="btn-logout" id="btnLogout">Logout</button>
+      </div>
+
+      <div class="shell-body">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+          <nav class="sidebar-menu">
+            <button class="sidebar-link active" data-section="sales">
+              <span class="sidebar-icon">🧾</span><span>Kasir</span>
+            </button>
+            <button class="sidebar-link sidebar-admin" data-section="inventory">
+              <span class="sidebar-icon">📦</span><span>Inventory & Resep</span>
+            </button>
+            <button class="sidebar-link sidebar-admin" data-section="dashboard">
+              <span class="sidebar-icon">📊</span><span>Dashboard</span>
+            </button>
+            <button class="sidebar-link sidebar-admin" data-section="opname">
+              <span class="sidebar-icon">📋</span><span>Stok Opname</span>
+            </button>
+          </nav>
+        </aside>
+
+        <!-- Main -->
+        <main class="shell-main">
+          <!-- Kasir -->
+          <div class="card hidden" id="salesCard">
+            <h2>Penjualan (Kasir)</h2>
+            <div class="row">
+              <div class="col">
+                <h3>Input Item ke Transaksi</h3>
+
+                <div class="input-group">
+                  <label>Cari Menu</label>
+                  <input id="saleSearch" type="text" placeholder="Ketik nama menu..." />
+                </div>
+
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr><th>Menu</th><th>Harga</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody id="saleMenuTableBody"></tbody>
+                  </table>
+                </div>
+
+                <p class="menu-selected-label">
+                  Menu terpilih: <strong id="saleSelectedName">Belum ada</strong>
+                </p>
+                <input type="hidden" id="saleSelectedId" />
+
+                <div class="input-group">
+                  <label>Qty</label>
+                  <input id="saleQty" type="number" min="1" value="1" />
+                </div>
+
+                <div class="input-group">
+                  <label>Subtotal Item (harga × qty)</label>
+                  <input id="saleSubtotal" type="number" disabled />
+                </div>
+
+                <button class="secondary" id="btnAddToCart">Tambah ke Daftar</button>
+
+                <h3 style="margin-top:14px;">Daftar Item dalam Transaksi</h3>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr><th>Menu</th><th>Qty</th><th>Harga</th><th>Subtotal</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody id="cartTableBody"></tbody>
+                  </table>
+                </div>
+                <p style="margin-top:6px;font-size:13px;">
+                  Subtotal transaksi: <strong id="cartSubtotalLabel">Rp 0</strong>
+                </p>
+
+                <hr style="margin:10px 0;border:none;border-top:1px dashed #e5e7eb;" />
+
+                <div class="input-group">
+                  <label>Diskon (%)</label>
+                  <input id="saleDiscount" type="number" min="0" max="100" value="0" />
+                </div>
+                <div class="input-group">
+                  <label>Voucher (nominal)</label>
+                  <input id="saleVoucher" type="number" min="0" value="0" />
+                </div>
+                <div class="input-group">
+                  <label>Total Bayar (setelah diskon &amp; voucher)</label>
+                  <input id="saleTotal" type="number" disabled />
+                </div>
+                <div class="input-group">
+                  <label>Uang Bayar</label>
+                  <input id="salePay" type="number" placeholder="Masukkan uang pembayaran" />
+                </div>
+                <div class="input-group">
+                  <label>Kembalian</label>
+                  <input id="saleChange" type="number" disabled />
+                </div>
+                <button class="primary" id="btnSaveSale">Simpan Penjualan</button>
+              </div>
+
+              <div class="col">
+                <h3>Penjualan Hari Ini</h3>
+                <p style="font-size:12px;color:#6b7280;margin-top:0;margin-bottom:6px;">
+                  Ringkasan transaksi berdasarkan tanggal hari ini.
+                </p>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr><th>Waktu</th><th>Detail</th><th>Qty</th><th>Total</th></tr>
+                    </thead>
+                    <tbody id="salesTableBody"></tbody>
+                  </table>
+                </div>
+                <p style="margin-top:8px;font-size:13px;">
+                  Total hari ini: <strong id="salesTotalToday">Rp 0</strong>
+                </p>
+
+                <h3 style="margin-top:10px;">Struk Terakhir</h3>
+                <div id="printArea" style="border:1px dashed #d4d4d8;border-radius:8px;padding:8px;background:#f9fafb;">
+                  <p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>
+                </div>
+                <button class="secondary" style="margin-top:8px;" onclick="window.print()">Print Struk</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inventory + Resep -->
+          <div class="card hidden" id="appCard">
+            <h2>Inventory &amp; Resep</h2>
+            <div class="row">
+              <div class="col">
+                <h3>Tambah / Edit Item</h3>
+                <input type="hidden" id="editProductId" />
+
+                <div class="input-group">
+                  <label>Nama Item</label>
+                  <input id="productName" placeholder="Contoh: Beras, Teh Hitam, Nasi Goreng" />
+                </div>
+                <div class="input-group">
+                  <label>Jenis Item</label>
+                  <select id="productType">
+                    <option value="bahan_baku">Bahan Baku</option>
+                    <option value="menu">Menu / Hidangan</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label>Kategori Produk</label>
+                  <select id="productCategory">
+                    <option value="makanan">Makanan</option>
+                    <option value="minuman">Minuman</option>
+                    <option value="lainnya">Lainnya</option>
+                  </select>
+                </div>
+                <div class="input-group" id="priceGroup">
+                  <label>Harga Jual (MENU)</label>
+                  <input id="productPrice" type="number" placeholder="15000" />
+                </div>
+                <div class="input-group" id="stockGroup">
+                  <label>Stok Awal (BAHAN BAKU)</label>
+                  <input id="productStock" type="number" placeholder="10" />
+                </div>
+                <div class="input-group" id="minStockGroup">
+                  <label>Minimal Stok (warning bahan baku)</label>
+                  <input id="productMinStock" type="number" placeholder="5" />
+                </div>
+                <div class="input-group">
+                  <label>Satuan Stok (kg, g, ml, pcs, porsi, dll)</label>
+                  <input id="productUnit" placeholder="contoh: kg / g / ml / pcs / porsi" />
+                </div>
+                <button class="primary" id="btnSaveProduct">Simpan Item</button>
+                <button class="secondary" id="btnResetForm">Reset Form</button>
+              </div>
+
+              <div class="col">
+                <h3>Daftar Item</h3>
+                <div class="row" style="margin-bottom:6px;">
+                  <div class="col">
+                    <div class="input-group" style="margin-bottom:6px;">
+                      <label>Cari Item</label>
+                      <input id="productSearch" placeholder="Ketik nama item..." />
+                    </div>
+                  </div>
+                  <div class="col">
+                    <div class="input-group" style="margin-bottom:6px;">
+                      <label>Filter Kategori</label>
+                      <select id="productFilterCategory">
+                        <option value="">Semua</option>
+                        <option value="makanan">Makanan</option>
+                        <option value="minuman">Minuman</option>
+                        <option value="lainnya">Lainnya</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col">
+                    <div class="input-group" style="margin-bottom:6px;">
+                      <label>Sort</label>
+                      <select id="productSort">
+                        <option value="name-asc">Nama A-Z</option>
+                        <option value="name-desc">Nama Z-A</option>
+                        <option value="price-asc">Harga termurah</option>
+                        <option value="price-desc">Harga termahal</option>
+                        <option value="stock-asc">Stok terendah</option>
+                        <option value="stock-desc">Stok tertinggi</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th>
+                        <th>Stok</th><th>Satuan</th><th>Status</th><th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="productTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <hr style="margin:12px 0;border:none;border-top:1px dashed #e5e7eb;" />
+
+            <h3>Resep Menu (BOM - Bahan Baku per Porsi)</h3>
+            <div class="row">
+              <div class="col">
+                <div class="input-group">
+                  <label>Pilih Menu</label>
+                  <select id="recipeMenuSelect">
+                    <option value="">Pilih menu...</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label>Bahan Baku</label>
+                  <select id="recipeIngredientSelect">
+                    <option value="">Pilih bahan...</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label>Qty per 1 Porsi</label>
+                  <input id="recipeQty" type="number" min="0" step="0.01" placeholder="0.1 / 15 / 1" />
+                </div>
+                <button class="primary" id="btnAddRecipe">Tambah ke Resep</button>
+              </div>
+
+              <div class="col">
+                <h3 style="margin-top:0;">Komposisi Menu Terpilih</h3>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr><th>Bahan</th><th>Qty / Porsi</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody id="recipeTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dashboard -->
+          <div class="card hidden" id="chartCard">
+            <h2>Dashboard Penjualan & Stok</h2>
+
+            <!-- METRIC STOCK -->
+            <div class="metrics-row">
+              <div class="metric-card metric-empty" id="cardEmpty">
+                <div class="metric-icon">❌</div>
+                <div class="metric-text">
+                  <span class="metric-label">Barang Habis</span>
+                  <span class="metric-value" id="metricEmptyCount">0</span>
+                </div>
+              </div>
+              <div class="metric-card metric-low" id="cardLow">
+                <div class="metric-icon">⚠️</div>
+                <div class="metric-text">
+                  <span class="metric-label">Hampir Habis</span>
+                  <span class="metric-value" id="metricLowCount">0</span>
+                </div>
+              </div>
+              <div class="metric-card metric-ok" id="cardOk">
+                <div class="metric-icon">✅</div>
+                <div class="metric-text">
+                  <span class="metric-label">Stok Aman</span>
+                  <span class="metric-value" id="metricOkCount">0</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col" style="min-height:220px;">
+                <h3>Penjualan Harian</h3>
+                <div style="height:180px;">
+                  <canvas id="dailyChart"></canvas>
+                </div>
+              </div>
+              <div class="col" style="min-height:220px;">
+                <h3>Penjualan Bulanan</h3>
+                <div style="height:180px;">
+                  <canvas id="monthlyChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <hr style="margin:12px 0;border:none;border-top:1px dashed #e5e7eb;" />
+
+            <h3>Riwayat Penjualan (Filter Tanggal)</h3>
+            <div class="row">
+              <div class="col">
+                <div class="input-group">
+                  <label>Pilih Tanggal</label>
+                  <input id="historyDate" type="date" />
+                </div>
+              </div>
+              <div class="col">
+                <p style="font-size:13px;margin-top:24px;">
+                  Total tanggal ini: <strong id="historyTotal">Rp 0</strong>
+                </p>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Waktu</th><th>Detail</th><th>Qty</th><th>Total</th></tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+              </table>
+            </div>
+
+            <h3 style="margin-top:14px;">Menu Terlaris (berdasarkan tanggal di atas)</h3>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Menu</th><th>Total Qty</th><th>Total Omzet</th></tr>
+                </thead>
+                <tbody id="topProductsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Opname -->
+          <div class="card hidden" id="opnameCard">
+            <h2>Stok Opname Mingguan</h2>
+            <p>Gunakan ini setiap Senin untuk input stok fisik bahan baku. Riwayat akan disimpan di Firebase.</p>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr><th>Bahan Baku</th><th>Stok Sistem</th><th>Stok Fisik</th><th>Selisih</th><th>Simpan</th></tr>
+                </thead>
+                <tbody id="opnameTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIC + FIREBASE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      getDocs,
+      updateDoc,
+      deleteDoc,
+      doc,
+      serverTimestamp,
+      query,
+      where
+    } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
+      authDomain: "app-387dc.firebaseapp.com",
+      projectId: "app-387dc",
+      storageBucket: "app-387dc.firebasestorage.app",
+      messagingSenderId: "227151496412",
+      appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
+      measurementId: "G-9E282TKXSJ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const toastContainer = document.getElementById("toastContainer");
+    function showToast(message, type = "info", timeout = 3000) {
+      const div = document.createElement("div");
+      div.classList.add("toast");
+      if (type === "success") div.classList.add("toast-success");
+      if (type === "error") div.classList.add("toast-error");
+      if (type === "info") div.classList.add("toast-info");
+      div.innerText = message;
+      toastContainer.appendChild(div);
+      setTimeout(() => div.remove(), timeout);
+    }
+
+    const authCard = document.getElementById("authCard");
+    const appShell = document.getElementById("appShell");
+
+    const topbarUser = document.getElementById("topbarUser");
+    const connectionStatus = document.getElementById("connectionStatus");
+
+    const btnSidebarToggle = document.getElementById("btnSidebarToggle");
+    const sidebarLinks = document.querySelectorAll(".sidebar-link");
+
+    const loginEmail = document.getElementById("loginEmail");
+    const loginPassword = document.getElementById("loginPassword");
+    const registerEmail = document.getElementById("registerEmail");
+    const registerPassword = document.getElementById("registerPassword");
+    const registerRole = document.getElementById("registerRole");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnRegister = document.getElementById("btnRegister");
+    const btnLogout = document.getElementById("btnLogout");
+
+    const salesCard = document.getElementById("salesCard");
+    const appCard = document.getElementById("appCard");
+    const chartCard = document.getElementById("chartCard");
+    const opnameCard = document.getElementById("opnameCard");
+
+    const productName = document.getElementById("productName");
+    const productType = document.getElementById("productType");
+    const productCategory = document.getElementById("productCategory");
+    const productPrice = document.getElementById("productPrice");
+    const productStock = document.getElementById("productStock");
+    const productUnit = document.getElementById("productUnit");
+    const productMinStock = document.getElementById("productMinStock");
+    const editProductId = document.getElementById("editProductId");
+    const btnSaveProduct = document.getElementById("btnSaveProduct");
+    const btnResetForm = document.getElementById("btnResetForm");
+    const productTableBody = document.getElementById("productTableBody");
+    const productSearch = document.getElementById("productSearch");
+    const productFilterCategory = document.getElementById("productFilterCategory");
+    const productSort = document.getElementById("productSort");
+    const opnameTableBody = document.getElementById("opnameTableBody");
+    const priceGroup = document.getElementById("priceGroup");
+    const stockGroup = document.getElementById("stockGroup");
+    const minStockGroup = document.getElementById("minStockGroup");
+
+    const recipeMenuSelect = document.getElementById("recipeMenuSelect");
+    const recipeIngredientSelect = document.getElementById("recipeIngredientSelect");
+    const recipeQty = document.getElementById("recipeQty");
+    const btnAddRecipe = document.getElementById("btnAddRecipe");
+    const recipeTableBody = document.getElementById("recipeTableBody");
+
+    const saleSearch = document.getElementById("saleSearch");
+    const saleMenuTableBody = document.getElementById("saleMenuTableBody");
+    const saleSelectedId = document.getElementById("saleSelectedId");
+    const saleSelectedName = document.getElementById("saleSelectedName");
+    const saleQty = document.getElementById("saleQty");
+    const saleSubtotal = document.getElementById("saleSubtotal");
+    const saleDiscount = document.getElementById("saleDiscount");
+    const saleVoucher = document.getElementById("saleVoucher");
+    const saleTotal = document.getElementById("saleTotal");
+    const salePay = document.getElementById("salePay");
+    const saleChange = document.getElementById("saleChange");
+    const btnSaveSale = document.getElementById("btnSaveSale");
+    const btnAddToCart = document.getElementById("btnAddToCart");
+    const cartTableBody = document.getElementById("cartTableBody");
+    const cartSubtotalLabel = document.getElementById("cartSubtotalLabel");
+    const salesTableBody = document.getElementById("salesTableBody");
+    const salesTotalToday = document.getElementById("salesTotalToday");
+
+    const historyDate = document.getElementById("historyDate");
+    const historyTableBody = document.getElementById("historyTableBody");
+    const historyTotal = document.getElementById("historyTotal");
+    const topProductsTableBody = document.getElementById("topProductsTableBody");
+
+    const printArea = document.getElementById("printArea");
+
+    const dailyCanvas = document.getElementById("dailyChart");
+    const monthlyCanvas = document.getElementById("monthlyChart");
+    let dailyChart = null;
+    let monthlyChart = null;
+
+    const metricEmptyCount = document.getElementById("metricEmptyCount");
+    const metricLowCount   = document.getElementById("metricLowCount");
+    const metricOkCount    = document.getElementById("metricOkCount");
+    const cardEmpty = document.getElementById("cardEmpty");
+    const cardLow   = document.getElementById("cardLow");
+    const cardOk    = document.getElementById("cardOk");
+
+    const colProducts = collection(db, "products");
+    const colUsers = collection(db, "users");
+    const colOpname = collection(db, "stock_opname");
+    const colSales = collection(db, "sales");
+    const colRecipes = collection(db, "recipes");
+
+    let productsCache = [];
+    let allSalesCache = [];
+    let recipesCache = [];
+    let currentUser = null;
+    let currentUserRole = null;
+    let currentCart = [];
+    let activeSection = "sales";
+
+    let productStatusFilter = "all"; // all | empty | low | ok
+
+    const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
+
+    function isOnline() { return navigator.onLine; }
+
+    function loadOfflineSalesQueue() {
+      try {
+        const raw = localStorage.getItem(OFFLINE_SALES_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        console.error("Gagal parse offline:", e);
+        return [];
+      }
+    }
+
+    function saveOfflineSalesQueue(list) {
+      try {
+        localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
+      } catch (e) {
+        console.error("Gagal simpan offline:", e);
+      }
+    }
+
+    function pushOfflineSale(entry) {
+      const list = loadOfflineSalesQueue();
+      list.push(entry);
+      saveOfflineSalesQueue(list);
+      updateConnectionStatusLabel();
+    }
+
+    function updateConnectionStatusLabel() {
+      if (!connectionStatus) return;
+      const queue = loadOfflineSalesQueue();
+      if (isOnline()) {
+        connectionStatus.className = "shell-status status-online";
+        if (queue.length > 0) {
+          connectionStatus.classList.add("status-sync");
+          connectionStatus.textContent = `🟢 Online • ${queue.length} transaksi offline siap disinkronkan`;
+        } else {
+          connectionStatus.textContent = "🟢 Online";
+        }
+      } else {
+        connectionStatus.className = "shell-status status-offline";
+        connectionStatus.textContent = "🔴 Offline • Transaksi akan disimpan di perangkat";
+      }
+    }
+
+    async function syncOfflineSalesIfOnline() {
+      if (!isOnline()) {
+        updateConnectionStatusLabel();
+        return;
+      }
+      let queue = loadOfflineSalesQueue();
+      if (!queue.length) {
+        updateConnectionStatusLabel();
+        return;
+      }
+
+      showToast(`Menyinkronkan ${queue.length} transaksi offline...`, "info", 6000);
+      connectionStatus.className = "shell-status status-sync";
+      connectionStatus.textContent = `🔄 Sinkronisasi ${queue.length} transaksi...`;
+
+      const remaining = [];
+
+      for (const entry of queue) {
+        try {
+          const saleDoc = entry.saleDoc;
+          const usageArray = entry.usageArray || [];
+
+          const saleToSave = {
+            ...saleDoc,
+            createdAt: serverTimestamp(),
+            offlineSynced: true
+          };
+          delete saleToSave.createdAtLocal;
+
+          await addDoc(colSales, saleToSave);
+
+          for (const u of usageArray) {
+            const ing = findProductById(u.ingredientId);
+            if (!ing) continue;
+            const newStockIng = Number(ing.stock || 0) - Number(u.need || 0);
+            const refIng = doc(db, "products", ing.id);
+            await updateDoc(refIng, { stock: newStockIng });
+          }
+        } catch (e) {
+          console.error("Gagal sync offline:", e);
+          remaining.push(entry);
+        }
+      }
+
+      saveOfflineSalesQueue(remaining);
+      await loadProducts();
+      await loadSalesData();
+      await loadRecipes();
+
+      if (remaining.length === 0) {
+        showToast("Semua transaksi offline berhasil disinkronkan ✅", "success", 5000);
+      } else {
+        showToast(`${remaining.length} transaksi offline belum tersinkron. Akan dicoba lagi nanti.`, "error", 6000);
+      }
+
+      updateConnectionStatusLabel();
+    }
+
+    // NAV
+    function showSection(section) {
+      activeSection = section;
+      sidebarLinks.forEach(btn => {
+        if (btn.dataset.section === section) btn.classList.add("active");
+        else btn.classList.remove("active");
+      });
+
+      salesCard.classList.add("hidden");
+      appCard.classList.add("hidden");
+      chartCard.classList.add("hidden");
+      opnameCard.classList.add("hidden");
+
+      if (section === "sales") salesCard.classList.remove("hidden");
+      if (section === "inventory") appCard.classList.remove("hidden");
+      if (section === "dashboard") chartCard.classList.remove("hidden");
+      if (section === "opname") opnameCard.classList.remove("hidden");
+
+      if (window.innerWidth <= 900 && appShell) {
+        appShell.classList.remove("shell--sidebar-open");
+      }
+    }
+
+    if (btnSidebarToggle && appShell) {
+      btnSidebarToggle.addEventListener("click", () => {
+        appShell.classList.toggle("shell--sidebar-open");
+      });
+    }
+
+    sidebarLinks.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const sec = btn.dataset.section;
+        if (sec) showSection(sec);
+      });
+    });
+
+    // klik kartu dashboard -> filter inventory
+    function setProductStatusFilter(status) {
+      productStatusFilter = status; // 'all'|'empty'|'low'|'ok'
+      showSection("inventory");
+      renderProductTable();
+    }
+    if (cardEmpty) {
+      cardEmpty.addEventListener("click", () => setProductStatusFilter("empty"));
+    }
+    if (cardLow) {
+      cardLow.addEventListener("click", () => setProductStatusFilter("low"));
+    }
+    if (cardOk) {
+      cardOk.addEventListener("click", () => setProductStatusFilter("ok"));
+    }
+
+    // ROLE HELPER
+    async function getUserRole(uid) {
+      try {
+        const q = query(colUsers, where("uid", "==", uid));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        let role = null;
+        snap.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.role) role = data.role;
+        });
+        return role;
+      } catch (err) {
+        console.error("Gagal ambil role:", err);
+        return null;
+      }
+    }
+
+    // AUTH
+    btnRegister.addEventListener("click", async () => {
+      const email = registerEmail.value.trim();
+      const pass = registerPassword.value;
+      const role = registerRole.value;
+      if (!email || !pass) return showToast("Email & password wajib diisi", "error");
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await addDoc(colUsers, { uid: cred.user.uid, email, role, createdAt: serverTimestamp() });
+        showToast("User berhasil dibuat!", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal register: " + err.message, "error");
+      }
+    });
+
+    btnLogin.addEventListener("click", async () => {
+      const email = loginEmail.value.trim();
+      const pass = loginPassword.value;
+      if (!email || !pass) return showToast("Isi email & password", "error");
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        showToast("Login berhasil", "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Login gagal: " + err.message, "error");
+      }
+    });
+
+    btnLogout.addEventListener("click", async () => { await signOut(auth); });
+
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      if (user) {
+        let role = await getUserRole(user.uid);
+        if (!role) role = "kasir";
+        currentUserRole = role;
+
+        authCard.classList.add("hidden");
+        appShell.classList.remove("app-shell-hidden");
+
+        topbarUser.textContent = `Login sebagai ${user.email} (${role})`;
+
+        document.querySelectorAll(".sidebar-admin").forEach(el => {
+          el.style.display = role === "admin" ? "flex" : "none";
+        });
+
+        showSection("sales");
+        updateConnectionStatusLabel();
+
+        await loadProducts();
+        await loadRecipes();
+        await loadSalesData();
+        await syncOfflineSalesIfOnline();
+
+        const now = new Date();
+        if (now.getDay() === 1 && role === "admin") {
+          showToast("Reminder: Hari ini jadwal stok opname mingguan ✅", "info", 8000);
+        }
+      } else {
+        currentUserRole = null;
+        appShell.classList.add("app-shell-hidden");
+        authCard.classList.remove("hidden");
+        productsCache = [];
+        allSalesCache = [];
+        recipesCache = [];
+        currentCart = [];
+        renderCartTable();
+        cartSubtotalLabel.textContent = "Rp 0";
+        salesTableBody.innerHTML = "";
+        salesTotalToday.textContent = "Rp 0";
+        historyTableBody.innerHTML = "";
+        historyTotal.textContent = "Rp 0";
+        topProductsTableBody.innerHTML = "";
+        if (historyDate) historyDate.value = "";
+        if (printArea) printArea.innerHTML = '<p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>';
+        destroyCharts();
+      }
+    });
+
+    window.addEventListener("online", () => {
+      showToast("Koneksi kembali online. Menyinkronkan transaksi offline (jika ada)...", "info", 5000);
+      updateConnectionStatusLabel();
+      syncOfflineSalesIfOnline();
+    });
+    window.addEventListener("offline", () => {
+      showToast("Kamu masuk MODE OFFLINE. Transaksi akan disimpan di perangkat.", "error", 6000);
+      updateConnectionStatusLabel();
+    });
+
+    // ===== Produk =====
+    function updateFormVisibilityByType() {
+      const type = productType.value;
+      if (type === "bahan_baku") {
+        priceGroup.style.display = "none";
+        stockGroup.style.display = "block";
+        minStockGroup.style.display = "block";
+      } else {
+        priceGroup.style.display = "block";
+        stockGroup.style.display = "none";
+        minStockGroup.style.display = "none";
+      }
+    }
+    updateFormVisibilityByType();
+    productType.addEventListener("change", updateFormVisibilityByType);
+
+    async function loadProducts() {
+      const snap = await getDocs(colProducts);
+      const products = [];
+      snap.forEach(docSnap => products.push({ id: docSnap.id, ...docSnap.data() }));
+      productsCache = products;
+
+      renderProductTable();
+      renderOpnameTable(products);
+      showLowStockNotifications(products);
+      updateStockMetricCards(products);
+
+      renderRecipeMenuOptions();
+      renderRecipeIngredientOptions();
+
+      renderMenuTableForSales();
+      updateItemSubtotal();
+      recomputeCartSummary();
+    }
+
+    function getCurrentProductFilterState() {
+      return {
+        searchTerm: (productSearch?.value || "").toLowerCase().trim(),
+        category: productFilterCategory?.value || "",
+        sort: productSort?.value || "name-asc",
+        status: productStatusFilter
+      };
+    }
+
+    function renderProductTable() {
+      productTableBody.innerHTML = "";
+      const { searchTerm, category, sort, status } = getCurrentProductFilterState();
+      let list = [...productsCache];
+
+      if (searchTerm) {
+        list = list.filter(p => (p.name || "").toLowerCase().includes(searchTerm));
+      }
+      if (category) {
+        list = list.filter(p => (p.category || "").toLowerCase() === category);
+      }
+
+      list = list.filter(p => {
+        if ((p.type || "bahan_baku") !== "bahan_baku") return true; // status filter hanya bahan baku
+        const stock = Number(p.stock || 0);
+        const min = Number(p.minStock || 0);
+        if (status === "empty") return stock <= 0;
+        if (status === "low")   return stock > 0 && stock <= min;
+        if (status === "ok")    return stock > min;
+        return true;
+      });
+
+      list.sort((a, b) => {
+        const priceA = Number(a.price || 0);
+        const priceB = Number(b.price || 0);
+        const stockA = Number(a.stock || 0);
+        const stockB = Number(b.stock || 0);
+        const nameA = (a.name || "").toLowerCase();
+        const nameB = (b.name || "").toLowerCase();
+        switch (sort) {
+          case "name-desc":  return nameA < nameB ? 1 : nameA > nameB ? -1 : 0;
+          case "price-asc":  return priceA - priceB;
+          case "price-desc": return priceB - priceA;
+          case "stock-asc":  return stockA - stockB;
+          case "stock-desc": return stockB - stockA;
+          default:           return nameA < nameB ? -1 : nameA > nameB ? 1 : 0;
+        }
+      });
+
+      const typeLabelMap = { bahan_baku: "Bahan Baku", menu: "Menu" };
+      const catLabelMap  = { makanan: "Makanan", minuman: "Minuman", lainnya: "Lainnya" };
+
+      list.forEach(p => {
+        const tr = document.createElement("tr");
+
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.classList.add("badge");
+        const min = Number(p.minStock || 0);
+        const stock = Number(p.stock || 0);
+
+        if ((p.type || "bahan_baku") === "bahan_baku") {
+          if (stock <= 0) {
+            badge.classList.add("badge-zero");
+            badge.textContent = "Habis";
+          } else if (stock <= min) {
+            badge.classList.add("badge-low");
+            badge.textContent = "Menipis";
+          } else {
+            badge.classList.add("badge-ok");
+            badge.textContent = "Aman";
+          }
+        } else {
+          badge.classList.add("badge-ok");
+          badge.textContent = "-";
+        }
+        statusCell.appendChild(badge);
+
+        const typeLabel = typeLabelMap[p.type] || "Bahan Baku";
+        const catLabel  = catLabelMap[(p.category || "").toLowerCase()] || "-";
+
+        const isBahan = (p.type || "bahan_baku") === "bahan_baku";
+        const priceDisplay = isBahan ? "-" : `Rp ${Number(p.price || 0).toLocaleString("id-ID")}`;
+        const stockDisplay = isBahan ? (p.stock ?? 0) : "-";
+
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${typeLabel}</td>
+          <td>${catLabel}</td>
+          <td>${priceDisplay}</td>
+          <td>${stockDisplay}</td>
+          <td>${p.unit || "-"}</td>
+        `;
+        tr.appendChild(statusCell);
+
+        const tdActions = document.createElement("td");
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.classList.add("secondary");
+        editBtn.style.marginRight = "4px";
+        editBtn.onclick = () => fillFormForEdit(p);
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Hapus";
+        delBtn.classList.add("danger");
+        delBtn.onclick = () => deleteProduct(p.id);
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        productTableBody.appendChild(tr);
+      });
+
+      if (!productTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="8" style="text-align:center;color:#9ca3af;padding:8px;">Item tidak ditemukan</td>`;
+        productTableBody.appendChild(tr);
+      }
+    }
+
+    if (productSearch) productSearch.addEventListener("input", renderProductTable);
+    if (productFilterCategory) productFilterCategory.addEventListener("change", () => { productStatusFilter="all"; renderProductTable(); });
+    if (productSort) productSort.addEventListener("change", renderProductTable);
+
+    function fillFormForEdit(p) {
+      editProductId.value = p.id;
+      productName.value = p.name || "";
+      productType.value = p.type || "bahan_baku";
+      productCategory.value = (p.category || "makanan").toLowerCase();
+      productPrice.value = p.price || "";
+      productStock.value = p.stock || "";
+      productUnit.value = p.unit || "";
+      productMinStock.value = p.minStock || "";
+      updateFormVisibilityByType();
+      showToast("Mode edit item aktif", "info");
+    }
+
+    btnResetForm.addEventListener("click", () => {
+      editProductId.value = "";
+      productName.value = "";
+      productType.value = "bahan_baku";
+      productCategory.value = "makanan";
+      productPrice.value = "";
+      productStock.value = "";
+      productUnit.value = "";
+      productMinStock.value = "";
+      updateFormVisibilityByType();
+    });
+
+    btnSaveProduct.addEventListener("click", async () => {
+      const name = productName.value.trim();
+      const type = productType.value || "bahan_baku";
+      const category = productCategory.value || "lainnya";
+      let price = Number(productPrice.value || 0);
+      let stock = Number(productStock.value || 0);
+      const unit = productUnit.value.trim();
+      let minStock = Number(productMinStock.value || 0);
+      if (!name) return showToast("Nama item wajib diisi", "error");
+
+      if (type === "bahan_baku") {
+        price = 0;
+      } else {
+        stock = 0;
+        minStock = 0;
+      }
+
+      try {
+        const id = editProductId.value;
+        if (id) {
+          const ref = doc(db, "products", id);
+          await updateDoc(ref, { name, type, category, price, stock, unit, minStock });
+          showToast("Item berhasil diupdate", "success");
+        } else {
+          await addDoc(colProducts, { name, type, category, price, stock, unit, minStock, createdAt: serverTimestamp() });
+          showToast("Item berhasil ditambahkan", "success");
+        }
+        btnResetForm.click();
+        await loadProducts();
+        await loadRecipes();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan item: " + err.message, "error");
+      }
+    });
+
+    async function deleteProduct(id) {
+      if (!confirm("Yakin hapus item ini?")) return;
+      try {
+        const ref = doc(db, "products", id);
+        await deleteDoc(ref);
+        showToast("Item dihapus", "success");
+        await loadProducts();
+        await loadRecipes();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal hapus: " + err.message, "error");
+      }
+    }
+
+    function renderOpnameTable(products) {
+      opnameTableBody.innerHTML = "";
+      const bahanBaku = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");
+      bahanBaku.forEach(p => {
+        const unit = p.unit || "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${p.name}</td>
+          <td>${p.stock ?? 0} ${unit}</td>
+          <td><input type="number" id="op_fisik_${p.id}" placeholder="Stok fisik ${unit ? "(" + unit + ")" : ""}" /></td>
+          <td id="op_selisih_${p.id}">-</td>
+        `;
+        const tdAction = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Simpan";
+        btn.classList.add("primary");
+        btn.onclick = () => saveOpnameForProduct(p);
+        tdAction.appendChild(btn);
+        tr.appendChild(tdAction);
+        opnameTableBody.appendChild(tr);
+      });
+      if (!opnameTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada bahan baku</td>`;
+        opnameTableBody.appendChild(tr);
+      }
+    }
+
+    async function saveOpnameForProduct(p) {
+      const input = document.getElementById(`op_fisik_${p.id}`);
+      const selisihCell = document.getElementById(`op_selisih_${p.id}`);
+      const fisik = Number(input.value);
+      if (Number.isNaN(fisik)) return showToast("Isi stok fisik terlebih dahulu", "error");
+      const sistem = Number(p.stock ?? 0);
+      const selisih = fisik - sistem;
+      selisihCell.textContent = selisih.toString();
+      try {
+        await addDoc(colOpname, {
+          productId: p.id,
+          productName: p.name,
+          stockSystem: sistem,
+          stockPhysical: fisik,
+          difference: selisih,
+          unit: p.unit || "",
+          opnameDate: serverTimestamp(),
+          userId: currentUser ? currentUser.uid : null
+        });
+        const ref = doc(db, "products", p.id);
+        await updateDoc(ref, { stock: fisik });
+        showToast("Stok opname tersimpan & stok terupdate", "success");
+        await loadProducts();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan opname: " + err.message, "error");
+      }
+    }
+
+    // RESEP
+    async function loadRecipes() {
+      const snap = await getDocs(colRecipes);
+      const list = [];
+      snap.forEach(docSnap => list.push({ id: docSnap.id, ...docSnap.data() }));
+      recipesCache = list;
+      renderRecipeTableForSelectedMenu();
+    }
+
+    function renderRecipeMenuOptions() {
+      const current = recipeMenuSelect.value;
+      recipeMenuSelect.innerHTML = '<option value="">Pilih menu...</option>';
+      const menus = productsCache.filter(p => (p.type || "bahan_baku") === "menu");
+      menus.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m.id;
+        opt.textContent = m.name;
+        recipeMenuSelect.appendChild(opt);
+      });
+      if (current && menus.some(m => m.id === current)) recipeMenuSelect.value = current;
+      renderRecipeTableForSelectedMenu();
+    }
+
+    function renderRecipeIngredientOptions() {
+      recipeIngredientSelect.innerHTML = '<option value="">Pilih bahan...</option>';
+      const ing = productsCache.filter(p => (p.type || "bahan_baku") === "bahan_baku");
+      ing.forEach(b => {
+        const opt = document.createElement("option");
+        const unit = b.unit || "";
+        opt.value = b.id;
+        opt.textContent = `${b.name} ${unit ? "(" + unit + ")" : ""} - stok: ${b.stock ?? 0}`;
+        recipeIngredientSelect.appendChild(opt);
+      });
+    }
+
+    function renderRecipeTableForSelectedMenu() {
+      recipeTableBody.innerHTML = "";
+      const menuId = recipeMenuSelect.value;
+      if (!menuId) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Pilih menu dulu untuk melihat komposisi</td>`;
+        recipeTableBody.appendChild(tr);
+        return;
+      }
+      const rows = recipesCache.filter(r => r.menuId === menuId);
+      rows.forEach(r => {
+        const unit = r.ingredientUnit || "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${r.ingredientName || "-"}</td><td>${r.qtyUsed} ${unit}</td>`;
+        const tdAct = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Hapus";
+        btn.classList.add("danger");
+        btn.style.fontSize = "11px";
+        btn.onclick = () => deleteRecipe(r.id);
+        tdAct.appendChild(btn);
+        tr.appendChild(tdAct);
+        recipeTableBody.appendChild(tr);
+      });
+      if (!recipeTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada bahan untuk menu ini</td>`;
+        recipeTableBody.appendChild(tr);
+      }
+    }
+    recipeMenuSelect.addEventListener("change", renderRecipeTableForSelectedMenu);
+
+    btnAddRecipe.addEventListener("click", async () => {
+      const menuId = recipeMenuSelect.value;
+      const ingredientId = recipeIngredientSelect.value;
+      const qty = Number(recipeQty.value || 0);
+      if (!menuId) return showToast("Pilih menu dulu", "error");
+      if (!ingredientId) return showToast("Pilih bahan baku dulu", "error");
+      if (!(qty > 0)) return showToast("Qty harus lebih dari 0", "error");
+      const menu = findProductById(menuId);
+      const ing = findProductById(ingredientId);
+      if (!menu || !ing) return showToast("Data menu/bahan tidak valid", "error");
+      try {
+        await addDoc(colRecipes, {
+          menuId,
+          menuName: menu.name,
+          ingredientId,
+          ingredientName: ing.name,
+          ingredientUnit: ing.unit || "",
+          qtyUsed: qty,
+          createdAt: serverTimestamp(),
+          userId: currentUser ? currentUser.uid : null
+        });
+        showToast("Resep ditambahkan", "success");
+        recipeQty.value = "";
+        await loadRecipes();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan resep: " + err.message, "error");
+      }
+    });
+
+    async function deleteRecipe(id) {
+      if (!confirm("Hapus bahan dari resep?")) return;
+      try {
+        const ref = doc(db, "recipes", id);
+        await deleteDoc(ref);
+        showToast("Resep dihapus", "success");
+        await loadRecipes();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal hapus resep: " + err.message, "error");
+      }
+    }
+
+    // Helper product
+    function findProductById(id) {
+      return productsCache.find(p => p.id === id) || null;
+    }
+
+    // KASIR: menu table (tanpa dropdown)
+    function renderMenuTableForSales() {
+      saleMenuTableBody.innerHTML = "";
+      const term = (saleSearch.value || "").toLowerCase().trim();
+      const menus = productsCache.filter(p => (p.type || "bahan_baku") === "menu");
+      menus.forEach(m => {
+        if (term && !(m.name || "").toLowerCase().includes(term)) return;
+        const tr = document.createElement("tr");
+        const canSellOnePortion = checkMenuEnoughStockForQty(m.id, 1);
+        tr.innerHTML = `
+          <td>${m.name}</td>
+          <td>Rp ${Number(m.price || 0).toLocaleString("id-ID")}</td>
+        `;
+        const tdAct = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.classList.add("sale-pilih-btn");
+        const recipes = recipesCache.filter(r => r.menuId === m.id);
+        const isAnyIngredientZero = recipes.some(r => {
+          const ing = findProductById(r.ingredientId);
+          return ing && Number(ing.stock || 0) <= 0;
+        });
+
+        if (canSellOnePortion) {
+          btn.classList.add("sale-pilih-ok");
+          btn.textContent = "Pilih";
+          btn.onclick = () => {
+            saleSelectedId.value = m.id;
+            saleSelectedName.textContent = m.name;
+            updateItemSubtotal();
+          };
+        } else {
+          btn.classList.add("sale-pilih-disabled");
+          btn.textContent = isAnyIngredientZero ? "Stok habis" : "Stok kurang";
+        }
+        tdAct.appendChild(btn);
+        tr.appendChild(tdAct);
+        saleMenuTableBody.appendChild(tr);
+      });
+
+      if (!saleMenuTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Menu tidak ditemukan</td>`;
+        saleMenuTableBody.appendChild(tr);
+      }
+    }
+    saleSearch.addEventListener("input", renderMenuTableForSales);
+
+    function updateItemSubtotal() {
+      const id = saleSelectedId.value;
+      const q = Number(saleQty.value || 0);
+      const p = findProductById(id);
+      if (!p || q <= 0) { saleSubtotal.value = ""; return; }
+      saleSubtotal.value = Number(p.price || 0) * q;
+    }
+    saleQty.addEventListener("input", updateItemSubtotal);
+
+    function renderCartTable() {
+      cartTableBody.innerHTML = "";
+      if (currentCart.length === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada item dalam transaksi</td>`;
+        cartTableBody.appendChild(tr);
+        return;
+      }
+      currentCart.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.productName}</td>
+          <td>${item.qty}</td>
+          <td>Rp ${Number(item.price || 0).toLocaleString("id-ID")}</td>
+          <td>Rp ${Number(item.subtotal || 0).toLocaleString("id-ID")}</td>
+        `;
+        const tdAct = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Hapus";
+        btn.classList.add("danger");
+        btn.style.fontSize = "11px";
+        btn.onclick = () => {
+          currentCart.splice(index, 1);
+          renderCartTable();
+          recomputeCartSummary();
+        };
+        tdAct.appendChild(btn);
+        tr.appendChild(tdAct);
+        cartTableBody.appendChild(tr);
+      });
+    }
+
+    function getCartSubtotal() {
+      return currentCart.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    }
+
+    function recomputeCartSummary() {
+      const subtotal = getCartSubtotal();
+      cartSubtotalLabel.textContent = "Rp " + subtotal.toLocaleString("id-ID");
+
+      let disc = Number(saleDiscount.value || 0);
+      if (disc < 0) disc = 0;
+      if (disc > 100) disc = 100;
+      saleDiscount.value = disc;
+
+      let voucher = Number(saleVoucher.value || 0);
+      if (voucher < 0) voucher = 0;
+      saleVoucher.value = voucher;
+
+      const discVal = subtotal * disc / 100;
+      let total = subtotal - discVal - voucher;
+      if (total < 0) total = 0;
+      saleTotal.value = total;
+
+      const pay = Number(salePay.value || 0);
+      if (!total || !pay || pay < total) {
+        saleChange.value = 0;
+      } else {
+        saleChange.value = pay - total;
+      }
+    }
+
+    saleDiscount.addEventListener("input", recomputeCartSummary);
+    saleVoucher.addEventListener("input", recomputeCartSummary);
+    salePay.addEventListener("input", recomputeCartSummary);
+
+    btnAddToCart.addEventListener("click", () => {
+      const productId = saleSelectedId.value;
+      const qty = Number(saleQty.value || 0);
+      const product = findProductById(productId);
+      if (!productId || !product) return showToast("Pilih menu dulu", "error");
+      if (qty <= 0) return showToast("Qty harus lebih dari 0", "error");
+
+      const checkResult = checkMenuStockForCartPlusNewQty(productId, qty);
+      if (!checkResult.ok) {
+        if (checkResult.reason === "zero") {
+          showToast(`Stok bahan "${checkResult.ingredientName}" habis. Tidak bisa transaksi.`, "error", 6000);
+        } else {
+          showToast(`Stok bahan "${checkResult.ingredientName}" tidak cukup untuk jumlah ini.`, "error", 6000);
+        }
+        return;
+      }
+
+      const price = Number(product.price || 0);
+      const subtotal = price * qty;
+
+      const existing = currentCart.find(i => i.productId === productId);
+      if (existing) {
+        existing.qty += qty;
+        existing.subtotal += subtotal;
+      } else {
+        currentCart.push({ productId, productName: product.name, price, qty, subtotal });
+      }
+
+      saleQty.value = 1;
+      updateItemSubtotal();
+      renderCartTable();
+      recomputeCartSummary();
+    });
+
+    // hitung kebutuhan bahan dari keranjang
+    function buildIngredientUsageFromCart() {
+      const usageMap = {};
+      currentCart.forEach(item => {
+        const product = findProductById(item.productId);
+        if (!product || (product.type || "bahan_baku") !== "menu") return;
+        const related = recipesCache.filter(r => r.menuId === product.id);
+        related.forEach(r => {
+          const ing = findProductById(r.ingredientId);
+          if (!ing) return;
+          const need = Number(r.qtyUsed || 0) * Number(item.qty || 0);
+          if (!usageMap[ing.id]) {
+            usageMap[ing.id] = { name: ing.name, unit: ing.unit || "", need: 0 };
+          }
+          usageMap[ing.id].need += need;
+        });
+      });
+      return usageMap;
+    }
+
+    // cek stok untuk qty tertentu
+    function checkMenuEnoughStockForQty(menuId, qty) {
+      const menu = findProductById(menuId);
+      if (!menu) return false;
+      const recipes = recipesCache.filter(r => r.menuId === menuId);
+      if (recipes.length === 0) return true;
+      for (const r of recipes) {
+        const ing = findProductById(r.ingredientId);
+        if (!ing) continue;
+        const need = Number(r.qtyUsed || 0) * Number(qty || 0);
+        const have = Number(ing.stock || 0);
+        if (have < need) return false;
+      }
+      return true;
+    }
+
+    // cek stok untuk keranjang + qty baru
+    function checkMenuStockForCartPlusNewQty(menuId, newQty) {
+      const tmpCart = [...currentCart];
+      const existing = tmpCart.find(i => i.productId === menuId);
+      if (existing) {
+        existing.qty += newQty;
+        existing.subtotal += Number(existing.price || 0) * newQty;
+      } else {
+        const menu = findProductById(menuId);
+        const price = Number(menu?.price || 0);
+        tmpCart.push({ productId: menuId, productName: menu?.name || "", price, qty: newQty, subtotal: price * newQty });
+      }
+
+      const usageMap = {};
+      tmpCart.forEach(item => {
+        const product = findProductById(item.productId);
+        if (!product || (product.type || "bahan_baku") !== "menu") return;
+        const related = recipesCache.filter(r => r.menuId === product.id);
+        related.forEach(r => {
+          const ing = findProductById(r.ingredientId);
+          if (!ing) return;
+          const need = Number(r.qtyUsed || 0) * Number(item.qty || 0);
+          if (!usageMap[ing.id]) {
+            usageMap[ing.id] = { name: ing.name, unit: ing.unit || "", need: 0 };
+          }
+          usageMap[ing.id].need += need;
+        });
+      });
+
+      for (const [ingId, info] of Object.entries(usageMap)) {
+        const ing = findProductById(ingId);
+        if (!ing) continue;
+        const have = Number(ing.stock || 0);
+        if (have <= 0) {
+          return { ok:false, reason:"zero", ingredientName: ing.name };
+        }
+        if (have < info.need) {
+          return { ok:false, reason:"less", ingredientName: ing.name };
+        }
+      }
+      return { ok:true };
+    }
+
+    async function saveSale() {
+      if (currentCart.length === 0) return showToast("Tambahkan item ke daftar dulu", "error");
+
+      const subtotal = getCartSubtotal();
+      if (subtotal <= 0) return showToast("Subtotal transaksi tidak valid", "error");
+
+      let disc = Number(saleDiscount.value || 0);
+      let voucher = Number(saleVoucher.value || 0);
+      if (disc < 0) disc = 0;
+      if (disc > 100) disc = 100;
+      if (voucher < 0) voucher = 0;
+
+      const discVal = subtotal * disc / 100;
+      let total = subtotal - discVal - voucher;
+      if (total < 0) total = 0;
+      const pay = Number(salePay.value || 0);
+      const change = Number(saleChange.value || 0);
+      if (pay < total) return showToast("Uang bayar kurang!", "error");
+
+      const usageMap = buildIngredientUsageFromCart();
+      const shortages = [];
+
+      Object.entries(usageMap).forEach(([ingId, info]) => {
+        const ing = findProductById(ingId);
+        if (!ing) return;
+        const have = Number(ing.stock || 0);
+        const need = info.need;
+        if (have < need) {
+          shortages.push({ name: ing.name, have, need, unit: ing.unit || "" });
+        }
+      });
+
+      if (shortages.length > 0) {
+        const first = shortages[0];
+        if (first.have <= 0) {
+          showToast(`Transaksi ditolak. Stok bahan "${first.name}" habis.`, "error", 8000);
+        } else {
+          showToast(`Transaksi ditolak. Stok bahan "${first.name}" tidak cukup. (Butuh ${first.need} ${first.unit}, ada ${first.have} ${first.unit})`, "error", 8000);
+        }
+        return;
+      }
+
+      const saleDocBase = {
+        items: currentCart.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          price: item.price,
+          qty: item.qty,
+          subtotal: item.subtotal
+        })),
+        subtotal,
+        discountPercent: disc,
+        discountValue: discVal,
+        voucherValue: voucher,
+        total,
+        pay,
+        change,
+        userId: currentUser ? currentUser.uid : null
+      };
+
+      const usageArray = Object.entries(usageMap).map(([ingredientId, info]) => ({
+        ingredientId,
+        need: info.need
+      }));
+
+      const saleForReceipt = { ...saleDocBase, date: new Date() };
+      renderReceipt(saleForReceipt);
+
+      if (!isOnline()) {
+        const offlineEntry = {
+          saleDoc: { ...saleDocBase, createdAtLocal: new Date().toISOString(), offline: true },
+          usageArray
+        };
+        pushOfflineSale(offlineEntry);
+        showToast("Transaksi disimpan OFFLINE & akan dikirim saat online ✅", "info", 6000);
+        resetSaleForm();
+        return;
+      }
+
+      try {
+        const saleDocOnline = { ...saleDocBase, createdAt: serverTimestamp() };
+        await addDoc(colSales, saleDocOnline);
+
+        for (const [ingId, info] of Object.entries(usageMap)) {
+          const ing = findProductById(ingId);
+          if (!ing) continue;
+          const newStockIng = Number(ing.stock || 0) - info.need;
+          const refIng = doc(db, "products", ing.id);
+          await updateDoc(refIng, { stock: newStockIng });
+        }
+
+        showToast("Penjualan tersimpan & stok bahan baku berkurang", "success");
+        resetSaleForm();
+        await loadProducts();
+        await loadSalesData();
+        await loadRecipes();
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan online. Disimpan sebagai transaksi offline.", "error", 6000);
+        const offlineEntry = {
+          saleDoc: { ...saleDocBase, createdAtLocal: new Date().toISOString(), offline: true },
+          usageArray
+        };
+        pushOfflineSale(offlineEntry);
+        resetSaleForm();
+      }
+    }
+    btnSaveSale.addEventListener("click", saveSale);
+
+    function resetSaleForm() {
+      currentCart = [];
+      renderCartTable();
+      cartSubtotalLabel.textContent = "Rp 0";
+      saleDiscount.value = 0;
+      saleVoucher.value = 0;
+      salePay.value = "";
+      saleChange.value = "";
+      saleTotal.value = "";
+      saleQty.value = 1;
+      saleSubtotal.value = "";
+      saleSelectedId.value = "";
+      saleSelectedName.textContent = "Belum ada";
+      updateItemSubtotal();
+    }
+
+    function renderReceipt(sale) {
+      if (!printArea) return;
+      const { items, subtotal, discountPercent, discountValue, voucherValue, total, pay, change, date } = sale;
+      const d = date || new Date();
+      const tanggal = d.toLocaleDateString("id-ID");
+      const waktu = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+      const itemsHtml = (items || []).map(it =>
+        `<p>${it.productName} x${it.qty} @ Rp ${Number(it.price || 0).toLocaleString("id-ID")} = Rp ${Number(it.subtotal || 0).toLocaleString("id-ID")}</p>`
+      ).join("");
+
+      printArea.innerHTML = `
+        <h4>STRUK PENJUALAN</h4>
+        <p>F&amp;B POS</p>
+        <p>${tanggal} ${waktu}</p>
+        <hr />
+        ${itemsHtml || '<p>Tidak ada item.</p>'}
+        <hr />
+        <p>Subtotal: Rp ${Number(subtotal || 0).toLocaleString("id-ID")}</p>
+        <p>Diskon: ${Number(discountPercent || 0)}% (Rp ${Number(discountValue || 0).toLocaleString("id-ID")})</p>
+        <p>Voucher: Rp ${Number(voucherValue || 0).toLocaleString("id-ID")}</p>
+        <hr />
+        <p><strong>Total Bayar: Rp ${Number(total || 0).toLocaleString("id-ID")}</strong></p>
+        <p>Uang Bayar: Rp ${Number(pay || 0).toLocaleString("id-ID")}</p>
+        <p>Kembalian: Rp ${Number(change || 0).toLocaleString("id-ID")}</p>
+        <hr />
+        <p style="text-align:center;">Terima kasih 🙏</p>
+      `;
+    }
+
+    // SALES DATA / DASHBOARD
+    async function loadSalesData() {
+      const snap = await getDocs(colSales);
+      const sales = [];
+      snap.forEach(docSnap => sales.push({ id: docSnap.id, ...docSnap.data() }));
+      allSalesCache = sales;
+      renderSalesToday(sales);
+      renderSalesCharts(sales);
+      setDefaultHistoryDate();
+      renderHistoryByDate();
+      return sales;
+    }
+
+    function getSaleItemsArray(s) {
+      if (Array.isArray(s.items) && s.items.length > 0) return s.items;
+      if (s.productId) {
+        const price = Number(s.price || 0);
+        const qty = Number(s.qty || 0);
+        const subtotal = Number(s.total ?? s.subtotal ?? price * qty);
+        return [{ productId: s.productId, productName: s.productName || "Item", price, qty, subtotal }];
+      }
+      return [];
+    }
+
+    function renderSalesToday(allSales) {
+      salesTableBody.innerHTML = "";
+      salesTotalToday.textContent = "Rp 0";
+
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const d = now.getDate();
+      let totalToday = 0;
+
+      const salesToday = allSales.filter(s => {
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        if (!t) return false;
+        return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
+      });
+
+      salesToday.sort((a,b) => {
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return ta - tb;
+      });
+
+      salesToday.forEach(s => {
+        const items = getSaleItemsArray(s);
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        const timeStr = t ? `${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}` : "-";
+        const total = Number(s.total ?? s.subtotal ?? 0);
+        totalToday += total;
+        const totalQty = items.reduce((sum,it)=> sum + Number(it.qty || 0), 0);
         const firstName = items[0]?.productName || "-";
-        const detail =
-          items.length > 1 ? `${firstName} +${items.length - 1} menu` : firstName;
+        const detail = items.length > 1 ? `${firstName} +${items.length-1} menu` : firstName;
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -2114,7 +2190,7 @@
 
       if (!salesTableBody.hasChildNodes()) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="4" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada transaksi hari ini</td>`;
+        tr.innerHTML = `<td colspan="4" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada penjualan hari ini</td>`;
         salesTableBody.appendChild(tr);
       }
 
@@ -2122,259 +2198,270 @@
     }
 
     function destroyCharts() {
-      if (dailyChart) {
-        dailyChart.destroy();
-        dailyChart = null;
-      }
-      if (monthlyChart) {
-        monthlyChart.destroy();
-        monthlyChart = null;
-      }
+      if (dailyChart) { dailyChart.destroy(); dailyChart = null; }
+      if (monthlyChart) { monthlyChart.destroy(); monthlyChart = null; }
     }
 
     function renderSalesCharts(allSales) {
       destroyCharts();
-      if (!dailyCanvas || !monthlyCanvas) return;
-      const byDay = {};
-      const byMonth = {};
 
+      // daily last 7 days
+      const dailyMap = {};
       allSales.forEach(s => {
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         if (!t) return;
+        const key = t.toISOString().slice(0,10); // yyyy-mm-dd
         const total = Number(s.total ?? s.subtotal ?? 0);
-
-        const dayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;
-        const monthKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2,"0")}`;
-
-        byDay[dayKey] = (byDay[dayKey] || 0) + total;
-        byMonth[monthKey] = (byMonth[monthKey] || 0) + total;
+        dailyMap[key] = (dailyMap[key] || 0) + total;
       });
 
-      const dayKeys = Object.keys(byDay).sort();
-      const dayLabels = dayKeys.map(k => {
-        const [y,m,d] = k.split("-");
-        return `${d}/${m}`;
+      const days = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0,10);
+        days.push(key);
+      }
+      const dailyLabels = days.map(k => {
+        const d = new Date(k);
+        return d.toLocaleDateString("id-ID", { weekday:"short", day:"2-digit" });
       });
-      const dayValues = dayKeys.map(k => byDay[k]);
+      const dailyValues = days.map(k => dailyMap[k] || 0);
 
-      const monthKeys = Object.keys(byMonth).sort();
-      const monthLabels = monthKeys.map(k => {
-        const [y,m] = k.split("-");
-        return `${m}/${y}`;
-      });
-      const monthValues = monthKeys.map(k => byMonth[k]);
-
-      if (dayLabels.length) {
-        dailyChart = new Chart(dailyCanvas.getContext("2d"), {
-          type: "bar",
-          data: {
-            labels: dayLabels,
-            datasets: [
-              {
-                label: "Total harian",
-                data: dayValues
-              }
-            ]
+      dailyChart = new Chart(dailyCanvas, {
+        type: "line",
+        data: {
+          labels: dailyLabels,
+          datasets: [{
+            label: "Omzet Harian",
+            data: dailyValues,
+            borderColor: "#111827",
+            backgroundColor: "rgba(250,204,21,0.35)",
+            borderWidth: 2,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: "#111827"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  callback: value => "Rp " + Number(value).toLocaleString("id-ID")
-                }
-              }
+          scales: {
+            x: { ticks: { color: "#111827", font:{size:11} } },
+            y: {
+              ticks: {
+                color: "#111827",
+                font:{size:11},
+                callback: v => "Rp " + Number(v).toLocaleString("id-ID")
+              },
+              beginAtZero: true
             }
           }
-        });
-      }
+        }
+      });
 
-      if (monthLabels.length) {
-        monthlyChart = new Chart(monthlyCanvas.getContext("2d"), {
-          type: "bar",
-          data: {
-            labels: monthLabels,
-            datasets: [
-              {
-                label: "Total bulanan",
-                data: monthValues
-              }
-            ]
+      // monthly last 6 months
+      const monthlyMap = {};
+      allSales.forEach(s => {
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        if (!t) return;
+        const key = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}`;
+        const total = Number(s.total ?? s.subtotal ?? 0);
+        monthlyMap[key] = (monthlyMap[key] || 0) + total;
+      });
+
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now);
+        d.setMonth(d.getMonth() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        months.push(key);
+      }
+      const monthlyLabels = months.map(k => {
+        const [yy,mm] = k.split("-");
+        const d = new Date(Number(yy), Number(mm)-1, 1);
+        return d.toLocaleDateString("id-ID", { month:"short", year:"2-digit" });
+      });
+      const monthlyValues = months.map(k => monthlyMap[k] || 0);
+
+      monthlyChart = new Chart(monthlyCanvas, {
+        type: "line",
+        data: {
+          labels: monthlyLabels,
+          datasets: [{
+            label: "Omzet Bulanan",
+            data: monthlyValues,
+            borderColor: "#111827",
+            backgroundColor: "rgba(250,204,21,0.35)",
+            borderWidth: 2,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: "#111827"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  callback: value => "Rp " + Number(value).toLocaleString("id-ID")
-                }
-              }
+          scales: {
+            x: { ticks: { color: "#111827", font:{size:11} } },
+            y: {
+              ticks: {
+                color: "#111827",
+                font:{size:11},
+                callback: v => "Rp " + Number(v).toLocaleString("id-ID")
+              },
+              beginAtZero: true
             }
           }
-        });
-      }
+        }
+      });
     }
 
-    // History
     function setDefaultHistoryDate() {
       if (!historyDate) return;
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, "0");
-      const d = String(now.getDate()).padStart(2, "0");
-      historyDate.value = `${y}-${m}-${d}`;
+      if (!historyDate.value) {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth()+1).padStart(2,"0");
+        const dd = String(now.getDate()).padStart(2,"0");
+        historyDate.value = `${yyyy}-${mm}-${dd}`;
+      }
     }
 
     function renderHistoryByDate() {
-      if (!historyDate) return;
-      const val = historyDate.value;
-      if (!val) {
-        historyTableBody.innerHTML = "";
-        topProductsTableBody.innerHTML = "";
-        historyTotal.textContent = "Rp 0";
-        return;
-      }
-      const [yy, mm, dd] = val.split("-").map(Number);
-      const selectedSales = allSalesCache.filter(s => {
+      historyTableBody.innerHTML = "";
+      topProductsTableBody.innerHTML = "";
+      historyTotal.textContent = "Rp 0";
+      if (!historyDate.value) return;
+
+      const [yStr,mStr,dStr] = historyDate.value.split("-");
+      const y = Number(yStr);
+      const m = Number(mStr)-1;
+      const d = Number(dStr);
+
+      let totalToday = 0;
+      const productsAgg = {};
+
+      const filtered = allSalesCache.filter(s => {
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         if (!t) return false;
-        return (
-          t.getFullYear() === yy &&
-          t.getMonth() === mm - 1 &&
-          t.getDate() === dd
-        );
+        return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d;
       });
 
-      historyTableBody.innerHTML = "";
-      let totalDate = 0;
+      filtered.sort((a,b) => {
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return ta - tb;
+      });
 
-      const productAgg = {}; // id -> {name, qty, omzet}
+      filtered.forEach(s => {
+        const items = getSaleItemsArray(s);
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        const timeStr = t ? `${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}` : "-";
+        const total = Number(s.total ?? s.subtotal ?? 0);
+        totalToday += total;
+        const totalQty = items.reduce((sum,it)=> sum + Number(it.qty || 0), 0);
+        const firstName = items[0]?.productName || "-";
+        const detail = items.length > 1 ? `${firstName} +${items.length-1} menu` : firstName;
 
-      selectedSales
-        .sort((a,b) => {
-          const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
-          const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
-          return ta - tb;
-        })
-        .forEach(s => {
-          const items = getSaleItemsArray(s);
-          const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
-          const timeStr = t
-            ? `${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}`
-            : "-";
-          const total = Number(s.total ?? s.subtotal ?? 0);
-          totalDate += total;
-          const totalQty = items.reduce((sum,it)=> sum + Number(it.qty || 0), 0);
-          const firstName = items[0]?.productName || "-";
-          const detail =
-            items.length > 1 ? `${firstName} +${items.length - 1} menu` : firstName;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${timeStr}</td>
+          <td>${detail}</td>
+          <td>${totalQty}</td>
+          <td>Rp ${total.toLocaleString("id-ID")}</td>
+        `;
+        historyTableBody.appendChild(tr);
 
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${timeStr}</td>
-            <td>${detail}</td>
-            <td>${totalQty}</td>
-            <td>Rp ${total.toLocaleString("id-ID")}</td>
-          `;
-          historyTableBody.appendChild(tr);
-
-          items.forEach(it => {
-            const id = it.productId || it.name || "unknown";
-            if (!productAgg[id]) {
-              productAgg[id] = {
-                name: it.productName || it.name || "Item",
-                qty: 0,
-                omzet: 0
-              };
-            }
-            productAgg[id].qty += Number(it.qty || 0);
-            productAgg[id].omzet += Number(it.subtotal || 0);
-          });
+        items.forEach(it => {
+          const key = it.productName || "Item";
+          if (!productsAgg[key]) {
+            productsAgg[key] = { qty:0, omzet:0 };
+          }
+          productsAgg[key].qty += Number(it.qty || 0);
+          productsAgg[key].omzet += Number(it.subtotal || 0);
         });
+      });
 
       if (!historyTableBody.hasChildNodes()) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="4" style="text-align:center;color:#9ca3af;padding:8px;">Tidak ada penjualan pada tanggal ini</td>`;
+        tr.innerHTML = `<td colspan="4" style="text-align:center;color:#9ca3af;padding:8px;">Tidak ada penjualan di tanggal ini</td>`;
         historyTableBody.appendChild(tr);
       }
 
-      historyTotal.textContent = "Rp " + totalDate.toLocaleString("id-ID");
+      historyTotal.textContent = "Rp " + totalToday.toLocaleString("id-ID");
 
-      // top products
-      topProductsTableBody.innerHTML = "";
-      const arr = Object.values(productAgg);
-      arr.sort((a,b) => b.qty - a.qty);
-      arr.forEach(p => {
+      const topList = Object.entries(productsAgg).map(([name,val]) => ({
+        name,
+        qty: val.qty,
+        omzet: val.omzet
+      })).sort((a,b) => b.qty - a.qty || b.omzet - a.omzet);
+
+      topList.forEach(row => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${p.name}</td>
-          <td>${p.qty}</td>
-          <td>Rp ${p.omzet.toLocaleString("id-ID")}</td>
+          <td>${row.name}</td>
+          <td>${row.qty}</td>
+          <td>Rp ${row.omzet.toLocaleString("id-ID")}</td>
         `;
         topProductsTableBody.appendChild(tr);
       });
 
       if (!topProductsTableBody.hasChildNodes()) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada data</td>`;
+        tr.innerHTML = `<td colspan="3" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada data menu terlaris</td>`;
         topProductsTableBody.appendChild(tr);
       }
     }
 
-    if (historyDate) {
-      historyDate.addEventListener("change", renderHistoryByDate);
-    }
+    if (historyDate) historyDate.addEventListener("change", renderHistoryByDate);
 
-    // STOCK METRIC CARDS
+    // stok metric cards
     function updateStockMetricCards(products) {
-      const bahan = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");
-      let empty = 0;
-      let low = 0;
-      let ok = 0;
+      let emptyCount = 0;
+      let lowCount = 0;
+      let okCount = 0;
 
+      const bahan = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");
       bahan.forEach(p => {
         const stock = Number(p.stock || 0);
         const min = Number(p.minStock || 0);
-        if (stock <= 0) empty++;
-        else if (stock <= min) low++;
-        else ok++;
+        if (stock <= 0) emptyCount++;
+        else if (stock <= min) lowCount++;
+        else okCount++;
       });
 
-      metricEmptyCount.textContent = empty;
-      metricLowCount.textContent = low;
-      metricOkCount.textContent = ok;
+      metricEmptyCount.textContent = emptyCount;
+      metricLowCount.textContent = lowCount;
+      metricOkCount.textContent = okCount;
     }
 
     function showLowStockNotifications(products) {
       const bahan = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");
-      const warning = bahan.filter(p => {
+      const alertItems = [];
+      bahan.forEach(p => {
         const stock = Number(p.stock || 0);
         const min = Number(p.minStock || 0);
-        return stock > 0 && stock <= min;
+        if (stock <= 0) {
+          alertItems.push(`HABIS: ${p.name}`);
+        } else if (stock <= min && min > 0) {
+          alertItems.push(`Menipis: ${p.name} (sisa ${stock})`);
+        }
       });
-      const habis = bahan.filter(p => Number(p.stock || 0) <= 0);
-
-      if (habis.length) {
-        const names = habis.slice(0, 3).map(p => p.name).join(", ");
-        const more = habis.length > 3 ? ` dan ${habis.length - 3} lainnya` : "";
-        showToast(`Barang HABIS: ${names}${more}`, "error", 7000);
-      }
-
-      if (warning.length) {
-        const names = warning.slice(0, 3).map(p => p.name).join(", ");
-        const more = warning.length > 3 ? ` dan ${warning.length - 3} lainnya` : "";
-        showToast(`Stok hampir habis: ${names}${more}`, "info", 7000);
+      if (alertItems.length > 0) {
+        showToast("Peringatan stok: " + alertItems.slice(0,5).join(", "), "error", 6000);
       }
     }
 
-    // init awal (sebelum login pun aman)
-    renderMenuTableForSales();
-    updateItemSubtotal();
-    updateConnectionStatusLabel();
   </script>
 </body>
 </html>
