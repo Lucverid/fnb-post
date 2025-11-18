@@ -266,64 +266,140 @@
       color: #111827;
     }
 
-    /* ===== NAVBAR + HAMBURGER ===== */
-    .nav {
-      max-width: 780px;
-      margin: 0 auto 14px auto;
-      background: rgba(15, 23, 42, 0.98);
-      border-radius: 999px;
-      padding: 6px 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      color: #e5e7eb;
-      border: 1px solid rgba(148, 163, 184, 0.5);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.5);
-    }
+    /* ===== NAVBAR + HAMBURGER (SIMPLE & CLEAN) ===== */
+.nav {
+  max-width: 780px;
+  margin: 0 auto 14px auto;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.98);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
 
-    .nav-links {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
+.nav-left {
+  display: flex;
+  flex-direction: column;
+}
 
-    .nav-link {
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      border: none;
-      background: transparent;
-      color: #e5e7eb;
-      cursor: pointer;
-      white-space: nowrap;
-    }
+.nav-logo {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #fefce8;
+}
 
-    .nav-link:hover {
-      background: rgba(148, 163, 184, 0.35);
-    }
+.nav-subtitle {
+  font-size: 11px;
+  color: #9ca3af;
+}
 
-    .nav-link.active {
-      background: #facc15;
-      color: #111827;
-    }
+.nav-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
-    .nav-toggle {
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      border: 1px solid rgba(148, 163, 184, 0.7);
-      background: rgba(15,23,42,0.9);
-      color: #e5e7eb;
-      display: none;  /* default: hidden, muncul di mobile */
-      align-items: center;
-      gap: 6px;
-    }
+.nav-link {
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: #e5e7eb;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
-    .nav-toggle span {
-      display: inline-block;
-      font-size: 14px;
-    }
+.nav-link:hover {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.nav-link.active {
+  background: #facc15;
+  color: #111827;
+}
+
+/* tombol hamburger */
+.nav-toggle {
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  display: none; /* default hidden di desktop */
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.nav-burger-line {
+  display: block;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .nav {
+    border-radius: 14px;
+    padding: 8px 12px;
+  }
+
+  .nav-left {
+    max-width: 70%;
+  }
+
+  .nav-toggle {
+    display: flex;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    margin-top: 4px;
+    background: rgba(15, 23, 42, 0.98);
+    border-radius: 12px;
+    padding: 6px 8px;
+    flex-direction: column;
+    display: none;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .nav-link {
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+  }
+}
+
+/* DESKTOP */
+@media (min-width: 769px) {
+  .nav-toggle {
+    display: none;
+  }
+  .nav-links {
+    display: flex !important;
+  }
+}
 
     /* ===== PRINT ===== */
     #printArea {
@@ -462,18 +538,27 @@
     </div>
 
     <!-- NAVBAR + HAMBURGER (MUNCUL SETELAH LOGIN) -->
-    <div id="navWrapper" class="nav hidden">
-      <button id="btnMenuToggle" class="nav-toggle">
-        <span>☰</span>
-        <span>Menu</span>
+    <!-- NAVBAR + HAMBURGER (MUNCUL SETELAH LOGIN) -->
+    <nav id="navWrapper" class="nav hidden">
+      <div class="nav-left">
+        <span class="nav-logo">F&amp;B POS</span>
+        <span class="nav-subtitle">Dashboard</span>
+      </div>
+
+      <!-- tombol hamburger untuk mobile -->
+      <button id="btnMenuToggle" class="nav-toggle" aria-label="Toggle menu">
+        <span class="nav-burger-line"></span>
+        <span class="nav-burger-line"></span>
+        <span class="nav-burger-line"></span>
       </button>
+
       <div id="navLinks" class="nav-links">
         <button class="nav-link active" data-section="sales">Kasir</button>
         <button class="nav-link nav-admin" data-section="inventory">Inventory</button>
         <button class="nav-link nav-admin" data-section="dashboard">Dashboard</button>
         <button class="nav-link nav-admin" data-section="opname">Stok Opname</button>
       </div>
-    </div>
+    </nav>
 
     <!-- LOGIN / REGISTER -->
     <div class="card" id="authCard">
