@@ -7,271 +7,229 @@
 
   <!-- CHART.JS -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script type="module" src="./script.js"></script>
+
   <style>
     :root {
-  --primary: #facc15;      /* kuning */
-  --primary-dark: #eab308;
-  --dark: #020617;         /* hitam gelap */
-  --dark-soft: #0f172a; 
-  --light: #ffffff;
-  --muted: #6b7280;
-  --danger: #dc2626;
-  --success: #16a34a;
-  --info: #2563eb;
+      --primary: #facc15;
+      --primary-dark: #eab308;
+      --dark: #020617;
+      --dark-soft: #0f172a;
+      --light: #ffffff;
+      --muted: #6b7280;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --info: #2563eb;
+      --card-bg: #ffffff;
+      --card-shadow: rgba(0,0,0,0.35);
+    }
 
-  --card-bg: #ffffff;
-  --card-shadow: rgba(0,0,0,0.35);
-}
+    /* GLOBAL */
+    * {
+      box-sizing: border-box;
+    }
 
-/* GLOBAL */
-* {
-  box-sizing: border-box;
-}
+    body {
+      font-family: system-ui, sans-serif;
+      background: radial-gradient(circle at top, var(--primary) 0, var(--dark) 40%, var(--dark) 100%);
+      margin: 0;
+      color: var(--dark-soft);
+      min-height: 100vh;
+    }
 
-body {
-  font-family: system-ui, sans-serif;
-  background: radial-gradient(circle at top, var(--primary) 0, var(--dark) 40%, var(--dark) 100%);
-  margin: 0;
-  color: var(--dark-soft);
-  min-height: 100vh;
-}
+    .container {
+      max-width: 1120px;
+      margin: auto;
+      padding: 18px;
+    }
 
-.container {
-  max-width: 1120px;
-  margin: auto;
-  padding: 18px;
-}
+    h1 {
+      color: var(--light);
+      text-align: center;
+      font-weight: 800;
+      margin: 10px 0;
+      letter-spacing: 1px;
+    }
 
-h1 {
-  color: var(--light);
-  text-align: center;
-  font-weight: 800;
-  margin: 10px 0;
-  letter-spacing: 1px;
-}
+    .subtitle {
+      text-align: center;
+      color: #fef9c3;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
 
-.subtitle {
-  text-align: center;
-  color: #fef9c3;
-  margin-bottom: 20px;
-  font-size: 13px;
-}
+    /* CARD */
+    .card {
+      background: var(--card-bg);
+      padding: 18px;
+      border-radius: 18px;
+      box-shadow: 0 15px 40px var(--card-shadow);
+      border: 1px solid rgba(255,255,255,0.18);
+      margin-bottom: 22px;
+    }
 
-/* CARD */
-.card {
-  background: var(--card-bg);
-  padding: 18px;
-  border-radius: 18px;
-  box-shadow: 0 15px 40px var(--card-shadow);
-  border: 1px solid rgba(255,255,255,0.18);
-  margin-bottom: 22px;
-}
+    /* HIDDEN */
+    .hidden { display: none !important; }
 
-/* HIDDEN */
-.hidden {
-  display: none !important;
-}
+    /* FORM LABEL */
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-top: 6px;
+      display: block;
+    }
 
-/* LABEL */
-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  margin-top: 6px;
-  display: block;
-}
+    /* INPUT */
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      margin-top: 4px;
+      font-size: 14px;
+      background: #f8fafc;
+    }
 
-/* INPUT & SELECT */
-input, select {
-  width: 100%;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  margin-top: 4px;
-  font-size: 14px;
-  background: #f8fafc;
-}
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(250,204,21,0.3);
+      background: #ffffff;
+      outline: none;
+    }
 
-input:focus, select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(250,204,21,0.3);
-  background: #ffffff;
-  outline: none;
-}
+    /* BUTTONS */
+    button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 12px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 8px;
+    }
 
-/* BUTTON */
-button {
-  width: 100%;
-  padding: 10px;
-  border-radius: 12px;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  font-weight: 600;
-  margin-top: 8px;
-}
+    button.primary {
+      background: var(--primary);
+      color: var(--dark);
+      box-shadow: 0 5px 12px rgba(250,204,21,0.4);
+    }
+    button.primary:hover { background: var(--primary-dark); }
 
-button.primary {
-  background: var(--primary);
-  color: var(--dark);
-  box-shadow: 0 5px 12px rgba(250,204,21,0.4);
-}
+    button.secondary {
+      background: var(--dark);
+      color: white;
+    }
 
-button.primary:hover {
-  background: var(--primary-dark);
-}
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
 
-button.secondary {
-  background: var(--dark);
-  color: white;
-}
+    /* TOAST */
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+    }
 
-button.secondary:hover {
-  opacity: 0.95;
-}
+    .toast {
+      padding: 12px 16px;
+      background: var(--dark);
+      color: white;
+      border-radius: 999px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 5px 18px rgba(0,0,0,0.35);
+      opacity: 0.98;
+    }
 
-button.danger {
-  background: var(--danger);
-  color: white;
-}
+    .toast-success { background: var(--success) !important; }
+    .toast-error   { background: var(--danger) !important; }
+    .toast-info    { background: var(--info) !important; }
 
-button.danger:hover {
-  opacity: 0.9;
-}
+    /* TABLE */
+    table {
+      width: 100%;
+      font-size: 13px;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+    }
 
-/* TOAST */
-.toast-container {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 9999;
-}
+    th, td {
+      border: 1px solid #e5e7eb;
+      padding: 8px;
+    }
 
-.toast {
-  padding: 12px 16px;
-  background: var(--dark);
-  color: white;
-  border-radius: 999px;
-  margin-bottom: 10px;
-  font-size: 13px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 5px 18px rgba(0,0,0,0.35);
-  opacity: 0.98;
-}
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #475569;
+    }
 
-.toast-success {
-  background: var(--success) !important;
-}
+    /* MENU GRID */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
 
-.toast-error {
-  background: var(--danger) !important;
-}
+    .menu-card {
+      background: white;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 5px 16px rgba(0,0,0,0.18);
+      cursor: pointer;
+      transition: 0.15s;
+    }
 
-.toast-info {
-  background: var(--info) !important;
-}
+    .menu-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.25);
+    }
 
-/* TABLE */
-table {
-  width: 100%;
-  font-size: 13px;
-  border-collapse: collapse;
-  margin-top: 10px;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-}
+    .menu-title {
+      font-size: 14px;
+      font-weight: 700;
+    }
 
-th, td {
-  border: 1px solid #e5e7eb;
-  padding: 8px;
-}
+    .menu-price {
+      font-size: 13px;
+      color: var(--muted);
+    }
 
-th {
-  background: #f1f5f9;
-  font-weight: 600;
-  color: #475569;
-}
+    /* CART */
+    .cart-box {
+      background: white;
+      padding: 14px;
+      border-radius: 14px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+      font-size: 14px;
+    }
 
-td {
-  color: #334155;
-}
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed #e2e8f0;
+    }
 
-/* GRID MENU */
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.menu-card {
-  background: white;
-  border-radius: 16px;
-  padding: 12px;
-  box-shadow: 0 5px 16px rgba(0,0,0,0.18);
-  cursor: pointer;
-  transition: 0.15s;
-  border: 1px solid rgba(0,0,0,0.05);
-}
-
-.menu-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 18px rgba(0,0,0,0.25);
-}
-
-.menu-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--dark-soft);
-}
-
-.menu-price {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-
-/* CART */
-.cart-box {
-  background: white;
-  padding: 14px;
-  border-radius: 14px;
-  box-shadow: 0 8px 18px rgba(0,0,0,0.25);
-  font-size: 14px;
-}
-
-.cart-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px dashed #e2e8f0;
-}
-
-.cart-item:last-child {
-  border-bottom: none;
-}
-
-/* RESPONSIVE */
-@media (max-width: 700px) {
-  .container {
-    padding: 10px;
-  }
-
-  .menu-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px,1fr));
-  }
-
-  button {
-    font-size: 13px;
-  }
-}
+    @media (max-width: 700px) {
+      .container { padding: 10px; }
+      .menu-grid { grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); }
+    }
   </style>
 </head>
 
 <body>
+
 <div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
@@ -287,24 +245,31 @@ td {
   <!-- LOGIN REGISTER -->
   <div id="authCard" class="card">
     <h3>Login / Register</h3>
-    <div>
-      <label>Email</label>
-      <input id="loginEmail" type="email">
-      <label>Password</label>
-      <input id="loginPassword" type="password">
-      <button id="btnLogin" class="primary">Login</button>
-    </div>
+
+    <label>Email</label>
+    <input id="loginEmail" type="email">
+
+    <label>Password</label>
+    <input id="loginPassword" type="password">
+
+    <button id="btnLogin" class="primary">Login</button>
+
     <hr>
+
     <h3>Daftar User Baru</h3>
+
     <label>Email</label>
     <input id="registerEmail" type="email">
+
     <label>Password</label>
     <input id="registerPassword" type="password">
+
     <label>Role</label>
     <select id="registerRole">
       <option value="admin">Admin</option>
       <option value="kasir">Kasir</option>
     </select>
+
     <button id="btnRegister" class="secondary">Register</button>
   </div>
 
@@ -313,7 +278,7 @@ td {
     <h3>Manajemen Inventory</h3>
 
     <label>Nama Item</label>
-    <input id="invName" placeholder="Contoh: Beras, Gula">
+    <input id="invName">
 
     <label>Jenis</label>
     <select id="invType">
@@ -330,14 +295,14 @@ td {
 
     <div id="priceGroup">
       <label>Harga Menu</label>
-      <input id="invPrice" type="number" placeholder="15000">
+      <input id="invPrice" type="number">
     </div>
 
     <label>Stok Awal</label>
     <input id="invStock" type="number">
 
     <label>Satuan</label>
-    <input id="invUnit" placeholder="kg / g / ml / pcs">
+    <input id="invUnit">
 
     <label>Minimal Stok</label>
     <input id="invMin" type="number">
@@ -387,7 +352,7 @@ td {
     </table>
   </div>
 
-  <!-- POS / KASIR -->
+  <!-- POS -->
   <div id="posCard" class="card hidden">
     <h3>Penjualan (Multi Item)</h3>
 
@@ -398,6 +363,7 @@ td {
     <div id="cartBox" class="cart-box"></div>
 
     <h4>Total Bayar</h4>
+
     <label>Diskon %</label>
     <input id="cashDisc" type="number">
 
@@ -445,9 +411,10 @@ td {
   </div>
 </div>
 
-<!-- ========================================================= -->
-<!-- JAVASCRIPT AKAN DIISI DI PART 2 DAN PART 3 -->
-<!-- ========================================================= -->
+<!-- ============================= -->
+<!-- LOAD script.js DI BAWAH BODY -->
+<!-- ============================= -->
+<script type="module" src="./script.js"></script>
 
 </body>
 </html>
