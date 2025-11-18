@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>F&B POS & Inventory (Firebase)</title>
+  <title>Tianlala Tasik</title>
   <style>
     :root {
       --bg-main: #020617;
@@ -326,7 +326,7 @@
 
   <div class="container">
     <h1>TIANLALA TASIKMALAYA</h1>
-    <p class="subtitle">Sistem kasir & stok F&amp;B — Agis</p>
+    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — Agis</p>
 
     <!-- TOP BAR SETELAH LOGIN -->
     <div id="topbar" class="topbar hidden">
@@ -336,8 +336,6 @@
       </div>
       <button class="btn-logout" id="btnLogout">Logout</button>
     </div>
-
-    <p id="currentUserInfo"></p>
 
     <!-- LOGIN / REGISTER -->
     <div class="card" id="authCard">
@@ -502,7 +500,6 @@
     }
 
     // ====== 5. DOM Elements ======
-    const currentUserInfo = document.getElementById("currentUserInfo");
     const authCard = document.getElementById("authCard");
     const appCard = document.getElementById("appCard");
     const opnameCard = document.getElementById("opnameCard");
@@ -581,9 +578,6 @@
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
-        // Sembunyikan info "Belum login"
-        currentUserInfo.textContent = "";
-
         // Topbar + user
         topbar.classList.remove("hidden");
         topbarUser.textContent = `Login sebagai ${user.email}`;
@@ -597,8 +591,6 @@
 
         await loadProducts();
       } else {
-        currentUserInfo.textContent = "Belum login";
-
         // Sembunyikan dashboard & topbar
         topbar.classList.add("hidden");
         appCard.classList.add("hidden");
@@ -824,7 +816,10 @@
       });
     }
 
-  
+    // TODO NEXT:
+    // - Modul penjualan (sales) yang simpan ke collection "sales"
+    // - Dashboard penjualan harian/bulanan
+    // - Export ke Excel (SheetJS)
   </script>
 </body>
 </html>
