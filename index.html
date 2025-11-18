@@ -294,8 +294,8 @@
     }
 
     .toast-success { background: #16a34a; }
-    .toast-error { background: #dc2626; }
-    .toast-info { background: #2563eb; }
+    .toast-error  { background: #dc2626; }
+    .toast-info   { background: #2563eb; }
 
     @media print {
       body * {
@@ -419,7 +419,7 @@
 
           <div class="input-group">
             <label>Nama Item</label>
-            <input id="productName" placeholder="Contoh: Beras, Nasi Goreng, Teh Hitam" />
+            <input id="productName" placeholder="Contoh: Beras, Teh Hitam, Nasi Goreng" />
           </div>
 
           <div class="input-group">
@@ -445,18 +445,18 @@
           </div>
 
           <div class="input-group" id="stockGroup">
-            <label>Stok Awal</label>
+            <label>Stok Awal (hanya untuk BAHAN BAKU)</label>
             <input id="productStock" type="number" placeholder="10" />
+          </div>
+
+          <div class="input-group" id="minStockGroup">
+            <label>Minimal Stok (peringatan stok menipis, BAHAN BAKU)</label>
+            <input id="productMinStock" type="number" placeholder="5" />
           </div>
 
           <div class="input-group">
             <label>Satuan Stok (kg, g, ml, pcs, porsi, dll)</label>
             <input id="productUnit" placeholder="contoh: kg / g / ml / pcs / porsi" />
-          </div>
-
-          <div class="input-group" id="minStockGroup">
-            <label>Minimal Stok (peringatan stok menipis)</label>
-            <input id="productMinStock" type="number" placeholder="5" />
           </div>
 
           <button class="primary" id="btnSaveProduct">Simpan Item</button>
@@ -569,12 +569,12 @@
       <h2>Penjualan (Kasir)</h2>
       <div class="row">
         <div class="col">
-          <h3>Input Penjualan</h3>
+          <h3>Input Item ke Transaksi</h3>
 
           <div class="input-group">
-            <label>Item (Menu)</label>
+            <label>Menu</label>
             <select id="saleProductSelect">
-              <option value="">Pilih item</option>
+              <option value="">Pilih menu</option>
             </select>
           </div>
 
@@ -584,9 +584,32 @@
           </div>
 
           <div class="input-group">
-            <label>Subtotal (harga × qty)</label>
+            <label>Subtotal Item (harga × qty)</label>
             <input id="saleSubtotal" type="number" disabled />
           </div>
+
+          <button class="secondary" id="btnAddToCart">Tambah ke Daftar</button>
+
+          <h3 style="margin-top:14px;">Daftar Item dalam Transaksi</h3>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Menu</th>
+                  <th>Qty</th>
+                  <th>Harga</th>
+                  <th>Subtotal</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="cartTableBody"></tbody>
+            </table>
+          </div>
+          <p style="margin-top:6px;font-size:13px;">
+            Subtotal transaksi: <strong id="cartSubtotalLabel">Rp 0</strong>
+          </p>
+
+          <hr style="margin:10px 0;border:none;border-top:1px dashed #e5e7eb;" />
 
           <div class="input-group">
             <label>Diskon (%)</label>
@@ -626,7 +649,7 @@
               <thead>
                 <tr>
                   <th>Waktu</th>
-                  <th>Item</th>
+                  <th>Detail</th>
                   <th>Qty</th>
                   <th>Total</th>
                 </tr>
@@ -682,7 +705,7 @@
           <thead>
             <tr>
               <th>Waktu</th>
-              <th>Item</th>
+              <th>Detail</th>
               <th>Qty</th>
               <th>Total</th>
             </tr>
@@ -691,12 +714,12 @@
         </table>
       </div>
 
-      <h3 style="margin-top:14px;">Item Terlaris (berdasarkan tanggal di atas)</h3>
+      <h3 style="margin-top:14px;">Menu Terlaris (berdasarkan tanggal di atas)</h3>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Item</th>
+              <th>Menu</th>
               <th>Total Qty</th>
               <th>Total Omzet</th>
             </tr>
@@ -709,11 +732,11 @@
     <!-- STOCK OPNAME SECTION -->
     <div class="card hidden" id="opnameCard">
       <h2>Stok Opname Mingguan</h2>
-      <p>Gunakan ini setiap Senin untuk input stok fisik. Riwayat akan disimpan di Firebase.</p>
+      <p>Gunakan ini setiap Senin untuk input stok fisik bahan baku. Riwayat akan disimpan di Firebase.</p>
       <table>
         <thead>
           <tr>
-            <th>Item</th>
+            <th>Bahan Baku</th>
             <th>Stok Sistem</th>
             <th>Stok Fisik</th>
             <th>Selisih</th>
@@ -743,7 +766,9 @@
       updateDoc,
       deleteDoc,
       doc,
-      serverTimestamp
+      serverTimestamp,
+      query,
+      where
     } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -804,7 +829,6 @@
     const productFilterCategory = document.getElementById("productFilterCategory");
     const productSort = document.getElementById("productSort");
     const opnameTableBody = document.getElementById("opnameTableBody");
-
     const priceGroup = document.getElementById("priceGroup");
     const stockGroup = document.getElementById("stockGroup");
     const minStockGroup = document.getElementById("minStockGroup");
@@ -816,7 +840,7 @@
     const btnAddRecipe = document.getElementById("btnAddRecipe");
     const recipeTableBody = document.getElementById("recipeTableBody");
 
-    // Penjualan
+    // Penjualan + keranjang
     const saleProductSelect = document.getElementById("saleProductSelect");
     const saleQty = document.getElementById("saleQty");
     const saleSubtotal = document.getElementById("saleSubtotal");
@@ -826,6 +850,9 @@
     const salePay = document.getElementById("salePay");
     const saleChange = document.getElementById("saleChange");
     const btnSaveSale = document.getElementById("btnSaveSale");
+    const btnAddToCart = document.getElementById("btnAddToCart");
+    const cartTableBody = document.getElementById("cartTableBody");
+    const cartSubtotalLabel = document.getElementById("cartSubtotalLabel");
     const salesTableBody = document.getElementById("salesTableBody");
     const salesTotalToday = document.getElementById("salesTotalToday");
 
@@ -852,6 +879,27 @@
     let allSalesCache = [];
     let recipesCache = [];
     let currentUser = null;
+    let currentUserRole = null; // "admin" atau "kasir"
+
+    let currentCart = [];
+
+    // ===== Helper Role User =====
+    async function getUserRole(uid) {
+      try {
+        const q = query(colUsers, where("uid", "==", uid));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        let role = null;
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data.role) role = data.role;
+        });
+        return role;
+      } catch (err) {
+        console.error("Gagal ambil role user:", err);
+        return null;
+      }
+    }
 
     // ===== AUTH =====
     btnRegister.addEventListener("click", async () => {
@@ -894,23 +942,44 @@
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
+        let role = await getUserRole(user.uid);
+        if (!role) role = "kasir";
+        currentUserRole = role;
+
         topbar.classList.remove("hidden");
-        topbarUser.textContent = `Login sebagai ${user.email}`;
+        topbarUser.textContent = `Login sebagai ${user.email} (${role})`;
         authCard.classList.add("hidden");
-        appCard.classList.remove("hidden");
+
         salesCard.classList.remove("hidden");
-        chartCard.classList.remove("hidden");
-        opnameCard.classList.remove("hidden");
+
+        if (role === "admin") {
+          appCard.classList.remove("hidden");
+          chartCard.classList.remove("hidden");
+          opnameCard.classList.remove("hidden");
+        } else {
+          appCard.classList.add("hidden");
+          chartCard.classList.add("hidden");
+          opnameCard.classList.add("hidden");
+        }
+
         await loadProducts();
         await loadRecipes();
         await loadSalesData();
+
+        const now = new Date();
+        if (now.getDay() === 1 && role === "admin") {
+          showToast("Reminder: Hari ini jadwal stok opname mingguan ✅", "info", 8000);
+        }
       } else {
+        currentUserRole = null;
+
         topbar.classList.add("hidden");
         appCard.classList.add("hidden");
         salesCard.classList.add("hidden");
         chartCard.classList.add("hidden");
         opnameCard.classList.add("hidden");
         authCard.classList.remove("hidden");
+
         productTableBody.innerHTML = "";
         opnameTableBody.innerHTML = "";
         recipeTableBody.innerHTML = "";
@@ -921,6 +990,13 @@
         topProductsTableBody.innerHTML = "";
         if (historyDate) historyDate.value = "";
         recipesCache = [];
+        currentCart = [];
+        renderCartTable();
+        cartSubtotalLabel.textContent = "Rp 0";
+        saleTotal.value = "";
+        salePay.value = "";
+        saleChange.value = "";
+
         if (printArea) {
           printArea.innerHTML = '<p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>';
         }
@@ -928,26 +1004,21 @@
       }
     });
 
-    // ===== FORM BEHAVIOR (BAHAN BAKU vs MENU) =====
-    function updateFormByType() {
+    // ===== Toggle Form tergantung Jenis (bahan_baku / menu) =====
+    function updateFormVisibilityByType() {
       const type = productType.value;
       if (type === "bahan_baku") {
-        // Bahan baku: stok & min stok ada, harga jual tidak dipakai
-        priceGroup.classList.add("hidden");
-        productPrice.value = "";
-        stockGroup.classList.remove("hidden");
-        minStockGroup.classList.remove("hidden");
+        priceGroup.style.display = "none";
+        stockGroup.style.display = "block";
+        minStockGroup.style.display = "block";
       } else {
-        // Menu: pakai harga jual, tidak pakai stok & min stok
-        priceGroup.classList.remove("hidden");
-        stockGroup.classList.add("hidden");
-        minStockGroup.classList.add("hidden");
-        productStock.value = "";
-        productMinStock.value = "";
+        priceGroup.style.display = "block";
+        stockGroup.style.display = "none";
+        minStockGroup.style.display = "none";
       }
     }
-
-    productType.addEventListener("change", updateFormByType);
+    updateFormVisibilityByType();
+    productType.addEventListener("change", updateFormVisibilityByType);
 
     // ===== PRODUCTS =====
     async function loadProducts() {
@@ -964,7 +1035,8 @@
       renderRecipeMenuOptions();
       renderRecipeIngredientOptions();
 
-      updateSaleCalculation();
+      updateItemSubtotal();
+      recomputeCartSummary();
     }
 
     function getCurrentProductFilterState() {
@@ -1029,19 +1101,13 @@
       list.forEach((p) => {
         const tr = document.createElement("tr");
 
-        const isRaw = (p.type || "bahan_baku") === "bahan_baku";
-        const stockDisplay = isRaw ? (p.stock ?? 0) : "-";
-        const priceDisplay = isRaw
-          ? "-"
-          : "Rp " + Number(p.price || 0).toLocaleString("id-ID");
-
         const statusCell = document.createElement("td");
         const badge = document.createElement("span");
         badge.classList.add("badge");
+        const min = p.minStock ?? 0;
 
-        if (isRaw) {
-          const min = p.minStock ?? 0;
-          if ((p.stock ?? 0) <= min) {
+        if ((p.type || "bahan_baku") === "bahan_baku") {
+          if (p.stock <= min) {
             badge.classList.add("badge-low");
             badge.textContent = "Menipis";
           } else {
@@ -1050,12 +1116,16 @@
           }
         } else {
           badge.classList.add("badge-ok");
-          badge.textContent = "Menu";
+          badge.textContent = "-";
         }
         statusCell.appendChild(badge);
 
         const typeLabel = typeLabelMap[p.type] || "Bahan Baku";
         const catLabel = catLabelMap[(p.category || "").toLowerCase()] || "-";
+
+        const isBahan = (p.type || "bahan_baku") === "bahan_baku";
+        const priceDisplay = isBahan ? "-" : `Rp ${Number(p.price || 0).toLocaleString("id-ID")}`;
+        const stockDisplay = isBahan ? (p.stock ?? 0) : "-";
 
         tr.innerHTML = `
           <td>${p.name}</td>
@@ -1096,50 +1166,47 @@
     if (productSort) productSort.addEventListener("change", renderProductTable);
 
     function fillFormForEdit(product) {
-      editProductId.value   = product.id;
-      productName.value     = product.name || "";
-      productType.value     = product.type || "bahan_baku";
+      editProductId.value = product.id;
+      productName.value = product.name || "";
+      productType.value = product.type || "bahan_baku";
       productCategory.value = (product.category || "makanan").toLowerCase();
-      productPrice.value    = product.price || "";
-      productStock.value    = product.stock || "";
-      productUnit.value     = product.unit || "";
+      productPrice.value = product.price || "";
+      productStock.value = product.stock || "";
+      productUnit.value = product.unit || "";
       productMinStock.value = product.minStock || "";
-      updateFormByType();
+      updateFormVisibilityByType();
       showToast("Mode edit item aktif", "info");
     }
 
     btnResetForm.addEventListener("click", () => {
-      editProductId.value   = "";
-      productName.value     = "";
-      productType.value     = "bahan_baku";
+      editProductId.value = "";
+      productName.value = "";
+      productType.value = "bahan_baku";
       productCategory.value = "makanan";
-      productPrice.value    = "";
-      productStock.value    = "";
-      productUnit.value     = "";
+      productPrice.value = "";
+      productStock.value = "";
+      productUnit.value = "";
       productMinStock.value = "";
-      updateFormByType();
+      updateFormVisibilityByType();
     });
 
     btnSaveProduct.addEventListener("click", async () => {
-      const name     = productName.value.trim();
-      const type     = productType.value || "bahan_baku";
+      const name = productName.value.trim();
+      const type = productType.value || "bahan_baku";
       const category = productCategory.value || "lainnya";
-
-      const price = type === "bahan_baku"
-        ? 0
-        : Number(productPrice.value || 0);
-
-      const stock = type === "bahan_baku"
-        ? Number(productStock.value || 0)
-        : 0;
-
+      let price = Number(productPrice.value || 0);
+      let stock = Number(productStock.value || 0);
       const unit = productUnit.value.trim();
-
-      const minStock = type === "bahan_baku"
-        ? Number(productMinStock.value || 0)
-        : 0;
+      let minStock = Number(productMinStock.value || 0);
 
       if (!name) return showToast("Nama item wajib diisi", "error");
+
+      if (type === "bahan_baku") {
+        price = 0;
+      } else if (type === "menu") {
+        stock = 0;
+        minStock = 0;
+      }
 
       try {
         const id = editProductId.value;
@@ -1185,8 +1252,8 @@
 
     function renderOpnameTable(products) {
       opnameTableBody.innerHTML = "";
-      const raws = products.filter(p => (p.type || "bahan_baku") === "bahan_baku");
-      raws.forEach((p) => {
+      const bahanBaku = products.filter((p) => (p.type || "bahan_baku") === "bahan_baku");
+      bahanBaku.forEach((p) => {
         const unit = p.unit || "";
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -1204,6 +1271,12 @@
         tr.appendChild(tdAction);
         opnameTableBody.appendChild(tr);
       });
+
+      if (!opnameTableBody.hasChildNodes()) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada bahan baku</td>`;
+        opnameTableBody.appendChild(tr);
+      }
     }
 
     async function saveOpnameForProduct(product) {
@@ -1258,6 +1331,7 @@
       if (current && menus.some((m) => m.id === current)) {
         recipeMenuSelect.value = current;
       }
+      renderRecipeTableForSelectedMenu();
     }
 
     function renderRecipeIngredientOptions() {
@@ -1359,17 +1433,16 @@
       }
     }
 
-    // ===== PENJUALAN =====
+    // ===== PENJUALAN & KERANJANG =====
     function renderProductOptionsForSales(products) {
-      saleProductSelect.innerHTML = '<option value="">Pilih item</option>';
+      saleProductSelect.innerHTML = '<option value="">Pilih menu</option>';
       products.forEach((p) => {
         const type = p.type || "bahan_baku";
         if (type !== "menu") return;
-
         const unitLabel = p.unit ? ` / ${p.unit}` : "";
         const opt = document.createElement("option");
         opt.value = p.id;
-        opt.textContent = `[MENU] ${p.name} (Rp ${Number(p.price || 0).toLocaleString("id-ID")}${unitLabel})`;
+        opt.textContent = `${p.name} (Rp ${Number(p.price || 0).toLocaleString("id-ID")}${unitLabel})`;
         saleProductSelect.appendChild(opt);
       });
     }
@@ -1378,19 +1451,59 @@
       return productsCache.find((p) => p.id === id) || null;
     }
 
-    function updateSaleCalculation() {
+    function updateItemSubtotal() {
       const productId = saleProductSelect.value;
       const qty = Number(saleQty.value || 0);
       const product = findProductById(productId);
       if (!product || qty <= 0) {
         saleSubtotal.value = "";
-        saleTotal.value = "";
-        saleChange.value = "";
         return;
       }
       const price = Number(product.price || 0);
       const subtotal = price * qty;
       saleSubtotal.value = subtotal;
+    }
+
+    function renderCartTable() {
+      cartTableBody.innerHTML = "";
+      if (currentCart.length === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="5" style="text-align:center;color:#9ca3af;padding:8px;">Belum ada item dalam transaksi</td>`;
+        cartTableBody.appendChild(tr);
+        return;
+      }
+
+      currentCart.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${item.productName}</td>
+          <td>${item.qty}</td>
+          <td>Rp ${Number(item.price || 0).toLocaleString("id-ID")}</td>
+          <td>Rp ${Number(item.subtotal || 0).toLocaleString("id-ID")}</td>
+        `;
+        const tdAct = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.textContent = "Hapus";
+        btn.classList.add("danger");
+        btn.style.fontSize = "11px";
+        btn.onclick = () => {
+          currentCart.splice(index, 1);
+          renderCartTable();
+          recomputeCartSummary();
+        };
+        tdAct.appendChild(btn);
+        tr.appendChild(tdAct);
+        cartTableBody.appendChild(tr);
+      });
+    }
+
+    function getCartSubtotal() {
+      return currentCart.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    }
+
+    function recomputeCartSummary() {
+      const subtotalCart = getCartSubtotal();
+      cartSubtotalLabel.textContent = "Rp " + subtotalCart.toLocaleString("id-ID");
 
       let discPct = Number(saleDiscount.value || 0);
       if (discPct < 0) discPct = 0;
@@ -1401,79 +1514,141 @@
       if (voucherVal < 0) voucherVal = 0;
       saleVoucher.value = voucherVal;
 
-      const discountValue = subtotal * discPct / 100;
-      let finalTotal = subtotal - discountValue - voucherVal;
+      const discountValue = subtotalCart * discPct / 100;
+      let finalTotal = subtotalCart - discountValue - voucherVal;
       if (finalTotal < 0) finalTotal = 0;
       saleTotal.value = finalTotal;
 
-      updateSaleChange();
-    }
-
-    function updateSaleChange() {
-      const total = Number(saleTotal.value || 0);
       const pay = Number(salePay.value || 0);
-      if (!total || !pay || pay < total) {
+      if (!finalTotal || !pay || pay < finalTotal) {
         saleChange.value = 0;
-        return;
+      } else {
+        saleChange.value = pay - finalTotal;
       }
-      saleChange.value = pay - total;
     }
 
-    saleProductSelect.addEventListener("change", updateSaleCalculation);
-    saleQty.addEventListener("input", updateSaleCalculation);
-    saleDiscount.addEventListener("input", updateSaleCalculation);
-    saleVoucher.addEventListener("input", updateSaleCalculation);
-    salePay.addEventListener("input", updateSaleChange);
-    btnSaveSale.addEventListener("click", saveSale);
+    saleProductSelect.addEventListener("change", updateItemSubtotal);
+    saleQty.addEventListener("input", updateItemSubtotal);
 
-    async function saveSale() {
+    saleDiscount.addEventListener("input", recomputeCartSummary);
+    saleVoucher.addEventListener("input", recomputeCartSummary);
+    salePay.addEventListener("input", recomputeCartSummary);
+
+    btnAddToCart.addEventListener("click", () => {
       const productId = saleProductSelect.value;
       const qty = Number(saleQty.value || 0);
       const product = findProductById(productId);
-      const subtotal = Number(saleSubtotal.value || 0);
-      const discountPercent = Number(saleDiscount.value || 0);
-      const voucherValue = Number(saleVoucher.value || 0);
-      const totalToPay = Number(saleTotal.value || 0);
-      const pay = Number(salePay.value || 0);
-      const change = Number(saleChange.value || 0);
-      const discountValue = subtotal * discountPercent / 100;
-
-      if (!productId || !product) return showToast("Pilih item terlebih dahulu", "error");
-      if (product.type !== "menu") return showToast("Penjualan hanya untuk MENU", "error");
+      if (!productId || !product) return showToast("Pilih menu dulu", "error");
       if (qty <= 0) return showToast("Qty harus lebih dari 0", "error");
-      if (subtotal <= 0) return showToast("Subtotal tidak valid", "error");
-      if (pay < totalToPay) return showToast("Uang bayar kurang!", "error");
 
-      const relatedRecipes = recipesCache.filter((r) => r.menuId === product.id);
-      if (relatedRecipes.length === 0) {
-        showToast("Menu belum punya resep. Stok bahan baku tidak berkurang.", "info", 5000);
+      const price = Number(product.price || 0);
+      const subtotal = price * qty;
+
+      const existing = currentCart.find((i) => i.productId === productId);
+      if (existing) {
+        existing.qty += qty;
+        existing.subtotal += subtotal;
       } else {
-        const shortages = [];
+        currentCart.push({
+          productId,
+          productName: product.name,
+          price,
+          qty,
+          subtotal
+        });
+      }
+
+      saleQty.value = 1;
+      updateItemSubtotal();
+
+      renderCartTable();
+      recomputeCartSummary();
+    });
+
+    btnSaveSale.addEventListener("click", saveSale);
+
+    function buildIngredientUsageFromCart() {
+      const usageMap = {}; // ingredientId -> {name, unit, need}
+      currentCart.forEach((item) => {
+        const product = findProductById(item.productId);
+        if (!product || (product.type || "bahan_baku") !== "menu") return;
+        const relatedRecipes = recipesCache.filter((r) => r.menuId === product.id);
         relatedRecipes.forEach((r) => {
           const ing = findProductById(r.ingredientId);
           if (!ing) return;
-          const need = Number(r.qtyUsed || 0) * qty;
-          const have = Number(ing.stock || 0);
-          if (have < need) {
-            shortages.push({ name: ing.name, need, have, unit: ing.unit || "" });
+          const need = Number(r.qtyUsed || 0) * Number(item.qty || 0);
+          if (!usageMap[ing.id]) {
+            usageMap[ing.id] = {
+              name: ing.name,
+              unit: ing.unit || "",
+              need: 0
+            };
           }
+          usageMap[ing.id].need += need;
         });
-        if (shortages.length > 0) {
-          const msg = shortages
-            .map(s => `${s.name} butuh ${s.need} ${s.unit}, ada ${s.have} ${s.unit}`)
-            .join("; ");
-          showToast("Stok bahan baku tidak cukup: " + msg, "error", 7000);
-          return;
+      });
+      return usageMap;
+    }
+
+    async function saveSale() {
+      if (currentCart.length === 0) {
+        return showToast("Tambahkan item ke daftar dulu", "error");
+      }
+
+      const subtotalCart = getCartSubtotal();
+      if (subtotalCart <= 0) return showToast("Subtotal transaksi tidak valid", "error");
+
+      let discountPercent = Number(saleDiscount.value || 0);
+      let voucherValue = Number(saleVoucher.value || 0);
+      if (discountPercent < 0) discountPercent = 0;
+      if (discountPercent > 100) discountPercent = 100;
+      if (voucherValue < 0) voucherValue = 0;
+
+      const discountValue = subtotalCart * discountPercent / 100;
+      let totalToPay = subtotalCart - discountValue - voucherValue;
+      if (totalToPay < 0) totalToPay = 0;
+      const pay = Number(salePay.value || 0);
+      const change = Number(saleChange.value || 0);
+
+      if (pay < totalToPay) return showToast("Uang bayar kurang!", "error");
+
+      // Cek stok bahan baku total untuk semua item di keranjang
+      const usageMap = buildIngredientUsageFromCart();
+      const shortages = [];
+
+      Object.entries(usageMap).forEach(([ingId, info]) => {
+        const ing = findProductById(ingId);
+        if (!ing) return;
+        const have = Number(ing.stock || 0);
+        const need = info.need;
+        if (have < need) {
+          shortages.push({
+            name: ing.name,
+            need,
+            have,
+            unit: ing.unit || ""
+          });
         }
+      });
+
+      if (shortages.length > 0) {
+        const msg = shortages
+          .map(s => `${s.name} butuh ${s.need} ${s.unit}, ada ${s.have} ${s.unit}`)
+          .join("; ");
+        showToast("Stok bahan baku tidak cukup: " + msg, "error", 7000);
+        return;
       }
 
       try {
-        await addDoc(colSales, {
-          productId,
-          productName: product.name,
-          price: Number(product.price || 0),
-          qty,
-          subtotal,
+        const saleDoc = {
+          items: currentCart.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            qty: item.qty,
+            subtotal: item.subtotal
+          })),
+          subtotal: subtotalCart,
           discountPercent,
           discountValue,
           voucherValue,
@@ -1481,40 +1656,25 @@
           pay,
           change,
           createdAt: serverTimestamp(),
-          userId: currentUser ? currentUser.uid : null,
-          productType: product.type || "menu",
-          unit: product.unit || ""
-        });
+          userId: currentUser ? currentUser.uid : null
+        };
 
-        if (relatedRecipes.length > 0) {
-          for (const r of relatedRecipes) {
-            const ing = findProductById(r.ingredientId);
-            if (!ing) continue;
-            const need = Number(r.qtyUsed || 0) * qty;
-            const newStockIng = Number(ing.stock || 0) - need;
-            const refIng = doc(db, "products", ing.id);
-            await updateDoc(refIng, { stock: newStockIng });
-          }
+        await addDoc(colSales, saleDoc);
+
+        // Kurangi stok bahan baku sesuai usageMap
+        for (const [ingId, info] of Object.entries(usageMap)) {
+          const ing = findProductById(ingId);
+          if (!ing) continue;
+          const newStockIng = Number(ing.stock || 0) - info.need;
+          const refIng = doc(db, "products", ing.id);
+          await updateDoc(refIng, { stock: newStockIng });
         }
 
         showToast("Penjualan tersimpan & stok bahan baku berkurang", "success");
 
-        saleQty.value = 1;
-        saleDiscount.value = 0;
-        saleVoucher.value = 0;
-        salePay.value = "";
-        saleChange.value = "";
-        updateSaleCalculation();
-
-        await loadProducts();
-        await loadSalesData();
-        await loadRecipes();
-
-        renderReceipt({
-          productName: product.name,
-          qty,
-          price: Number(product.price || 0),
-          subtotal,
+        const saleForReceipt = {
+          items: saleDoc.items,
+          subtotal: subtotalCart,
           discountPercent,
           discountValue,
           voucherValue,
@@ -1522,7 +1682,25 @@
           pay,
           change,
           date: new Date()
-        });
+        };
+        renderReceipt(saleForReceipt);
+
+        currentCart = [];
+        renderCartTable();
+        cartSubtotalLabel.textContent = "Rp 0";
+
+        saleDiscount.value = 0;
+        saleVoucher.value = 0;
+        salePay.value = "";
+        saleChange.value = "";
+        saleTotal.value = "";
+        saleQty.value = 1;
+        saleSubtotal.value = "";
+        updateItemSubtotal();
+
+        await loadProducts();
+        await loadSalesData();
+        await loadRecipes();
       } catch (err) {
         console.error(err);
         showToast("Gagal menyimpan penjualan: " + err.message, "error");
@@ -1532,9 +1710,7 @@
     function renderReceipt(sale) {
       if (!printArea) return;
       const {
-        productName,
-        qty,
-        price,
+        items,
         subtotal,
         discountPercent,
         discountValue,
@@ -1549,14 +1725,19 @@
       const tanggal = d.toLocaleDateString("id-ID");
       const waktu = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
+      const itemsHtml = (items || [])
+        .map((it) =>
+          `<p>${it.productName} x${it.qty} @ Rp ${Number(it.price || 0).toLocaleString("id-ID")} = Rp ${Number(it.subtotal || 0).toLocaleString("id-ID")}</p>`
+        )
+        .join("");
+
       printArea.innerHTML = `
         <h4>STRUK PENJUALAN</h4>
         <p>F&amp;B POS</p>
         <p>${tanggal} ${waktu}</p>
         <hr />
-        <p><strong>${productName}</strong></p>
-        <p>Qty: ${qty}</p>
-        <p>Harga: Rp ${Number(price || 0).toLocaleString("id-ID")}</p>
+        ${itemsHtml || '<p>Tidak ada item.</p>'}
+        <hr />
         <p>Subtotal: Rp ${Number(subtotal || 0).toLocaleString("id-ID")}</p>
         <p>Diskon: ${Number(discountPercent || 0)}% (Rp ${Number(discountValue || 0).toLocaleString("id-ID")})</p>
         <p>Voucher: Rp ${Number(voucherValue || 0).toLocaleString("id-ID")}</p>
@@ -1582,6 +1763,25 @@
       return sales;
     }
 
+    function getSaleItemsArray(s) {
+      if (Array.isArray(s.items) && s.items.length > 0) {
+        return s.items;
+      }
+      if (s.productId) {
+        const price = Number(s.price || 0);
+        const qty = Number(s.qty || 0);
+        const subtotal = Number(s.total ?? s.subtotal ?? price * qty);
+        return [{
+          productId: s.productId,
+          productName: s.productName || "Item",
+          price,
+          qty,
+          subtotal
+        }];
+      }
+      return [];
+    }
+
     function renderSalesToday(allSales) {
       salesTableBody.innerHTML = "";
       salesTotalToday.textContent = "Rp 0";
@@ -1605,7 +1805,7 @@
       });
 
       salesToday.forEach((s) => {
-        const tr = document.createElement("tr");
+        const items = getSaleItemsArray(s);
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         const timeStr = t
           ? `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
@@ -1614,10 +1814,16 @@
         const total = Number(s.total ?? s.subtotal ?? 0);
         totalToday += total;
 
+        const totalQty = items.reduce((sum, it) => sum + Number(it.qty || 0), 0);
+        const firstName = items[0]?.productName || "-";
+        const detail =
+          items.length > 1 ? `${firstName} +${items.length - 1} menu` : firstName;
+
+        const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${timeStr}</td>
-          <td>${s.productName || "-"}</td>
-          <td>${s.qty || 0}</td>
+          <td>${detail}</td>
+          <td>${totalQty}</td>
           <td>Rp ${total.toLocaleString("id-ID")}</td>
         `;
         salesTableBody.appendChild(tr);
@@ -1668,7 +1874,7 @@
       });
 
       filtered.forEach((s) => {
-        const tr = document.createElement("tr");
+        const items = getSaleItemsArray(s);
         const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
         const timeStr = t
           ? `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
@@ -1677,10 +1883,16 @@
         const rowTotal = Number(s.total ?? s.subtotal ?? 0);
         total += rowTotal;
 
+        const totalQty = items.reduce((sum, it) => sum + Number(it.qty || 0), 0);
+        const firstName = items[0]?.productName || "-";
+        const detail =
+          items.length > 1 ? `${firstName} +${items.length - 1} menu` : firstName;
+
+        const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${timeStr}</td>
-          <td>${s.productName || "-"}</td>
-          <td>${s.qty || 0}</td>
+          <td>${detail}</td>
+          <td>${totalQty}</td>
           <td>Rp ${rowTotal.toLocaleString("id-ID")}</td>
         `;
         historyTableBody.appendChild(tr);
@@ -1689,14 +1901,17 @@
 
       const map = {};
       filtered.forEach((s) => {
-        const name = s.productName || "Tanpa nama";
-        const qty = Number(s.qty || 0);
-        const rowTotal = Number(s.total ?? s.subtotal ?? 0);
-        if (!map[name]) {
-          map[name] = { qty: 0, total: 0 };
-        }
-        map[name].qty += qty;
-        map[name].total += rowTotal;
+        const items = getSaleItemsArray(s);
+        items.forEach((it) => {
+          const name = it.productName || "Tanpa nama";
+          const qty = Number(it.qty || 0);
+          const subtotal = Number(it.subtotal || 0);
+          if (!map[name]) {
+            map[name] = { qty: 0, total: 0 };
+          }
+          map[name].qty += qty;
+          map[name].total += subtotal;
+        });
       });
 
       const topList = Object.entries(map)
@@ -1809,7 +2024,7 @@
       const day = now.getDay();
       const hour = now.getHours();
       const minute = now.getMinutes();
-      if (day === 0 && hour === 5 && minute === 0) {
+      if (day === 0 && hour === 5 && minute === 0 && currentUserRole === "admin") {
         showToast("Reminder: Besok Senin jadwal stok opname!", "info", 8000);
       }
     }
@@ -1819,14 +2034,11 @@
       products.forEach((p) => {
         if ((p.type || "bahan_baku") !== "bahan_baku") return;
         const min = p.minStock ?? 0;
-        if ((p.stock ?? 0) <= min) {
+        if (p.stock <= min) {
           showToast(`Stok menipis: ${p.name} (sisa ${p.stock} ${p.unit || ""})`, "error");
         }
       });
     }
-
-    // Set form awal sesuai jenis default (bahan baku)
-    updateFormByType();
   </script>
 </body>
 </html>
