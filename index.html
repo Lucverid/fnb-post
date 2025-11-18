@@ -8,302 +8,304 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Icon SVG Library -->
+  <!-- Icon SVG Library (Lucide) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css">
 
-  <!-- CSS akan dimasukkan pada Bagian 2 -->
+  <!-- CSS utama -->
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<!-- 🔔 TOAST -->
-<div id="toast-container"></div>
+  <!-- 🔔 TOAST -->
+  <div id="toast-container"></div>
 
-<!-- 🔒 AUTH -->
-<div id="auth-card" class="auth-card hidden">
-  <div class="auth-box">
-    <h2>Login</h2>
-    <label>Email</label>
-    <input id="loginEmail" type="email">
+  <!-- 🔒 AUTH -->
+  <!-- HAPUS class "hidden" di sini supaya form login muncul dulu -->
+  <div id="auth-card" class="auth-card">
+    <div class="auth-box">
+      <h2>Login</h2>
+      <label>Email</label>
+      <input id="loginEmail" type="email">
 
-    <label>Password</label>
-    <input id="loginPassword" type="password">
+      <label>Password</label>
+      <input id="loginPassword" type="password">
 
-    <button id="btnLogin" class="btn-primary">Login</button>
+      <button id="btnLogin" class="btn-primary">Login</button>
 
-    <hr>
+      <hr>
 
-    <h2>Register</h2>
-    <label>Email</label>
-    <input id="registerEmail" type="email">
+      <h2>Register</h2>
+      <label>Email</label>
+      <input id="registerEmail" type="email">
 
-    <label>Password</label>
-    <input id="registerPassword" type="password">
+      <label>Password</label>
+      <input id="registerPassword" type="password">
 
-    <label>Role</label>
-    <select id="registerRole">
-      <option value="admin">Admin</option>
-      <option value="kasir">Kasir</option>
-    </select>
+      <label>Role</label>
+      <select id="registerRole">
+        <option value="admin">Admin</option>
+        <option value="kasir">Kasir</option>
+      </select>
 
-    <button id="btnRegister" class="btn-secondary">Daftar Baru</button>
+      <button id="btnRegister" class="btn-secondary">Daftar Baru</button>
+    </div>
   </div>
-</div>
 
-<!-- 🧊 APP SHELL -->
-<div id="app-shell" class="app-shell hidden">
+  <!-- 🧊 APP SHELL -->
+  <!-- Tetap hidden, nanti dibuka lewat script setelah user login -->
+  <div id="app-shell" class="app-shell hidden">
 
-  <!-- 📌 HEADER NEW DESIGN -->
-  <header class="app-header glass">
-    <div class="header-left">
-      <div class="logo">F&B</div>
+    <!-- 📌 HEADER NEW DESIGN -->
+    <header class="app-header glass">
+      <div class="header-left">
+        <div class="logo">F&amp;B</div>
 
-      <div class="user-info">
-        <div id="topbarEmail">–</div>
-        <div id="connectionStatus" class="connection">Offline</div>
-      </div>
-    </div>
-
-    <div class="header-right">
-
-      <!-- Icon Notifikasi -->
-      <div id="notifBtn" class="notif-btn">
-        <i class="lucide-bell"></i>
-        <span id="notifBadge" class="notif-count">0</span>
+        <div class="user-info">
+          <div id="topbarEmail">–</div>
+          <div id="connectionStatus" class="connection">Offline</div>
+        </div>
       </div>
 
-      <!-- Panel Notifikasi -->
-      <div id="notifPanel" class="notif-panel hidden">
-        <div class="notif-title">Notifikasi</div>
-        <ul id="notifList"></ul>
-      </div>
+      <div class="header-right">
 
-      <!-- Burger Mobile -->
-      <button id="burgerBtn" class="burger-btn">
-        <span></span><span></span><span></span>
-      </button>
-
-    </div>
-  </header>
-
-  <!-- 🧭 SIDEBAR -->
-  <aside id="sidebar" class="sidebar">
-    <nav>
-      <div class="sidebar-group">
-        <button class="side-item active" data-section="sales">
-          <i class="lucide-shopping-cart"></i> <span>Kasir</span>
-        </button>
-
-        <button class="side-item admin-only" data-section="inventory">
-          <i class="lucide-box"></i> <span>Inventory</span>
-        </button>
-
-        <button class="side-item admin-only" data-section="dashboard">
-          <i class="lucide-bar-chart"></i> <span>Dashboard</span>
-        </button>
-
-        <button class="side-item admin-only" data-section="opname">
-          <i class="lucide-clipboard-list"></i> <span>Opname</span>
-        </button>
-      </div>
-
-      <div class="sidebar-footer">
-        <button id="btnLogout" class="logout-btn">
-          <i class="lucide-log-out"></i> Logout
-        </button>
-      </div>
-    </nav>
-  </aside>
-
-  <!-- 📌 MAIN CONTENT -->
-  <main class="app-main">
-
-    <!-- ⭐ WELCOME BANNER -->
-    <section id="welcomeBanner" class="welcome-banner hidden">
-      <h2>Selamat datang, <span id="bannerRole"></span></h2>
-      <p>Akses cepat POS, inventory, dan dashboard.</p>
-    </section>
-
-    <!-- 🛒 POS (Sales) -->
-    <section id="salesSection" class="section hidden">
-      <h2>Kasir</h2>
-
-      <div class="pos-layout">
-
-        <!-- Left = Menu list -->
-        <div class="pos-left">
-          <input id="saleSearch" class="search-bar" placeholder="Cari menu...">
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Menu</th>
-                  <th>Harga</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="saleMenuBody"></tbody>
-            </table>
-          </div>
+        <!-- Icon Notifikasi -->
+        <div id="notifBtn" class="notif-btn">
+          <i class="lucide-bell"></i>
+          <span id="notifBadge" class="notif-count">0</span>
         </div>
 
-        <!-- Right = Cart -->
-        <div class="pos-right">
+        <!-- Panel Notifikasi -->
+        <div id="notifPanel" class="notif-panel hidden">
+          <div class="notif-title">Notifikasi</div>
+          <ul id="notifList"></ul>
+        </div>
 
-          <div class="cart-box">
-            <h3>Daftar Pesanan</h3>
+        <!-- Burger Mobile -->
+        <button id="burgerBtn" class="burger-btn">
+          <span></span><span></span><span></span>
+        </button>
 
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th><th>Qty</th><th>Subtotal</th><th></th>
-                </tr>
-              </thead>
-              <tbody id="cartBody"></tbody>
-            </table>
+      </div>
+    </header>
 
-            <div class="cart-summary">
-              <div>Subtotal: <span id="cartSubtotal">Rp 0</span></div>
+    <!-- 🧭 SIDEBAR -->
+    <aside id="sidebar" class="sidebar">
+      <nav>
+        <div class="sidebar-group">
+          <button class="side-item active" data-section="sales">
+            <i class="lucide-shopping-cart"></i> <span>Kasir</span>
+          </button>
 
-              <label>Diskon (%)</label>
-              <input id="saleDiscount" type="number">
+          <button class="side-item admin-only" data-section="inventory">
+            <i class="lucide-box"></i> <span>Inventory</span>
+          </button>
 
-              <label>Voucher (Rp)</label>
-              <input id="saleVoucher" type="number">
+          <button class="side-item admin-only" data-section="dashboard">
+            <i class="lucide-bar-chart"></i> <span>Dashboard</span>
+          </button>
 
-              <label>Total</label>
-              <input id="saleTotal" disabled>
+          <button class="side-item admin-only" data-section="opname">
+            <i class="lucide-clipboard-list"></i> <span>Opname</span>
+          </button>
+        </div>
 
-              <label>Uang Bayar</label>
-              <input id="salePay" type="number">
+        <div class="sidebar-footer">
+          <button id="btnLogout" class="logout-btn">
+            <i class="lucide-log-out"></i> Logout
+          </button>
+        </div>
+      </nav>
+    </aside>
 
-              <label>Kembalian</label>
-              <input id="saleChange" disabled>
+    <!-- 📌 MAIN CONTENT -->
+    <main class="app-main">
 
-              <button id="btnSaveSale" class="btn-primary">Simpan Transaksi</button>
+      <!-- ⭐ WELCOME BANNER -->
+      <section id="welcomeBanner" class="welcome-banner hidden">
+        <h2>Selamat datang, <span id="bannerRole"></span></h2>
+        <p>Akses cepat POS, inventory, dan dashboard.</p>
+      </section>
+
+      <!-- 🛒 POS (Sales) -->
+      <section id="salesSection" class="section hidden">
+        <h2>Kasir</h2>
+
+        <div class="pos-layout">
+
+          <!-- Left = Menu list -->
+          <div class="pos-left">
+            <input id="saleSearch" class="search-bar" placeholder="Cari menu...">
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Menu</th>
+                    <th>Harga</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="saleMenuBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right = Cart -->
+          <div class="pos-right">
+
+            <div class="cart-box">
+              <h3>Daftar Pesanan</h3>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item</th><th>Qty</th><th>Subtotal</th><th></th>
+                  </tr>
+                </thead>
+                <tbody id="cartBody"></tbody>
+              </table>
+
+              <div class="cart-summary">
+                <div>Subtotal: <span id="cartSubtotal">Rp 0</span></div>
+
+                <label>Diskon (%)</label>
+                <input id="saleDiscount" type="number">
+
+                <label>Voucher (Rp)</label>
+                <input id="saleVoucher" type="number">
+
+                <label>Total</label>
+                <input id="saleTotal" disabled>
+
+                <label>Uang Bayar</label>
+                <input id="salePay" type="number">
+
+                <label>Kembalian</label>
+                <input id="saleChange" disabled>
+
+                <button id="btnSaveSale" class="btn-primary">Simpan Transaksi</button>
+              </div>
+
+              <h3>Struk</h3>
+              <div id="printArea" class="print-area">Belum ada transaksi</div>
+              <button onclick="window.print()" class="btn-secondary">Print</button>
             </div>
 
-            <h3>Struk</h3>
-            <div id="printArea" class="print-area">Belum ada transaksi</div>
-            <button onclick="window.print()" class="btn-secondary">Print</button>
           </div>
 
         </div>
+      </section>
 
-      </div>
-    </section>
+      <!-- 📦 Inventory -->
+      <section id="inventorySection" class="section hidden">
+        <h2>Inventory</h2>
 
-    <!-- 📦 Inventory -->
-    <section id="inventorySection" class="section hidden">
-      <h2>Inventory</h2>
+        <div class="form-grid">
+          <div>
+            <label>Nama</label>
+            <input id="productName">
+          </div>
 
-      <div class="form-grid">
-        <div>
-          <label>Nama</label>
-          <input id="productName">
+          <div>
+            <label>Jenis</label>
+            <select id="productType">
+              <option value="bahan_baku">Bahan Baku</option>
+              <option value="menu">Menu</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Kategori</label>
+            <select id="productCategory">
+              <option value="makanan">Makanan</option>
+              <option value="minuman">Minuman</option>
+              <option value="lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <div id="groupPrice">
+            <label>Harga</label>
+            <input id="productPrice" type="number">
+          </div>
+
+          <div id="groupStock">
+            <label>Stok</label>
+            <input id="productStock" type="number">
+          </div>
+
+          <div id="groupMinStock">
+            <label>Minimal Stok</label>
+            <input id="productMinStock" type="number">
+          </div>
+
+          <div>
+            <label>Satuan</label>
+            <input id="productUnit">
+          </div>
+
+          <button id="btnSaveProduct" class="btn-primary full">Simpan</button>
         </div>
 
-        <div>
-          <label>Jenis</label>
-          <select id="productType">
-            <option value="bahan_baku">Bahan Baku</option>
-            <option value="menu">Menu</option>
-          </select>
+        <h3>Daftar Item</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="productTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 📊 DASHBOARD -->
+      <section id="dashboardSection" class="section hidden">
+        <h2>Dashboard Penjualan</h2>
+
+        <div class="metric-row">
+          <div id="metricEmpty" class="metric-card red">
+            <i class="lucide-x-circle"></i>
+            <div><b id="metricEmptyCount">0</b> Habis</div>
+          </div>
+
+          <div id="metricLow" class="metric-card yellow">
+            <i class="lucide-alert-triangle"></i>
+            <div><b id="metricLowCount">0</b> Hampir Habis</div>
+          </div>
+
+          <div id="metricOk" class="metric-card green">
+            <i class="lucide-check-circle"></i>
+            <div><b id="metricOkCount">0</b> Aman</div>
+          </div>
         </div>
 
-        <div>
-          <label>Kategori</label>
-          <select id="productCategory">
-            <option value="makanan">Makanan</option>
-            <option value="minuman">Minuman</option>
-            <option value="lainnya">Lainnya</option>
-          </select>
+        <div class="chart-grid">
+          <canvas id="dailyChart"></canvas>
+          <canvas id="monthlyChart"></canvas>
         </div>
+      </section>
 
-        <div id="groupPrice">
-          <label>Harga</label>
-          <input id="productPrice" type="number">
+      <!-- 📋 OPNAME -->
+      <section id="opnameSection" class="section hidden">
+        <h2>Stok Opname</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Item</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th></th></tr>
+            </thead>
+            <tbody id="opnameTable"></tbody>
+          </table>
         </div>
+      </section>
 
-        <div id="groupStock">
-          <label>Stok</label>
-          <input id="productStock" type="number">
-        </div>
+    </main>
+  </div>
 
-        <div id="groupMinStock">
-          <label>Minimal Stok</label>
-          <input id="productMinStock" type="number">
-        </div>
-
-        <div>
-          <label>Satuan</label>
-          <input id="productUnit">
-        </div>
-
-        <button id="btnSaveProduct" class="btn-primary full">Simpan</button>
-      </div>
-
-      <h3>Daftar Item</h3>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nama</th><th>Jenis</th><th>Kategori</th><th>Harga</th><th>Stok</th><th>Status</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="productTable"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 📊 DASHBOARD -->
-    <section id="dashboardSection" class="section hidden">
-      <h2>Dashboard Penjualan</h2>
-
-      <div class="metric-row">
-        <div id="metricEmpty" class="metric-card red">
-          <i class="lucide-x-circle"></i>
-          <div><b id="metricEmptyCount">0</b> Habis</div>
-        </div>
-
-        <div id="metricLow" class="metric-card yellow">
-          <i class="lucide-alert-triangle"></i>
-          <div><b id="metricLowCount">0</b> Hampir Habis</div>
-        </div>
-
-        <div id="metricOk" class="metric-card green">
-          <i class="lucide-check-circle"></i>
-          <div><b id="metricOkCount">0</b> Aman</div>
-        </div>
-      </div>
-
-      <div class="chart-grid">
-        <canvas id="dailyChart"></canvas>
-        <canvas id="monthlyChart"></canvas>
-      </div>
-    </section>
-
-    <!-- 📋 OPNAME -->
-    <section id="opnameSection" class="section hidden">
-      <h2>Stok Opname</h2>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Item</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th></th></tr>
-          </thead>
-          <tbody id="opnameTable"></tbody>
-        </table>
-      </div>
-    </section>
-
-  </main>
-</div>
-
-<!-- JS Firebase + Logic akan masuk Bagian 3–5 -->
-<script src="script.js" type="module"></script>
+  <!-- JS utama -->
+  <script src="script.js" type="module"></script>
 
 </body>
 </html>
