@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tianlala Tasik</title>
+  <title>F&B POS & Inventory (Firebase)</title>
+
+  <!-- Chart.js untuk grafik -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root {
       --bg-main: #020617;
@@ -62,7 +66,6 @@
       border: 1px solid rgba(148, 163, 184, 0.35);
     }
 
-    /* Card khusus login agar fokus dan responsif */
     #authCard {
       max-width: 780px;
       margin: 0 auto 20px auto;
@@ -176,6 +179,13 @@
       background: #f9fafb;
     }
 
+    .table-scroll {
+      max-height: 210px;
+      overflow-y: auto;
+      border-radius: 12px;
+      background: white;
+    }
+
     .badge {
       display: inline-block;
       padding: 2px 6px;
@@ -197,7 +207,6 @@
       display: none !important;
     }
 
-    /* TOP BAR setelah login */
     .topbar {
       background: rgba(15, 23, 42, 0.96);
       border-radius: 999px;
@@ -246,7 +255,25 @@
       color: #111827;
     }
 
-    /* Toast Notification */
+    #printArea {
+      font-size: 12px;
+    }
+
+    #printArea h4 {
+      margin: 4px 0;
+      text-align: center;
+    }
+
+    #printArea p {
+      margin: 2px 0;
+    }
+
+    #printArea hr {
+      border: none;
+      border-top: 1px dashed #9ca3af;
+      margin: 4px 0;
+    }
+
     .toast-container {
       position: fixed;
       top: 16px;
@@ -270,42 +297,48 @@
     .toast-error { background: #dc2626; }
     .toast-info { background: #2563eb; }
 
-    /* Mobile tweaks */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printArea, #printArea * {
+        visibility: visible;
+      }
+      #printArea {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        padding: 4px;
+      }
+    }
+
     @media (max-width: 768px) {
       .container {
         padding: 14px 10px 24px;
       }
-
       #authCard {
         padding: 16px 14px 14px;
         margin-top: 6px;
       }
-
       h1 {
         font-size: 19px;
       }
-
       .subtitle {
         font-size: 11px;
       }
-
       .card h2 {
         font-size: 16px;
       }
-
       .card h3 {
         font-size: 14px;
       }
-
       button {
         font-size: 13px;
       }
-
       .topbar {
         border-radius: 14px;
         padding: 8px 10px;
       }
-
       .topbar-left {
         max-width: 70%;
       }
@@ -325,8 +358,8 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <div class="container">
-    <h1>TIANLALA TASIKMALAYA</h1>
-    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — Agis</p>
+    <h1>F&B POS & Inventory</h1>
+    <p class="subtitle">Sistem kasir &amp; stok F&amp;B — tema kuning, hitam, putih. Nyaman di HP &amp; laptop.</p>
 
     <!-- TOP BAR SETELAH LOGIN -->
     <div id="topbar" class="topbar hidden">
@@ -380,7 +413,6 @@
       <h2>Inventory &amp; Stok Opname</h2>
 
       <div class="row">
-        <!-- Add / Edit Product -->
         <div class="col">
           <h3>Tambah / Edit Produk</h3>
           <input type="hidden" id="editProductId" />
@@ -404,7 +436,6 @@
           <button class="secondary" id="btnResetForm">Reset Form</button>
         </div>
 
-        <!-- Inventory Table -->
         <div class="col">
           <h3>Daftar Produk</h3>
           <table>
@@ -417,11 +448,137 @@
                 <th>Aksi</th>
               </tr>
             </thead>
-            <tbody id="productTableBody">
-              <!-- Filled by JS -->
-            </tbody>
+            <tbody id="productTableBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- PENJUALAN (KASIR) -->
+    <div class="card hidden" id="salesCard">
+      <h2>Penjualan (Kasir)</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Input Penjualan</h3>
+
+          <div class="input-group">
+            <label>Produk</label>
+            <select id="saleProductSelect">
+              <option value="">Pilih produk</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Qty</label>
+            <input id="saleQty" type="number" min="1" value="1" />
+          </div>
+
+          <div class="input-group">
+            <label>Subtotal (harga × qty)</label>
+            <input id="saleSubtotal" type="number" disabled />
+          </div>
+
+          <div class="input-group">
+            <label>Diskon (%)</label>
+            <input id="saleDiscount" type="number" min="0" max="100" value="0" />
+          </div>
+
+          <div class="input-group">
+            <label>Voucher (nominal)</label>
+            <input id="saleVoucher" type="number" min="0" value="0" />
+          </div>
+
+          <div class="input-group">
+            <label>Total Bayar (setelah diskon &amp; voucher)</label>
+            <input id="saleTotal" type="number" disabled />
+          </div>
+
+          <div class="input-group">
+            <label>Uang Bayar</label>
+            <input id="salePay" type="number" placeholder="Masukkan uang pembayaran" />
+          </div>
+
+          <div class="input-group">
+            <label>Kembalian</label>
+            <input id="saleChange" type="number" disabled />
+          </div>
+
+          <button class="primary" id="btnSaveSale">Simpan Penjualan</button>
+        </div>
+
+        <div class="col">
+          <h3>Penjualan Hari Ini</h3>
+          <p style="font-size:12px;color:#6b7280;margin-top:0;margin-bottom:6px;">
+            Ringkasan transaksi berdasarkan tanggal hari ini.
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Produk</th>
+                  <th>Qty</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="salesTableBody"></tbody>
+            </table>
+          </div>
+          <p style="margin-top:8px;font-size:13px;">
+            Total hari ini: <strong id="salesTotalToday">Rp 0</strong>
+          </p>
+
+          <h3 style="margin-top:10px;">Struk Terakhir</h3>
+          <div id="printArea" style="border:1px dashed #d4d4d8;border-radius:8px;padding:8px;background:#f9fafb;">
+            <p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>
+          </div>
+          <button class="secondary" style="margin-top:8px;" onclick="window.print()">Print Struk</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD GRAFIK + RIWAYAT PENJUALAN -->
+    <div class="card hidden" id="chartCard">
+      <h2>Dashboard Penjualan</h2>
+      <div class="row">
+        <div class="col">
+          <h3>Penjualan Harian</h3>
+          <canvas id="dailyChart" height="160"></canvas>
+        </div>
+        <div class="col">
+          <h3>Penjualan Bulanan</h3>
+          <canvas id="monthlyChart" height="160"></canvas>
+        </div>
+      </div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px dashed #e5e7eb;" />
+
+      <h3>Riwayat Penjualan (Filter Tanggal)</h3>
+      <div class="row">
+        <div class="col">
+          <div class="input-group">
+            <label>Pilih Tanggal</label>
+            <input id="historyDate" type="date" />
+          </div>
+        </div>
+        <div class="col">
+          <p style="font-size:13px;margin-top:24px;">
+            Total tanggal ini: <strong id="historyTotal">Rp 0</strong>
+          </p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Produk</th>
+              <th>Qty</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -439,16 +596,13 @@
             <th>Simpan</th>
           </tr>
         </thead>
-        <tbody id="opnameTableBody">
-          <!-- Filled by JS -->
-        </tbody>
+        <tbody id="opnameTableBody"></tbody>
       </table>
     </div>
   </div>
 
   <!-- FIREBASE + APP LOGIC -->
   <script type="module">
-    // ====== 1. Import Firebase SDK via CDN (modular) ======
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
     import {
       getAuth,
@@ -468,7 +622,6 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-    // ====== 2. Firebase Config (punyamu) ======
     const firebaseConfig = {
       apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
       authDomain: "app-387dc.firebaseapp.com",
@@ -479,12 +632,10 @@
       measurementId: "G-9E282TKXSJ"
     };
 
-    // ====== 3. Init Firebase ======
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // ====== 4. Helpers: Toast Notification ======
     const toastContainer = document.getElementById("toastContainer");
     function showToast(message, type = "info", timeout = 3000) {
       const div = document.createElement("div");
@@ -494,14 +645,13 @@
       if (type === "info") div.classList.add("toast-info");
       div.innerText = message;
       toastContainer.appendChild(div);
-      setTimeout(() => {
-        div.remove();
-      }, timeout);
+      setTimeout(() => div.remove(), timeout);
     }
 
-    // ====== 5. DOM Elements ======
     const authCard = document.getElementById("authCard");
     const appCard = document.getElementById("appCard");
+    const salesCard = document.getElementById("salesCard");
+    const chartCard = document.getElementById("chartCard");
     const opnameCard = document.getElementById("opnameCard");
     const topbar = document.getElementById("topbar");
     const topbarUser = document.getElementById("topbarUser");
@@ -525,22 +675,45 @@
     const productTableBody = document.getElementById("productTableBody");
     const opnameTableBody = document.getElementById("opnameTableBody");
 
-    // ====== 6. Data Collections ======
+    const saleProductSelect = document.getElementById("saleProductSelect");
+    const saleQty = document.getElementById("saleQty");
+    const saleSubtotal = document.getElementById("saleSubtotal");
+    const saleDiscount = document.getElementById("saleDiscount");
+    const saleVoucher = document.getElementById("saleVoucher");
+    const saleTotal = document.getElementById("saleTotal");
+    const salePay = document.getElementById("salePay");
+    const saleChange = document.getElementById("saleChange");
+    const btnSaveSale = document.getElementById("btnSaveSale");
+    const salesTableBody = document.getElementById("salesTableBody");
+    const salesTotalToday = document.getElementById("salesTotalToday");
+
+    const historyDate = document.getElementById("historyDate");
+    const historyTableBody = document.getElementById("historyTableBody");
+    const historyTotal = document.getElementById("historyTotal");
+
+    const printArea = document.getElementById("printArea");
+
+    const dailyCanvas = document.getElementById("dailyChart");
+    const monthlyCanvas = document.getElementById("monthlyChart");
+    let dailyChart = null;
+    let monthlyChart = null;
+
     const colProducts = collection(db, "products");
     const colUsers = collection(db, "users");
     const colOpname = collection(db, "stock_opname");
+    const colSales = collection(db, "sales");
 
-    // ====== 7. AUTH: Register + Login + Logout ======
+    let productsCache = [];
+    let allSalesCache = [];
+    let currentUser = null;
+
     btnRegister.addEventListener("click", async () => {
       const email = registerEmail.value.trim();
       const pass = registerPassword.value;
       const role = registerRole.value;
-
       if (!email || !pass) return showToast("Email & password wajib diisi", "error");
-
       try {
         const cred = await createUserWithEmailAndPassword(auth, email, pass);
-        // Simpan role user di collection users
         await addDoc(colUsers, {
           uid: cred.user.uid,
           email,
@@ -557,9 +730,7 @@
     btnLogin.addEventListener("click", async () => {
       const email = loginEmail.value.trim();
       const pass = loginPassword.value;
-
       if (!email || !pass) return showToast("Isi email & password", "error");
-
       try {
         await signInWithEmailAndPassword(auth, email, pass);
         showToast("Login berhasil", "success");
@@ -573,51 +744,48 @@
       await signOut(auth);
     });
 
-    // ====== 8. AUTH STATE LISTENER ======
-    let currentUser = null;
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (user) {
-        // Topbar + user
         topbar.classList.remove("hidden");
         topbarUser.textContent = `Login sebagai ${user.email}`;
-
-        // Sembunyikan form login/register
         authCard.classList.add("hidden");
-
-        // Tampilkan dashboard
         appCard.classList.remove("hidden");
+        salesCard.classList.remove("hidden");
+        chartCard.classList.remove("hidden");
         opnameCard.classList.remove("hidden");
-
         await loadProducts();
+        await loadSalesData();
       } else {
-        // Sembunyikan dashboard & topbar
         topbar.classList.add("hidden");
         appCard.classList.add("hidden");
+        salesCard.classList.add("hidden");
+        chartCard.classList.add("hidden");
         opnameCard.classList.add("hidden");
-
-        // Tampilkan kembali form login/register
         authCard.classList.remove("hidden");
-
-        // Bersihkan tabel
         productTableBody.innerHTML = "";
         opnameTableBody.innerHTML = "";
+        salesTableBody.innerHTML = "";
+        salesTotalToday.textContent = "Rp 0";
+        historyTableBody.innerHTML = "";
+        historyTotal.textContent = "Rp 0";
+        if (historyDate) historyDate.value = "";
+        if (printArea) {
+          printArea.innerHTML = '<p style="font-size:12px;color:#9ca3af;">Belum ada transaksi.</p>';
+        }
+        destroyCharts();
       }
     });
 
-    // ====== 9. CRUD PRODUCT ======
     async function loadProducts() {
       productTableBody.innerHTML = "";
       const snap = await getDocs(colProducts);
       const products = [];
-      snap.forEach((docSnap) => {
-        products.push({ id: docSnap.id, ...docSnap.data() });
-      });
+      snap.forEach((docSnap) => products.push({ id: docSnap.id, ...docSnap.data() }));
+      productsCache = products;
 
-      // Render table
       products.forEach((p) => {
         const tr = document.createElement("tr");
-
         const statusCell = document.createElement("td");
         const badge = document.createElement("span");
         badge.classList.add("badge");
@@ -644,12 +812,10 @@
         editBtn.classList.add("secondary");
         editBtn.style.marginRight = "4px";
         editBtn.onclick = () => fillFormForEdit(p);
-
         const delBtn = document.createElement("button");
         delBtn.textContent = "Hapus";
         delBtn.classList.add("danger");
         delBtn.onclick = () => deleteProduct(p.id);
-
         tdActions.appendChild(editBtn);
         tdActions.appendChild(delBtn);
         tr.appendChild(tdActions);
@@ -657,10 +823,10 @@
         productTableBody.appendChild(tr);
       });
 
-      // Juga render tabel stok opname
+      renderProductOptionsForSales(products);
       renderOpnameTable(products);
-      // Cek stok menipis dan tampilkan notifikasi modern
       showLowStockNotifications(products);
+      updateSaleCalculation();
     }
 
     function fillFormForEdit(product) {
@@ -685,23 +851,14 @@
       const price = Number(productPrice.value || 0);
       const stock = Number(productStock.value || 0);
       const minStock = Number(productMinStock.value || 0);
-
       if (!name) return showToast("Nama produk wajib diisi", "error");
-
       try {
         const id = editProductId.value;
         if (id) {
-          // Update
           const ref = doc(db, "products", id);
-          await updateDoc(ref, {
-            name,
-            price,
-            stock,
-            minStock
-          });
+          await updateDoc(ref, { name, price, stock, minStock });
           showToast("Produk berhasil diupdate", "success");
         } else {
-          // Create
           await addDoc(colProducts, {
             name,
             price,
@@ -732,7 +889,6 @@
       }
     }
 
-    // ====== 10. STOCK OPNAME MINGGUAN ======
     function renderOpnameTable(products) {
       opnameTableBody.innerHTML = "";
       products.forEach((p) => {
@@ -758,17 +914,11 @@
       const input = document.getElementById(`op_fisik_${product.id}`);
       const selisihCell = document.getElementById(`op_selisih_${product.id}`);
       const fisik = Number(input.value);
-
-      if (Number.isNaN(fisik)) {
-        return showToast("Isi stok fisik terlebih dahulu", "error");
-      }
-
+      if (Number.isNaN(fisik)) return showToast("Isi stok fisik terlebih dahulu", "error");
       const sistem = Number(product.stock ?? 0);
       const selisih = fisik - sistem;
       selisihCell.textContent = selisih.toString();
-
       try {
-        // Simpan riwayat stok opname per produk
         await addDoc(colOpname, {
           productId: product.id,
           productName: product.name,
@@ -778,11 +928,8 @@
           opnameDate: serverTimestamp(),
           userId: currentUser ? currentUser.uid : null
         });
-
-        // Update stok produk ke stok fisik
         const ref = doc(db, "products", product.id);
         await updateDoc(ref, { stock: fisik });
-
         showToast("Stok opname tersimpan & stok terupdate", "success");
         await loadProducts();
       } catch (err) {
@@ -791,22 +938,400 @@
       }
     }
 
-    // ====== 11. Peringatan Mingguan (reminder opname) ======
+    function renderProductOptionsForSales(products) {
+      saleProductSelect.innerHTML = '<option value="">Pilih produk</option>';
+      products.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = `${p.name} (Rp ${Number(p.price || 0).toLocaleString("id-ID")})`;
+        saleProductSelect.appendChild(opt);
+      });
+    }
+
+    function findProductById(id) {
+      return productsCache.find((p) => p.id === id) || null;
+    }
+
+    function updateSaleCalculation() {
+      const productId = saleProductSelect.value;
+      const qty = Number(saleQty.value || 0);
+      const product = findProductById(productId);
+      if (!product || qty <= 0) {
+        saleSubtotal.value = "";
+        saleTotal.value = "";
+        saleChange.value = "";
+        return;
+      }
+      const price = Number(product.price || 0);
+      const subtotal = price * qty;
+      saleSubtotal.value = subtotal;
+
+      let discPct = Number(saleDiscount.value || 0);
+      if (discPct < 0) discPct = 0;
+      if (discPct > 100) discPct = 100;
+      saleDiscount.value = discPct;
+
+      let voucherVal = Number(saleVoucher.value || 0);
+      if (voucherVal < 0) voucherVal = 0;
+      saleVoucher.value = voucherVal;
+
+      const discountValue = subtotal * discPct / 100;
+      let finalTotal = subtotal - discountValue - voucherVal;
+      if (finalTotal < 0) finalTotal = 0;
+      saleTotal.value = finalTotal;
+
+      updateSaleChange();
+    }
+
+    function updateSaleChange() {
+      const total = Number(saleTotal.value || 0);
+      const pay = Number(salePay.value || 0);
+      if (!total || !pay || pay < total) {
+        saleChange.value = 0;
+        return;
+      }
+      saleChange.value = pay - total;
+    }
+
+    saleProductSelect.addEventListener("change", updateSaleCalculation);
+    saleQty.addEventListener("input", updateSaleCalculation);
+    saleDiscount.addEventListener("input", updateSaleCalculation);
+    saleVoucher.addEventListener("input", updateSaleCalculation);
+    salePay.addEventListener("input", updateSaleChange);
+    btnSaveSale.addEventListener("click", saveSale);
+
+    async function saveSale() {
+      const productId = saleProductSelect.value;
+      const qty = Number(saleQty.value || 0);
+      const product = findProductById(productId);
+      const subtotal = Number(saleSubtotal.value || 0);
+      const discountPercent = Number(saleDiscount.value || 0);
+      const voucherValue = Number(saleVoucher.value || 0);
+      const totalToPay = Number(saleTotal.value || 0);
+      const pay = Number(salePay.value || 0);
+      const change = Number(saleChange.value || 0);
+      const discountValue = subtotal * discountPercent / 100;
+
+      if (!productId || !product) return showToast("Pilih produk terlebih dahulu", "error");
+      if (qty <= 0) return showToast("Qty harus lebih dari 0", "error");
+      const currentStock = Number(product.stock ?? 0);
+      if (qty > currentStock) return showToast(`Stok tidak cukup. Stok saat ini ${currentStock}`, "error");
+      if (subtotal <= 0) return showToast("Subtotal tidak valid", "error");
+      if (pay < totalToPay) return showToast("Uang bayar kurang!", "error");
+
+      try {
+        await addDoc(colSales, {
+          productId,
+          productName: product.name,
+          price: Number(product.price || 0),
+          qty,
+          subtotal,
+          discountPercent,
+          discountValue,
+          voucherValue,
+          total: totalToPay,
+          pay,
+          change,
+          createdAt: serverTimestamp(),
+          userId: currentUser ? currentUser.uid : null
+        });
+
+        const newStock = currentStock - qty;
+        const ref = doc(db, "products", product.id);
+        await updateDoc(ref, { stock: newStock });
+
+        showToast("Penjualan tersimpan & stok berkurang", "success");
+
+        saleQty.value = 1;
+        saleDiscount.value = 0;
+        saleVoucher.value = 0;
+        salePay.value = "";
+        saleChange.value = "";
+        updateSaleCalculation();
+
+        await loadProducts();
+        await loadSalesData();
+
+        renderReceipt({
+          productName: product.name,
+          qty,
+          price: Number(product.price || 0),
+          subtotal,
+          discountPercent,
+          discountValue,
+          voucherValue,
+          total: totalToPay,
+          pay,
+          change,
+          date: new Date()
+        });
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyimpan penjualan: " + err.message, "error");
+      }
+    }
+
+    function renderReceipt(sale) {
+      if (!printArea) return;
+      const {
+        productName,
+        qty,
+        price,
+        subtotal,
+        discountPercent,
+        discountValue,
+        voucherValue,
+        total,
+        pay,
+        change,
+        date
+      } = sale;
+
+      const d = date || new Date();
+      const tanggal = d.toLocaleDateString("id-ID");
+      const waktu = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+      printArea.innerHTML = `
+        <h4>STRUK PENJUALAN</h4>
+        <p>F&amp;B POS</p>
+        <p>${tanggal} ${waktu}</p>
+        <hr />
+        <p><strong>${productName}</strong></p>
+        <p>Qty: ${qty}</p>
+        <p>Harga: Rp ${Number(price || 0).toLocaleString("id-ID")}</p>
+        <p>Subtotal: Rp ${Number(subtotal || 0).toLocaleString("id-ID")}</p>
+        <p>Diskon: ${Number(discountPercent || 0)}% (Rp ${Number(discountValue || 0).toLocaleString("id-ID")})</p>
+        <p>Voucher: Rp ${Number(voucherValue || 0).toLocaleString("id-ID")}</p>
+        <hr />
+        <p><strong>Total Bayar: Rp ${Number(total || 0).toLocaleString("id-ID")}</strong></p>
+        <p>Uang Bayar: Rp ${Number(pay || 0).toLocaleString("id-ID")}</p>
+        <p>Kembalian: Rp ${Number(change || 0).toLocaleString("id-ID")}</p>
+        <hr />
+        <p style="text-align:center;">Terima kasih 🙏</p>
+      `;
+    }
+
+    async function loadSalesData() {
+      const snap = await getDocs(colSales);
+      const sales = [];
+      snap.forEach((docSnap) => sales.push({ id: docSnap.id, ...docSnap.data() }));
+      allSalesCache = sales;
+      renderSalesToday(sales);
+      renderSalesCharts(sales);
+      setDefaultHistoryDate();
+      renderHistoryByDate();
+      return sales;
+    }
+
+    function renderSalesToday(allSales) {
+      salesTableBody.innerHTML = "";
+      salesTotalToday.textContent = "Rp 0";
+
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const d = now.getDate();
+
+      let totalToday = 0;
+      const salesToday = allSales.filter((s) => {
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        if (!t) return false;
+        return (
+          t.getFullYear() === y &&
+          t.getMonth() === m &&
+          t.getDate() === d
+        );
+      });
+
+      salesToday.sort((a, b) => {
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return ta - tb;
+      });
+
+      salesToday.forEach((s) => {
+        const tr = document.createElement("tr");
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        const timeStr = t
+          ? `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
+          : "-";
+
+        const total = Number(s.total ?? s.subtotal ?? 0);
+        totalToday += total;
+
+        tr.innerHTML = `
+          <td>${timeStr}</td>
+          <td>${s.productName || "-"}</td>
+          <td>${s.qty || 0}</td>
+          <td>Rp ${total.toLocaleString("id-ID")}</td>
+        `;
+        salesTableBody.appendChild(tr);
+      });
+
+      salesTotalToday.textContent = "Rp " + totalToday.toLocaleString("id-ID");
+    }
+
+    function setDefaultHistoryDate() {
+      if (!historyDate) return;
+      if (historyDate.value) return;
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      historyDate.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    function renderHistoryByDate() {
+      if (!historyDate) return;
+      const val = historyDate.value;
+      if (!val) {
+        historyTableBody.innerHTML = "";
+        historyTotal.textContent = "Rp 0";
+        return;
+      }
+
+      const [year, month, day] = val.split("-");
+      const y = Number(year);
+      const m = Number(month) - 1;
+      const d = Number(day);
+
+      historyTableBody.innerHTML = "";
+      let total = 0;
+
+      const filtered = allSalesCache.filter((s) => {
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        if (!t) return false;
+        return (
+          t.getFullYear() === y &&
+          t.getMonth() === m &&
+          t.getDate() === d
+        );
+      });
+
+      filtered.sort((a, b) => {
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return ta - tb;
+      });
+
+      filtered.forEach((s) => {
+        const tr = document.createElement("tr");
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        const timeStr = t
+          ? `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`
+          : "-";
+
+        const rowTotal = Number(s.total ?? s.subtotal ?? 0);
+        total += rowTotal;
+
+        tr.innerHTML = `
+          <td>${timeStr}</td>
+          <td>${s.productName || "-"}</td>
+          <td>${s.qty || 0}</td>
+          <td>Rp ${rowTotal.toLocaleString("id-ID")}</td>
+        `;
+        historyTableBody.appendChild(tr);
+      });
+
+      historyTotal.textContent = "Rp " + total.toLocaleString("id-ID");
+    }
+
+    if (historyDate) {
+      historyDate.addEventListener("change", renderHistoryByDate);
+    }
+
+    function destroyCharts() {
+      if (dailyChart) {
+        dailyChart.destroy();
+        dailyChart = null;
+      }
+      if (monthlyChart) {
+        monthlyChart.destroy();
+        monthlyChart = null;
+      }
+    }
+
+    function renderSalesCharts(allSales) {
+      destroyCharts();
+
+      const dailyMap = {};
+      const monthlyMap = {};
+
+      allSales.forEach((s) => {
+        const t = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate() : null;
+        if (!t) return;
+        const dayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(
+          t.getDate()
+        ).padStart(2, "0")}`;
+        const monthKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}`;
+        const total = Number(s.total ?? s.subtotal ?? 0);
+        dailyMap[dayKey] = (dailyMap[dayKey] || 0) + total;
+        monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + total;
+      });
+
+      const dailyLabels = Object.keys(dailyMap).sort();
+      const dailyData = dailyLabels.map((k) => dailyMap[k]);
+      const monthlyLabels = Object.keys(monthlyMap).sort();
+      const monthlyData = monthlyLabels.map((k) => monthlyMap[k]);
+
+      if (dailyCanvas && dailyLabels.length > 0) {
+        dailyChart = new Chart(dailyCanvas.getContext("2d"), {
+          type: "line",
+          data: {
+            labels: dailyLabels,
+            datasets: [
+              { label: "Total Harian (Rp)", data: dailyData, tension: 0.25 }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (val) => "Rp " + Number(val).toLocaleString("id-ID")
+                }
+              }
+            }
+          }
+        });
+      }
+
+      if (monthlyCanvas && monthlyLabels.length > 0) {
+        monthlyChart = new Chart(monthlyCanvas.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels: monthlyLabels,
+            datasets: [
+              { label: "Total Bulanan (Rp)", data: monthlyData }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (val) => "Rp " + Number(val).toLocaleString("id-ID")
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
     function checkWeeklyReminder() {
       const now = new Date();
-      const day = now.getDay(); // 0 = Minggu, 1 = Senin, dst
+      const day = now.getDay();
       const hour = now.getHours();
       const minute = now.getMinutes();
-
-      // Minggu jam 05:00 → ingatkan bahwa Senin besok stok opname
       if (day === 0 && hour === 5 && minute === 0) {
         showToast("Reminder: Besok Senin jadwal stok opname!", "info", 8000);
       }
     }
-    // Cek tiap menit
     setInterval(checkWeeklyReminder, 60000);
 
-    // ====== 12. Peringatan Stok Menipis ======
     function showLowStockNotifications(products) {
       products.forEach((p) => {
         const min = p.minStock ?? 0;
@@ -815,11 +1340,6 @@
         }
       });
     }
-
-    // TODO NEXT:
-    // - Modul penjualan (sales) yang simpan ke collection "sales"
-    // - Dashboard penjualan harian/bulanan
-    // - Export ke Excel (SheetJS)
   </script>
 </body>
 </html>
