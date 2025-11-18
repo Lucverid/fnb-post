@@ -331,26 +331,40 @@
     }
 
     <div class="shell-header">
-  <div class="shell-left">
-    <div class="shell-logo">F&B</div>
-    <div class="shell-title-wrap">
-      <div class="shell-title" id="topbarUser">Login sebagai -</div>
-      <div class="shell-sub" id="connectionStatus">Status: -</div>
+
+  <!-- Row 1: Logo + User + Notif -->
+  <div class="header-row-1">
+    
+    <!-- Logo + User -->
+    <div class="header-user-info">
+      <div class="shell-logo">F&B</div>
+      <div class="shell-title-wrap">
+        <div class="shell-title" id="topbarUser">Login sebagai -</div>
+      </div>
     </div>
 
-    <!-- ⬇⬇ Tambahan baru: burger di bawah user/status (masih satu grup) -->
+    <!-- Notifikasi -->
+    <button class="notif-btn" id="notifBtn">
+      🔔 <span class="notif-badge" id="notifBadge">0</span>
+    </button>
+
+  </div>
+
+  <!-- Row 2: Status koneksi -->
+  <div class="header-row-status">
+    <div class="shell-sub" id="connectionStatus">Status: -</div>
+  </div>
+
+  <!-- Row 3: Burger menu -->
+  <div class="header-row-burger">
     <button id="btnSidebarToggle" class="btn-sidebar-toggle" aria-label="Menu">
       <span class="btn-sidebar-line"></span>
       <span class="btn-sidebar-line"></span>
       <span class="btn-sidebar-line"></span>
     </button>
-    <!-- ⬆⬆ -->
   </div>
-  <div class="shell-right">
-    ...
-  </div>
-</div>
 
+</div>
     .btn-sidebar-toggle {
   display: none;           /* default: tidak tampil di desktop */
   border-radius: 999px;
@@ -621,29 +635,65 @@
     display:block;
   }
 
-  /* header jadi kolom */
-  .shell-header {
-    flex-direction:column;
-    align-items:flex-start;
-    gap:6px;
-  }
+ /* --- HEADER GRID --- */
+.header-row-1 {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-  .shell-left {
-    flex-direction:column;
-    align-items:flex-start;
-    gap:6px;
-  }
+.header-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-  /* burger aktif di mobile, tanpa background hitam */
+/* Baris status */
+.header-row-status {
+  margin-top: 4px;
+}
+
+/* Baris burger */
+.header-row-burger {
+  margin-top: 8px;
+}
+
+/* Burger menu default hidden di desktop */
+.btn-sidebar-toggle {
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+}
+
+.btn-sidebar-line {
+  width: 20px;
+  height: 2px;
+  background: #111827;
+  border-radius: 5px;
+}
+
+/* MOBILE MODE */
+@media (max-width: 900px) {
+
+  /* Burger tampil di mobile */
   .btn-sidebar-toggle {
-    display:flex;
-    margin-top:4px;
-    padding:4px 0;
-    background:transparent;
-    border:none;
-    box-shadow:none;
+    display: flex;
   }
 
+  /* Desktop notif disembunyikan */
+  .shell-right {
+    display: none !important;
+  }
+
+  /* User info dirapikan */
+  .shell-title-wrap .shell-sub {
+    font-size: 11px;
+  }
+}
   .shell-right{
     align-self:flex-end;
   }
