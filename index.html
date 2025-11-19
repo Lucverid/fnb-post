@@ -66,7 +66,6 @@
       </div>
 
       <div class="header-right">
-
         <!-- Icon Notifikasi -->
         <div id="notifBtn" class="notif-btn">
           <i class="lucide-bell"></i>
@@ -83,7 +82,6 @@
         <button id="burgerBtn" class="burger-btn">
           <span></span><span></span><span></span>
         </button>
-
       </div>
     </header>
 
@@ -112,7 +110,7 @@
             <i class="lucide-clipboard-list"></i> <span>Opname</span>
           </button>
 
-          <!-- 🧾 LAPORAN (BARU) -->
+          <!-- 🧾 LAPORAN -->
           <button class="side-item admin-only" data-section="reports">
             <i class="lucide-file-text"></i> <span>Laporan</span>
           </button>
@@ -132,7 +130,7 @@
       <!-- ⭐ WELCOME BANNER -->
       <section id="welcomeBanner" class="welcome-banner hidden">
         <h2>Selamat datang, <span id="bannerRole"></span></h2>
-        <p>Akses cepat POS, inventory, dan dashboard.</p>
+        <p>Akses cepat POS, inventory, dashboard, dan laporan.</p>
       </section>
 
       <!-- 🛒 POS (Sales) -->
@@ -140,7 +138,6 @@
         <h2>Kasir</h2>
 
         <div class="pos-layout">
-
           <!-- Left = Menu list -->
           <div class="pos-left">
             <input id="saleSearch" class="search-bar" placeholder="Cari menu...">
@@ -161,7 +158,6 @@
 
           <!-- Right = Cart -->
           <div class="pos-right">
-
             <div class="cart-box">
               <h3>Daftar Pesanan</h3>
 
@@ -199,13 +195,11 @@
               <div id="printArea" class="print-area">Belum ada transaksi</div>
               <button onclick="window.print()" class="btn-secondary">Print</button>
             </div>
-
           </div>
-
         </div>
       </section>
 
-      <!-- 📦 Inventory (khusus Bahan Baku) -->
+      <!-- 📦 Inventory -->
       <section id="inventorySection" class="section hidden">
         <h2>Inventory Bahan Baku</h2>
 
@@ -255,7 +249,6 @@
         </div>
 
         <h3>Daftar Bahan Baku</h3>
-        <!-- 🔍 search bahan baku -->
         <input id="inventorySearch" class="search-bar" placeholder="Cari bahan / kategori..." />
 
         <div class="table-wrap">
@@ -274,7 +267,6 @@
       <section id="recipeSection" class="section hidden">
         <h2>Resep &amp; Menu</h2>
 
-        <!-- Form menu -->
         <div class="form-grid">
           <div>
             <label>Nama Menu</label>
@@ -307,7 +299,6 @@
         </div>
 
         <h3>Daftar Menu</h3>
-        <!-- 🔍 search menu -->
         <input id="recipeSearch" class="search-bar" placeholder="Cari menu / kategori..." />
 
         <div class="table-wrap">
@@ -347,7 +338,6 @@
           </div>
         </div>
 
-        <!-- 🔍 FILTER TANGGAL -->
         <div class="filter-row">
           <div>
             <label for="filterStart">Dari tanggal</label>
@@ -363,7 +353,6 @@
           </div>
         </div>
 
-        <!-- 📈 CHART -->
         <div class="chart-grid">
           <div class="chart-card">
             <h4>Omzet Harian</h4>
@@ -380,7 +369,6 @@
           </div>
         </div>
 
-        <!-- ⭐ MENU TERLARIS -->
         <h3>Menu Terlaris</h3>
         <div class="table-wrap">
           <table>
@@ -396,9 +384,7 @@
         </div>
 
         <h3>Riwayat Penjualan</h3>
-
         <input id="historySearch" class="search-bar" placeholder="Cari tanggal / menu..." />
-
         <div class="table-wrap">
           <table>
             <thead>
@@ -454,7 +440,8 @@
             </div>
           </div>
 
-          <div class="field">
+          <!-- tombol dibuat flex lewat class 'actions' -->
+          <div class="field actions">
             <button id="btnReportGenerate" class="btn-primary">Generate</button>
             <button id="btnReportDownload" class="btn-outline">Download CSV</button>
           </div>
@@ -473,6 +460,5 @@
 
   <!-- JS utama -->
   <script src="script.js" type="module"></script>
-
 </body>
 </html>
