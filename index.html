@@ -491,70 +491,17 @@
     </main>
   </div>
 
+<!-- STRUK -->
+<h3 id="strukTitle">Struk</h3>
+<div id="printArea" class="print-area">
+  Belum ada transaksi
+</div>
+<button id="btnPrint" class="btn-secondary" type="button" onclick="window.print()">
+  Print
+</button>
+
   <!-- JS utama -->
   <script src="script.js" type="module"></script>
 
-  <!-- JS tambahan khusus PRINT STRUK -->
-  <script>
-    function handlePrint() {
-      const printDiv = document.getElementById("printArea");
-      if (!printDiv) return;
-
-      // isi struk (sudah berisi <div class="receipt"><pre>...</pre></div>)
-      const printContents = printDiv.innerHTML;
-
-      const win = window.open("", "", "width=400,height=600");
-
-      win.document.write(`
-        <html>
-          <head>
-            <title>Print Struk</title>
-            <style>
-              @page {
-                margin: 0;
-              }
-              body {
-                margin: 0;
-                padding: 8px;
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                font-size: 12px;
-              }
-              .receipt {
-                margin: 0;
-                padding: 0;
-                box-shadow: none;
-                border-radius: 0;
-                border: none;
-              }
-              .receipt-pre {
-                font-family: "SF Mono","Roboto Mono",monospace;
-                font-size: 12px;
-                white-space: pre;
-              }
-            </style>
-          </head>
-          <body>
-            ${printContents}
-          </body>
-        </html>
-      `);
-
-      win.document.close();
-
-      // kasih jeda sebentar supaya Android Print Service sempat render
-      setTimeout(() => {
-        win.focus();
-        win.print();
-        // jangan langsung win.close(); biar spooler gak error
-      }, 400);
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const btnPrint = document.getElementById("btnPrint");
-      if (btnPrint) {
-        btnPrint.addEventListener("click", handlePrint);
-      }
-    });
-  </script>
 </body>
 </html>
