@@ -1392,7 +1392,7 @@ function updateCharts() {
       .filter((s) => s.dateKey === key)
       .reduce((n, s) => n + Number(s.total || 0), 0);
     dayData.push(sum);
-  }
+  } 
 
   const monthLabels = [];
   const monthData = [];
