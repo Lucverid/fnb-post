@@ -566,9 +566,9 @@ if (btnSaveProduct) {
   btnSaveProduct.addEventListener("click", async () => {
     try {
       const name = (productName?.value || "").trim();
-      const type = "bahan_baku"; // <<–– dipaksa bahan baku
+      const type = "bahan_baku"; // dipaksa bahan baku
       const category = productCategory?.value || "lainnya";
-      const price = 0;                          // ga dipakai untuk bahan baku
+      const price = 0;
       const stock = Number(productStock?.value || 0);
       const minStock = Number(productMinStock?.value || 0);
       const unit = (productUnit?.value || "").trim();
@@ -936,6 +936,50 @@ function updatePrintAreaFromSale(saleDoc) {
     </div>`;
 }
 
+// ================= CEK STOK BAHAN UNTUK CURRENT CART =================
+function checkStockForCurrentCart() {
+  const shortage = [];
+
+  currentCart.forEach((it) => {
+    const menu = productsCache.find(
+      (p) => p.id === it.productId && p.type === "menu"
+    );
+    if (!menu || !Array.isArray(menu.bom)) return;
+
+    menu.bom.forEach((b) => {
+      if (!b.materialId || !b.qty) return;
+
+      const bahan = productsCache.find(
+        (p) => p.id === b.materialId && p.type === "bahan_baku"
+      );
+
+      const required = Number(b.qty) * Number(it.qty || 0);
+      const available = Number(bahan?.stock || 0);
+
+      if (required > available) {
+        shortage.push({
+          bahanName: bahan?.name || b.materialName || "Bahan",
+          menuName: menu.name || "-",
+          required,
+          available,
+        });
+      }
+    });
+  });
+
+  if (!shortage.length) {
+    return true; // stok aman
+  }
+
+  let msg = "Transaksi dibatalkan. Bahan baku kurang:\n";
+  shortage.forEach((s) => {
+    msg += `- ${s.bahanName} untuk menu ${s.menuName} (butuh ${s.required}, stok ${s.available})\n`;
+  });
+
+  showToast(msg, "error", 6000);
+  return false;
+}
+
 // ================= BOM STOCK HELPER =================
 async function applyBomForSale(saleDoc) {
   if (!saleDoc || !Array.isArray(saleDoc.items)) return;
@@ -980,6 +1024,12 @@ if (btnSaveSale) {
     try {
       if (!currentCart.length) {
         showToast("Keranjang kosong", "error");
+        return;
+      }
+
+      // cek stok bahan dulu
+      const stokOk = checkStockForCurrentCart();
+      if (!stokOk) {
         return;
       }
 
