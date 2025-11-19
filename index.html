@@ -194,12 +194,14 @@
                 <button id="btnSaveSale" class="btn-primary">Simpan Transaksi</button>
               </div>
 
-              <!-- STRUK -->
+              <!-- STRUK (HANYA INI) -->
               <h3 id="strukTitle">Struk</h3>
               <div id="printArea" class="print-area">
                 Belum ada transaksi
               </div>
-              <button id="btnPrint" class="btn-secondary" type="button">Print</button>
+              <button id="btnPrint" class="btn-secondary" type="button" onclick="window.print()">
+                Print
+              </button>
             </div>
           </div>
         </div>
@@ -461,7 +463,7 @@
               <input type="date" id="reportEnd">
             </div>
           </div>
-
+    
           <div class="field actions">
             <button id="btnReportGenerate" class="btn-primary">Generate</button>
             <button id="btnReportDownload" class="btn-outline">Download CSV</button>
@@ -488,20 +490,10 @@
         </div>
       </div>
 
-    </main>
+    </main> 
   </div>
-
-<!-- STRUK -->
-<h3 id="strukTitle">Struk</h3>
-<div id="printArea" class="print-area">
-  Belum ada transaksi
-</div>
-<button id="btnPrint" class="btn-secondary" type="button" onclick="window.print()">
-  Print
-</button>
 
   <!-- JS utama -->
   <script src="script.js" type="module"></script>
-
 </body>
 </html>
