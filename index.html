@@ -21,7 +21,6 @@
   <div id="toast-container"></div>
 
   <!-- 🔒 AUTH -->
-  <!-- HAPUS class "hidden" di sini supaya form login muncul dulu -->
   <div id="auth-card" class="auth-card">
     <div class="auth-box">
       <h2>Login</h2>
@@ -53,7 +52,6 @@
   </div>
 
   <!-- 🧊 APP SHELL -->
-  <!-- Tetap hidden, nanti dibuka lewat script setelah user login -->
   <div id="app-shell" class="app-shell hidden">
 
     <!-- 📌 HEADER NEW DESIGN -->
@@ -244,6 +242,15 @@
             <input id="productUnit">
           </div>
 
+          <!-- 🔥 BOM / Resep Menu -->
+          <div id="bomWrapper" class="full hidden">
+            <label>Resep / BOM (bahan per 1 porsi)</label>
+            <div id="bomList" class="bom-list"></div>
+            <button type="button" id="btnAddBomRow" class="btn-secondary small" style="margin-top:8px;">
+              + Tambah Bahan
+            </button>
+          </div>
+
           <button id="btnSaveProduct" class="btn-primary full">Simpan</button>
         </div>
 
@@ -262,92 +269,91 @@
 
       <!-- 📊 DASHBOARD -->
       <section id="dashboardSection" class="section hidden">
-  <h2>Dashboard Penjualan</h2>
+        <h2>Dashboard Penjualan</h2>
 
-  <div class="metric-row">
-    <div id="metricEmpty" class="metric-card red">
-      <i class="lucide-x-circle"></i>
-      <div><b id="metricEmptyCount">0</b> Habis</div>
-    </div>
+        <div class="metric-row">
+          <div id="metricEmpty" class="metric-card red">
+            <i class="lucide-x-circle"></i>
+            <div><b id="metricEmptyCount">0</b> Habis</div>
+          </div>
 
-    <div id="metricLow" class="metric-card yellow">
-      <i class="lucide-alert-triangle"></i>
-      <div><b id="metricLowCount">0</b> Hampir Habis</div>
-    </div>
+          <div id="metricLow" class="metric-card yellow">
+            <i class="lucide-alert-triangle"></i>
+            <div><b id="metricLowCount">0</b> Hampir Habis</div>
+          </div>
 
-    <div id="metricOk" class="metric-card green">
-      <i class="lucide-check-circle"></i>
-      <div><b id="metricOkCount">0</b> Aman</div>
-    </div>
-  </div>
+          <div id="metricOk" class="metric-card green">
+            <i class="lucide-check-circle"></i>
+            <div><b id="metricOkCount">0</b> Aman</div>
+          </div>
+        </div>
 
-  <!-- 🔍 FILTER TANGGAL -->
-  <div class="filter-row">
-    <div>
-      <label for="filterStart">Dari tanggal</label>
-      <input type="date" id="filterStart">
-    </div>
-    <div>
-      <label for="filterEnd">Sampai tanggal</label>
-      <input type="date" id="filterEnd">
-    </div>
-    <div class="filter-actions">
-      <button id="btnFilterApply" class="btn-secondary small">Terapkan</button>
-      <button id="btnFilterReset" class="btn-secondary small ghost">Reset</button>
-    </div>
-  </div>
+        <!-- 🔍 FILTER TANGGAL -->
+        <div class="filter-row">
+          <div>
+            <label for="filterStart">Dari tanggal</label>
+            <input type="date" id="filterStart">
+          </div>
+          <div>
+            <label for="filterEnd">Sampai tanggal</label>
+            <input type="date" id="filterEnd">
+          </div>
+          <div class="filter-actions">
+            <button id="btnFilterApply" class="btn-secondary small">Terapkan</button>
+            <button id="btnFilterReset" class="btn-secondary small ghost">Reset</button>
+          </div>
+        </div>
 
-  <!-- 📈 CHART -->
-  <div class="chart-grid">
-    <div class="chart-card">
-      <h4>Omzet Harian</h4>
-      <div class="chart-box">
-        <canvas id="dailyChart"></canvas>
-      </div>
-    </div>
+        <!-- 📈 CHART -->
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h4>Omzet Harian</h4>
+            <div class="chart-box">
+              <canvas id="dailyChart"></canvas>
+            </div>
+          </div>
 
-    <div class="chart-card">
-      <h4>Omzet Bulanan</h4>
-      <div class="chart-box">
-        <canvas id="monthlyChart"></canvas>
-      </div>
-    </div>
-  </div>
+          <div class="chart-card">
+            <h4>Omzet Bulanan</h4>
+            <div class="chart-box">
+              <canvas id="monthlyChart"></canvas>
+            </div>
+          </div>
+        </div>
 
-  <!-- ⭐ MENU TERLARIS --!>
+        <!-- ⭐ MENU TERLARIS -->
+        <h3>Menu Terlaris</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Menu</th>
+                <th>Qty Terjual</th>
+                <th>Total Omzet</th>
+              </tr>
+            </thead>
+            <tbody id="topMenuTable"></tbody>
+          </table>
+        </div>
 
-<h3>Menu Terlaris</h3>
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>Menu</th>
-        <th>Qty Terjual</th>
-        <th>Total Omzet</th>
-      </tr>
-    </thead>
-    <tbody id="topMenuTable"></tbody>
-  </table>
-</div>
+        <h3>Riwayat Penjualan</h3>
 
-<h3>Riwayat Penjualan</h3>
+        <input id="historySearch" class="search-bar" placeholder="Cari tanggal / menu..." />
 
-<input id="historySearch" class="search-bar" placeholder="Cari tanggal / menu..." />
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal &amp; Waktu</th>
+                <th>Detail Item</th>
+                <th>Total Omzet</th>
+              </tr>
+            </thead>
+            <tbody id="historyTable"></tbody>
+          </table>
+        </div>
+      </section>
 
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th>Tanggal & Waktu</th>
-        <th>Detail Item</th>
-        <th>Total Omzet</th>
-      </tr>
-    </thead>
-    <tbody id="historyTable"></tbody>
-  </table>
-</div>
-
-</section>
       <!-- 📋 OPNAME -->
       <section id="opnameSection" class="section hidden">
         <h2>Stok Opname</h2>
