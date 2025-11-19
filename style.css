@@ -1246,57 +1246,6 @@ td {
    STOK OPNAME – DESKTOP & MOBILE
 ================================================== */
 
-/* Override bawaan .table-wrap biar nggak kepotong */
-#opnameSection .table-wrap {
-  max-height: none;
-}
-
-/* Desktop: rapihin kolom */
-#opnameSection table th,
-#opnameSection table td {
-  font-size: 13px;
-}
-
-#opnameSection table th:nth-child(1),
-#opnameSection table td:nth-child(1) {
-  width: 35%;
-}
-
-#opnameSection table th:nth-child(2),
-#opnameSection table th:nth-child(3),
-#opnameSection table th:nth-child(4),
-#opnameSection table td:nth-child(2),
-#opnameSection table td:nth-child(3),
-#opnameSection table td:nth-child(4) {
-  text-align: center;
-  white-space: nowrap;
-}
-
-#opnameSection table td:last-child {
-  text-align: right;
-}
-
-#opnameSection input[type="number"] {
-  max-width: 140px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  font-size: 13px;
-  background: #f9fafb;
-}
-
-#opnameSection input[type="number"]:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
-  background: #ffffff;
-}
-
-/* ==================================================
-   STOK OPNAME – DESKTOP & MOBILE
-================================================== */
-
 /* DESKTOP */
 #opnameSection .table-wrap {
   max-height: none;
