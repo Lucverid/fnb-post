@@ -1,4 +1,4 @@
-// script.js (versi stabil + filter dashboard + menu terlaris + history)
+// script.js (versi stabil + filter dashboard + menu terlaris + riwayat)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -129,7 +129,7 @@ const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
 let monthlyChart = null;
 
-// 🔍 filter tanggal + menu terlaris + history
+// 🔍 filter tanggal + menu terlaris + riwayat
 const filterStart = $("filterStart");
 const filterEnd = $("filterEnd");
 const btnFilterApply = $("btnFilterApply");
@@ -804,7 +804,7 @@ function updateTopMenu() {
 
   const rows = Object.entries(agg)
     .sort((a, b) => b[1].qty - a[1].qty)
-    .slice(0, 10);
+    .slice(0, 5); // top 5
 
   topMenuTable.innerHTML = "";
   if (!rows.length) {
@@ -826,7 +826,7 @@ function updateTopMenu() {
   });
 }
 
-// 👉 History penjualan (tabel)
+// 👉 Riwayat penjualan (semua transaksi sesuai filter)
 function updateHistoryTable() {
   if (!historyTable) return;
 
@@ -997,3 +997,4 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = "–";
   }
 });
+```0
