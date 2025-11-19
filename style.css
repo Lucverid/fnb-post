@@ -1449,35 +1449,36 @@ td {
   }
 }
 /* =========================================
-   PRINT – HANYA #printArea YANG TERCETAK
+   PRINT – HANYA STRUK (#printArea) YANG CETAK
 ========================================= */
 @media print {
 
-  /* Sembunyikan semua elemen dulu */
+  /* SEMUA elemen hilang dulu */
   body * {
-    visibility: hidden !important;
+    display: none !important;
   }
 
-  /* Tampilkan hanya konten struk */
+  /* HANYA #printArea dan isinya yang muncul */
   #printArea,
   #printArea * {
-    visibility: visible !important;
+    display: block !important;
   }
 
-  /* Pindahkan struk ke pojok atas halaman */
+  /* Styling struk di kertas */
   #printArea {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     margin: 0;
-    padding: 0 6px;          /* boleh diubah kalau mau lebih mepet */
+    padding: 0 6px;
     box-shadow: none !important;
+    border-radius: 0 !important;
     border: none !important;
-    background: #ffffff;
+    background: #ffffff !important;
   }
 
-  /* Hilangkan tombol Print (kalau dia anak dari cart-box dll) */
+  /* Pastikan tombol Print ikut hilang kalau masih kebaca */
   #btnPrint {
     display: none !important;
   }
