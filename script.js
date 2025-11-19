@@ -1,3 +1,4 @@
+
 // script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -53,6 +54,41 @@ function formatCurrency(num) {
   const n = Number(num || 0);
   return "Rp " + n.toLocaleString("id-ID");
 }
+
+// ===== HELPER ANGKA UNTUK INPUT (titik ribuan) =====
+function cleanNumber(val) {
+  if (val == null) return 0;
+  const num = parseInt(val.toString().replace(/\D/g, ""), 10);
+  return isNaN(num) ? 0 : num;
+}
+
+function formatRupiahInput(val) {
+  const n = cleanNumber(val);
+  if (!n) return "";
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function attachRupiahFormatter(ids) {
+  ids.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      const pos = el.selectionStart;
+      const prevLen = el.value.length;
+
+      const formatted = formatRupiahInput(el.value);
+      el.value = formatted;
+
+      const newLen = formatted.length;
+      if (typeof pos === "number") {
+        const diff = newLen - prevLen;
+        const newPos = Math.max(pos + diff, 0);
+        el.selectionStart = el.selectionEnd = newPos;
+      }
+    });
+  });
+}
+
 function todayKey(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -369,13 +405,11 @@ document.querySelectorAll(".side-item").forEach((btn) => {
     const section = btn.dataset.section;
     if (!section) return;
 
-    // pindah kelas "active"
     document.querySelectorAll(".side-item").forEach((b) => {
       b.classList.remove("active");
     });
     btn.classList.add("active");
 
-    // kalau buka opname dari sidebar → reset filter status
     if (section === "opname") {
       opnameStatusFilter = null;
       if (opnameSearch) opnameSearch.value = "";
@@ -389,6 +423,7 @@ document.querySelectorAll(".side-item").forEach((btn) => {
     }
   });
 });
+
 // burger
 if (burgerBtn && sidebar) {
   burgerBtn.addEventListener("click", (e) => {
@@ -416,7 +451,6 @@ function initMetricClickToOpname() {
     if (!card) return;
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
-      // tentukan status dari kartu yang diklik
       if (card === metricEmptyCard) {
         opnameStatusFilter = "Habis";
       } else if (card === metricLowCard) {
@@ -427,16 +461,11 @@ function initMetricClickToOpname() {
         opnameStatusFilter = null;
       }
 
-      // kosongkan search di opname
       if (opnameSearch) opnameSearch.value = "";
 
-      // pindah ke halaman opname
       showSection("opname");
-
-      // render tabel sesuai filter
       renderOpnameTable();
 
-      // scroll ke tabel
       if (opnameSection) {
         opnameSection.scrollIntoView({ behavior: "smooth" });
       }
@@ -664,9 +693,9 @@ function fillProductForm(id) {
   if (productName) productName.value = p.name || "";
   if (productType) productType.value = p.type || "bahan_baku";
   if (productCategory) productCategory.value = p.category || "makanan";
-  if (productPrice) productPrice.value = p.price || "";
-  if (productStock) productStock.value = p.stock || "";
-  if (productMinStock) productMinStock.value = p.minStock || "";
+  if (productPrice) productPrice.value = formatRupiahInput(p.price || 0);
+  if (productStock) productStock.value = formatRupiahInput(p.stock || 0);
+  if (productMinStock) productMinStock.value = formatRupiahInput(p.minStock || 0);
   if (productUnit) productUnit.value = p.unit || "";
   updateInventoryFormVisibility();
 }
@@ -692,8 +721,8 @@ if (btnSaveProduct) {
       const type = "bahan_baku";
       const category = productCategory?.value || "lainnya";
       const price = 0;
-      const stock = Number(productStock?.value || 0);
-      const minStock = Number(productMinStock?.value || 0);
+      const stock = cleanNumber(productStock?.value || 0);
+      const minStock = cleanNumber(productMinStock?.value || 0);
       const unit = (productUnit?.value || "").trim();
 
       if (!name) {
@@ -810,7 +839,7 @@ function openBomModal(menuId) {
   bomModal.classList.remove("hidden");
 }
 
-// close modal (icon X + klik backdrop)
+// close modal
 if (bomModalClose && bomModal) {
   bomModalClose.addEventListener("click", () => {
     bomModal.classList.add("hidden");
@@ -886,7 +915,7 @@ function fillRecipeForm(id) {
   editingRecipeId = id;
   if (recipeName) recipeName.value = m.name || "";
   if (recipeCategory) recipeCategory.value = m.category || "makanan";
-  if (recipePrice) recipePrice.value = m.price || 0;
+  if (recipePrice) recipePrice.value = formatRupiahInput(m.price || 0);
   if (recipeDesc) recipeDesc.value = m.desc || "";
 
   if (bomList) {
@@ -914,7 +943,7 @@ if (btnSaveRecipe) {
     try {
       const name = (recipeName?.value || "").trim();
       const category = recipeCategory?.value || "lainnya";
-      const price = Number(recipePrice?.value || 0);
+      const price = cleanNumber(recipePrice?.value || 0);
       const desc = (recipeDesc?.value || "").trim();
 
       if (!name) {
@@ -1058,22 +1087,37 @@ function updateCartSummary() {
   }
 
   const discPct = Number(saleDiscount?.value || 0);
-  const voucher = Number(saleVoucher?.value || 0);
+  const voucher = cleanNumber(saleVoucher?.value || 0);
 
   let discAmount = discPct > 0 ? subtotal * (discPct / 100) : 0;
   let total = subtotal - discAmount - voucher;
   if (total < 0) total = 0;
 
-  if (saleTotal) saleTotal.value = total;
-
-  const pay = Number(salePay?.value || 0);
+  const pay = cleanNumber(salePay?.value || 0);
   const change = pay > total ? pay - total : 0;
-  if (saleChange) saleChange.value = change;
+
+  if (saleTotal) saleTotal.value = formatRupiahInput(total);
+  if (saleChange) saleChange.value = formatRupiahInput(change);
 }
 
 [saleDiscount, saleVoucher, salePay].forEach((el) => {
   if (el) el.addEventListener("input", updateCartSummary);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ================= STRUK PRINT (TEXT MODE) =================
 function updatePrintAreaFromSale(saleDoc) {
@@ -1166,6 +1210,9 @@ function updatePrintAreaFromSale(saleDoc) {
     </div>
   `;
 }
+
+
+
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
   const shortage = [];
@@ -1258,23 +1305,21 @@ if (btnSaveSale) {
       }
 
       const stokOk = checkStockForCurrentCart();
-      if (!stokOk) {
-        return;
-      }
+      if (!stokOk) return;
 
       const subtotal = currentCart.reduce(
         (sum, it) => sum + Number(it.subtotal || 0),
         0
       );
       const discountPercent = Number(saleDiscount?.value || 0);
-      const voucher = Number(saleVoucher?.value || 0);
+      const voucher = cleanNumber(saleVoucher?.value || 0);
       const discountAmount =
         discountPercent > 0 ? subtotal * (discountPercent / 100) : 0;
 
       let total = subtotal - discountAmount - voucher;
       if (total < 0) total = 0;
 
-      const pay = Number(salePay?.value || 0);
+      const pay = cleanNumber(salePay?.value || 0);
       if (pay < total) {
         showToast("Uang bayar kurang dari total", "error");
         return;
@@ -1298,6 +1343,7 @@ if (btnSaveSale) {
         createdByUid: currentUser?.uid || null,
       };
 
+      // OFFLINE
       if (!navigator.onLine) {
         queueOfflineSale(saleDoc);
         showToast(
@@ -1309,12 +1355,13 @@ if (btnSaveSale) {
         currentCart = [];
         renderCart();
         if (saleDiscount) saleDiscount.value = 0;
-        if (saleVoucher) saleVoucher.value = 0;
+        if (saleVoucher) saleVoucher.value = "";
         if (salePay) salePay.value = "";
         if (saleChange) saleChange.value = "";
         return;
       }
 
+      // ONLINE
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
       await applyBomForSale(saleDoc);
 
@@ -1322,9 +1369,10 @@ if (btnSaveSale) {
       currentCart = [];
       renderCart();
       if (saleDiscount) saleDiscount.value = 0;
-      if (saleVoucher) saleVoucher.value = 0;
+      if (saleVoucher) saleVoucher.value = "";
       if (salePay) salePay.value = "";
       if (saleChange) saleChange.value = "";
+
       updatePrintAreaFromSale(saleDoc);
       await loadSales();
     } catch (e) {
@@ -1476,22 +1524,19 @@ function updateCharts() {
     monthData.push(sum);
   }
 
-  // 🔢 TOTAL HARI & BULAN BERDASARKAN TANGGAL FILTER ("Dari tanggal")
-  // kalau user belum pilih, pakai hari ini
+  // total harian & bulanan (berdasarkan filterStart jika ada)
   let refDate = today;
   if (filterStart && filterStart.value) {
     refDate = new Date(filterStart.value + "T00:00:00");
   }
 
-  const refKey = todayKey(refDate); // YYYY-MM-DD acuan
+  const refKey = todayKey(refDate);
   const ymRef  = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}`;
 
-  // total untuk "hari ini" = total di tanggal acuan
   const todayTotal = src
     .filter((s) => s.dateKey === refKey)
     .reduce((n, s) => n + Number(s.total || 0), 0);
 
-  // total untuk "bulan ini" = semua transaksi di bulan acuan
   const thisMonthTotal = src
     .filter((s) => (s.dateKey || "").startsWith(ymRef))
     .reduce((n, s) => n + Number(s.total || 0), 0);
@@ -1503,7 +1548,6 @@ function updateCharts() {
     monthlyTotalLabel.textContent = formatCurrency(thisMonthTotal);
   }
 
-  // --- Render chart ---
   if (dailyChart) dailyChart.destroy();
   if (monthlyChart) monthlyChart.destroy();
 
@@ -1531,7 +1575,6 @@ function updateCharts() {
   });
 }
 
-// menu terlaris
 function updateTopMenu() {
   if (!topMenuTable) return;
 
@@ -1571,7 +1614,6 @@ function updateTopMenu() {
   });
 }
 
-// riwayat
 function updateHistoryTable() {
   if (!historyTable) return;
 
@@ -1620,6 +1662,7 @@ function updateHistoryTable() {
     });
 }
 
+// filter + search event
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
@@ -1678,17 +1721,14 @@ function renderOpnameTable() {
   if (!opnameTable) return;
   opnameTable.innerHTML = "";
 
-  // filter hanya bahan baku
   let bahan = productsCache.filter((p) => p.type === "bahan_baku");
 
-  // filter berdasarkan status (Habis / Hampir habis / Aman)
   if (opnameStatusFilter) {
     bahan = bahan.filter(
       (p) => productStatus(p).label === opnameStatusFilter
     );
   }
 
-  // filter berdasarkan teks pencarian
   const q = (opnameSearch?.value || "").trim().toLowerCase();
   if (q) {
     bahan = bahan.filter(
@@ -1728,7 +1768,6 @@ function renderOpnameTable() {
     opnameTable.appendChild(tr);
   });
 
-  // hitung selisih realtime
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
     const prod = productsCache.find((p) => p.id === id);
@@ -1740,7 +1779,6 @@ function renderOpnameTable() {
     });
   });
 
-  // tombol simpan per-baris
   opnameTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     btn.addEventListener("click", () => saveOpnameRow(id));
@@ -1776,11 +1814,10 @@ async function saveOpnameRow(id) {
       createdBy: currentUser?.email || "-",
     };
 
-    // OFFLINE MODE
     if (!navigator.onLine) {
       queueOfflineOpname(opDoc);
 
-      prod.stock = fisik; // update UI stock lokal
+      prod.stock = fisik;
       showToast(
         `Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`,
         "info",
@@ -1794,7 +1831,6 @@ async function saveOpnameRow(id) {
       return;
     }
 
-    // ONLINE MODE
     await addDoc(colOpname, {
       ...opDoc,
       createdAt: serverTimestamp(),
@@ -1807,7 +1843,6 @@ async function saveOpnameRow(id) {
 
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
 
-    // Refresh data
     await loadProducts();
     await loadOpnameLogs();
   } catch (err) {
@@ -2103,6 +2138,18 @@ if (btnReportDownload) {
   });
 }
 
+// ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
+attachRupiahFormatter([
+  "saleVoucher",
+  "salePay",
+  "saleTotal",
+  "saleChange",
+  "productPrice",
+  "productStock",
+  "productMinStock",
+  "recipePrice",
+]);
+
 // ================= AUTH STATE =================
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
@@ -2128,13 +2175,11 @@ onAuthStateChanged(auth, async (user) => {
 
     ensureReportDateDefaults();
 
-    // 🔥 DI SINI BEDAIN:
     if (role === "admin") {
-      showSection("dashboard");  // admin masuk ke Dashboard dulu
+      showSection("dashboard");
     } else {
-      showSection("sales");      // kasir masuk ke Kasir
+      showSection("sales");
     }
-
   } else {
     currentRole = null;
     productsCache = [];
