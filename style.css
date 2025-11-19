@@ -64,6 +64,11 @@ body {
 /* hide by default */
 .hidden { display: none !important; }
 
+h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
 /* --------------------------------------------------
   GLASS EFFECT
 -------------------------------------------------- */
@@ -99,41 +104,80 @@ body {
 .toast-info    { background: var(--primary); }
 
 /* --------------------------------------------------
-  AUTH PAGE
+  AUTH PAGE (LOGIN/REGISTER)
 -------------------------------------------------- */
+
+/* wrapper card */
 .auth-card {
-  max-width: 380px;
-  margin: 50px auto;
+  max-width: 430px;
+  margin: 40px auto;
+  padding: 0 16px;
 }
 
+/* kotak putih di dalam */
 .auth-box {
   background: var(--bg-card);
-  padding: 20px;
+  padding: 22px 20px 18px;
   border-radius: 18px;
   box-shadow: var(--shadow-heavy);
+  border: 1px solid var(--border);
 }
 
-.auth-box input,
-.auth-box select {
-  width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  margin-bottom: 12px;
-  background: var(--bg);
+/* judul & label biar rapi */
+.auth-box h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--text);
 }
 
+.auth-box hr {
+  margin: 18px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.auth-box label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+/* input & select */
+.auth-box input,
+.auth-box select {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.auth-box input:focus,
+.auth-box select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
+  background: #ffffff;
+}
+
+/* tombol */
 .btn-primary,
 .btn-secondary {
-  padding: 10px;
+  padding: 10px 14px;
   width: 100%;
-  border-radius: 12px;
+  border-radius: 999px;
   border: none;
   font-size: 15px;
   cursor: pointer;
   margin-top: 6px;
   transition: .15s;
+  font-weight: 600;
 }
 
 .btn-primary {
@@ -148,7 +192,7 @@ body {
   color: white;
 }
 
-.btn-secondary:hover { opacity: 0.85; }
+.btn-secondary:hover { opacity: 0.9; }
 
 /* --------------------------------------------------
   APP SHELL
@@ -333,11 +377,6 @@ body {
   height: 100vh;
 }
 
-h2 {
-  margin: 0 0 12px;
-  font-size: 22px;
-}
-
 /* --------------------------------------------------
   WELCOME BANNER
 -------------------------------------------------- */
@@ -452,6 +491,8 @@ td {
 /* --------------------------------------------------
   RESPONSIVE (MOBILE)
 -------------------------------------------------- */
+
+/* layar <= 900px (tablet / hp) */
 @media (max-width: 900px) {
   .burger-btn { display: flex; }
 
@@ -476,6 +517,42 @@ td {
 
   .pos-layout {
     flex-direction: column;
+  }
+}
+
+/* layar kecil banget (hp) – fokus ke login biar nggak "over" */
+@media (max-width: 480px) {
+  .auth-card {
+    margin: 20px auto 24px;
+    padding: 0 10px;
+  }
+
+  .auth-box {
+    border-radius: 16px;
+    padding: 16px 14px 14px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+  }
+
+  .auth-box h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .auth-box label {
+    font-size: 12px;
+  }
+
+  .auth-box input,
+  .auth-box select {
+    font-size: 13px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    font-size: 14px;
+    padding: 9px 12px;
   }
 }
 
