@@ -1,4 +1,4 @@
-// script.js (offline-ready: queue transaksi, sync, notif, search history + inventory rules)
+// script.js (offline-ready: queue transaksi, sync, notif, search history + inventory rules + BOM)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -146,10 +146,15 @@ const productUnit = $("productUnit");
 const btnSaveProduct = $("btnSaveProduct");
 const productTable = $("productTable");
 
-// group wrapper form inventory (html pakai id groupPrice/Stock/MinStock)
+// group wrapper form inventory
 const groupPrice = $("groupPrice");
 const groupStock = $("groupStock");
 const groupMinStock = $("groupMinStock");
+
+// BOM / Resep menu
+const bomWrapper = $("bomWrapper");
+const bomList = $("bomList");
+const btnAddBomRow = $("btnAddBomRow");
 
 // Dashboard
 const metricEmptyCount = $("metricEmptyCount");
@@ -371,16 +376,19 @@ function updateInventoryFormVisibility() {
   if (!groupPrice || !groupStock || !groupMinStock) return;
 
   if (type === "bahan_baku") {
-    // Bahan baku: harga disembunyikan, stok+min stok muncul
+    // Bahan baku: harga disembunyikan, stok+min stok muncul, BOM disembunyikan
     groupPrice.classList.add("hidden");
     groupStock.classList.remove("hidden");
     groupMinStock.classList.remove("hidden");
+    if (bomWrapper) bomWrapper.classList.add("hidden");
     if (productPrice) productPrice.value = "";
+    if (bomList) bomList.innerHTML = "";
   } else {
-    // Menu: harga muncul, stok+min stok disembunyikan
+    // Menu: harga muncul, stok+min stok disembunyikan, BOM muncul
     groupPrice.classList.remove("hidden");
     groupStock.classList.add("hidden");
     groupMinStock.classList.add("hidden");
+    if (bomWrapper) bomWrapper.classList.remove("hidden");
     if (productStock) productStock.value = "";
     if (productMinStock) productMinStock.value = "";
   }
@@ -389,6 +397,46 @@ function updateInventoryFormVisibility() {
 if (productType) {
   productType.addEventListener("change", updateInventoryFormVisibility);
   updateInventoryFormVisibility();
+}
+
+// ================= BOM / RESEP MENU =================
+function createBomRow(selectedId = "", qty = "") {
+  if (!bomList) return null;
+
+  const materials = productsCache.filter((p) => p.type === "bahan_baku");
+
+  const row = document.createElement("div");
+  row.className = "bom-row";
+  row.innerHTML = `
+    <select data-field="material">
+      <option value="">Pilih bahan...</option>
+      ${materials
+        .map(
+          (m) => `
+        <option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>
+          ${m.name} ${m.unit ? "(" + m.unit + ")" : ""}
+        </option>`
+        )
+        .join("")}
+    </select>
+    <input type="number" min="0" step="0.01" data-field="qty" placeholder="Qty" value="${qty}">
+    <button type="button" class="btn-table btn-table-delete small" data-act="remove-bom">×</button>
+  `;
+
+  const btnRemove = row.querySelector("[data-act='remove-bom']");
+  if (btnRemove) {
+    btnRemove.addEventListener("click", () => row.remove());
+  }
+
+  bomList.appendChild(row);
+  return row;
+}
+
+// tombol "+ Tambah Bahan"
+if (btnAddBomRow) {
+  btnAddBomRow.addEventListener("click", () => {
+    createBomRow();
+  });
 }
 
 // ================= AUTH BTN =================
@@ -513,6 +561,16 @@ function fillProductForm(id) {
   if (productUnit) productUnit.value = p.unit || "";
 
   updateInventoryFormVisibility();
+
+  // isi BOM jika menu
+  if (bomList) {
+    bomList.innerHTML = "";
+    if (p.type === "menu" && Array.isArray(p.bom)) {
+      p.bom.forEach((row) => {
+        createBomRow(row.materialId, row.qty);
+      });
+    }
+  }
 }
 
 async function deleteProduct(id) {
@@ -549,6 +607,21 @@ if (btnSaveProduct) {
         return;
       }
 
+      // ambil BOM (resep) kalau tipe menu
+      let bom = [];
+      if (type === "menu" && bomList) {
+        const rows = bomList.querySelectorAll(".bom-row");
+        rows.forEach((row) => {
+          const sel = row.querySelector("select[data-field='material']");
+          const qtyInput = row.querySelector("input[data-field='qty']");
+          const materialId = sel?.value || "";
+          const qtyVal = Number(qtyInput?.value || 0);
+          if (materialId && qtyVal > 0) {
+            bom.push({ materialId, qty: qtyVal });
+          }
+        });
+      }
+
       const payload = {
         name,
         type,
@@ -557,6 +630,7 @@ if (btnSaveProduct) {
         stock: type === "bahan_baku" ? stock : 0,
         minStock: type === "bahan_baku" ? minStock : 0,
         unit,
+        bom: type === "menu" ? bom : [],
         updatedAt: serverTimestamp(),
       };
 
@@ -576,6 +650,8 @@ if (btnSaveProduct) {
       if (productStock) productStock.value = "";
       if (productMinStock) productMinStock.value = "";
       if (productUnit) productUnit.value = "";
+      if (bomList) bomList.innerHTML = "";
+      updateInventoryFormVisibility();
       await loadProducts();
     } catch (err) {
       console.error(err);
@@ -704,6 +780,50 @@ function updatePrintAreaFromSale(saleDoc) {
     </div>`;
 }
 
+// ================= BOM KONSUMSI STOK =================
+function calculateUsedMaterialsFromSaleItems(items) {
+  const used = {}; // { materialId: totalQty }
+
+  items.forEach((cartItem) => {
+    const menu = productsCache.find((p) => p.id === cartItem.productId);
+    if (!menu || menu.type !== "menu" || !Array.isArray(menu.bom)) return;
+
+    const qtySale = Number(cartItem.qty || 0);
+    menu.bom.forEach((row) => {
+      const materialId = row.materialId;
+      const perPortion = Number(row.qty || 0);
+      if (!materialId || perPortion <= 0) return;
+
+      const totalUse = qtySale * perPortion;
+      if (!used[materialId]) used[materialId] = 0;
+      used[materialId] += totalUse;
+    });
+  });
+
+  return Object.entries(used).map(([materialId, qty]) => ({ materialId, qty }));
+}
+
+async function applyBomStockReduction(usedMaterials) {
+  if (!Array.isArray(usedMaterials) || !usedMaterials.length) return;
+
+  try {
+    for (const item of usedMaterials) {
+      const prod = productsCache.find(
+        (p) => p.id === item.materialId && p.type === "bahan_baku"
+      );
+      if (!prod) continue;
+
+      const currentStock = Number(prod.stock || 0);
+      const newStock = currentStock - Number(item.qty || 0);
+      await updateDoc(doc(db, "products", prod.id), { stock: newStock });
+    }
+
+    await loadProducts();
+  } catch (err) {
+    console.error("applyBomStockReduction error:", err);
+  }
+}
+
 // ================== SAVE SALE (ONLINE + OFFLINE) ==================
 if (btnSaveSale) {
   btnSaveSale.addEventListener("click", async () => {
@@ -729,6 +849,9 @@ if (btnSaveSale) {
       }
       const change = pay - total;
       const now = new Date();
+
+      const usedMaterials = calculateUsedMaterialsFromSaleItems(currentCart);
+
       const saleDoc = {
         items: currentCart.map((it) => ({ ...it })),
         subtotal,
@@ -742,6 +865,7 @@ if (btnSaveSale) {
         createdAtLocal: now.toISOString(),
         createdBy: currentUser?.email || "-",
         createdByUid: currentUser?.uid || null,
+        usedMaterials,
       };
 
       if (!navigator.onLine) {
@@ -764,6 +888,7 @@ if (btnSaveSale) {
 
       // ONLINE
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
+      await applyBomStockReduction(usedMaterials);
       showToast("Transaksi tersimpan", "success");
       currentCart = [];
       renderCart();
@@ -786,12 +911,33 @@ async function syncOfflineSales() {
   if (!queue.length) return;
 
   try {
+    // agregasi pemakaian bahan dari semua transaksi offline
+    const aggregatedUsed = {};
+
     for (const sale of queue) {
       await addDoc(colSales, {
         ...sale,
         createdAt: serverTimestamp(),
       });
+
+      if (Array.isArray(sale.usedMaterials)) {
+        sale.usedMaterials.forEach((um) => {
+          const id = um.materialId;
+          const qty = Number(um.qty || 0);
+          if (!id || qty <= 0) return;
+          if (!aggregatedUsed[id]) aggregatedUsed[id] = 0;
+          aggregatedUsed[id] += qty;
+        });
+      }
     }
+
+    const usedMaterials = Object.entries(aggregatedUsed).map(
+      ([materialId, qty]) => ({ materialId, qty })
+    );
+    if (usedMaterials.length) {
+      await applyBomStockReduction(usedMaterials);
+    }
+
     saveOfflineQueue([]);
     showToast(`${queue.length} transaksi offline tersinkron`, "success", 4000);
     await loadSales();
