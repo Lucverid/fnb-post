@@ -99,6 +99,11 @@
             <i class="lucide-box"></i> <span>Inventory</span>
           </button>
 
+          <!-- 🔥 BARU: menu Resep -->
+          <button class="side-item admin-only" data-section="recipe">
+            <i class="lucide-utensils"></i> <span>Resep</span>
+          </button>
+
           <button class="side-item admin-only" data-section="dashboard">
             <i class="lucide-bar-chart"></i> <span>Dashboard</span>
           </button>
@@ -195,9 +200,9 @@
         </div>
       </section>
 
-      <!-- 📦 Inventory -->
+      <!-- 📦 Inventory (khusus Bahan Baku) -->
       <section id="inventorySection" class="section hidden">
-        <h2>Inventory</h2>
+        <h2>Inventory Bahan Baku</h2>
 
         <div class="form-grid">
           <div>
@@ -242,19 +247,13 @@
             <input id="productUnit">
           </div>
 
-          <!-- 🔥 BOM / Resep Menu -->
-          <div id="bomWrapper" class="full hidden">
-            <label>Resep / BOM (bahan per 1 porsi)</label>
-            <div id="bomList" class="bom-list"></div>
-            <button type="button" id="btnAddBomRow" class="btn-secondary small" style="margin-top:8px;">
-              + Tambah Bahan
-            </button>
-          </div>
-
           <button id="btnSaveProduct" class="btn-primary full">Simpan</button>
         </div>
 
-        <h3>Daftar Item</h3>
+        <h3>Daftar Bahan Baku</h3>
+        <!-- 🔍 search bahan baku -->
+        <input id="inventorySearch" class="search-bar" placeholder="Cari bahan / kategori..." />
+
         <div class="table-wrap">
           <table>
             <thead>
@@ -263,6 +262,62 @@
               </tr>
             </thead>
             <tbody id="productTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 🍽️ RESEP / MENU -->
+      <section id="recipeSection" class="section hidden">
+        <h2>Resep &amp; Menu</h2>
+
+        <!-- Form menu -->
+        <div class="form-grid">
+          <div>
+            <label>Nama Menu</label>
+            <input id="recipeName">
+          </div>
+
+          <div>
+            <label>Kategori</label>
+            <select id="recipeCategory">
+              <option value="makanan">Makanan</option>
+              <option value="minuman">Minuman</option>
+              <option value="lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Harga Jual</label>
+            <input id="recipePrice" type="number">
+          </div>
+
+          <div class="full">
+            <label>Resep / BOM (bahan per 1 porsi)</label>
+            <div id="bomList" class="bom-list"></div>
+            <button type="button" id="btnAddBomRow" class="btn-secondary small" style="margin-top:8px;">
+              + Tambah Bahan
+            </button>
+          </div>
+
+          <button id="btnSaveRecipe" class="btn-primary full">Simpan Resep</button>
+        </div>
+
+        <h3>Daftar Menu</h3>
+        <!-- 🔍 search menu -->
+        <input id="recipeSearch" class="search-bar" placeholder="Cari menu / kategori..." />
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nama Menu</th>
+                <th>Kategori</th>
+                <th>Harga</th>
+                <th>BOM</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="recipeTable"></tbody>
           </table>
         </div>
       </section>
