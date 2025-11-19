@@ -468,8 +468,6 @@ td {
   font-size: 28px;
 }
 
-
-
 /* --------------------------------------------------
   DASHBOARD CHART & FILTER
 -------------------------------------------------- */
@@ -542,7 +540,7 @@ td {
 
 .chart-box {
   position: relative;
-  height: 260px;   /* ⬅️ tinggi chart diperkecil */
+  height: 260px;   /* tinggi chart */
 }
 
 /* Mobile */
@@ -555,8 +553,6 @@ td {
     height: 220px;
   }
 }
-
-
 
 /* --------------------------------------------------
   POS LAYOUT
@@ -577,6 +573,33 @@ td {
   margin-bottom: 10px;
   background: var(--bg-card);
   color: var(--text);
+}
+
+/* 🔹 Tombol "Tambah" di daftar menu kasir */
+#saleMenuBody td:last-child {
+  text-align: right;
+}
+
+#saleMenuBody button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--primary);
+  background: rgba(79, 70, 229, 0.06);
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+#saleMenuBody button:hover {
+  background: var(--primary);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+#saleMenuBody button:active {
+  transform: translateY(0);
 }
 
 /* Cart di Kasir */
@@ -663,12 +686,19 @@ td {
 /* --------------------------------------------------
   PRINT AREA
 -------------------------------------------------- */
+
+/* jarak heading "Struk" dari tombol simpan */
+#strukTitle {
+  margin-top: 26px;
+}
+
 .print-area {
   border: 1px dashed var(--border);
   padding: 12px;
   border-radius: 12px;
   background: var(--bg-card);
   font-size: 13px;
+  margin-top: 8px;   /* sedikit jarak dari teks Struk */
 }
 
 @media print {
