@@ -1,3 +1,4 @@
+
 // script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -1541,7 +1542,7 @@ function renderOpnameTable() {
 
   if (!bahan.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="5">Belum ada data bahan baku untuk opname.</td>`;
+    tr.innerHTML = `<td colspan="6">Belum ada data bahan baku untuk opname.</td>`;
     opnameTable.appendChild(tr);
     return;
   }
@@ -1555,13 +1556,13 @@ function renderOpnameTable() {
       <td>
         <div>${p.name}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-          <span class="status-badge ${st.cls}">${st.label}</span>
-          ${p.category ? ` • ${p.category}` : ""}
+          ${p.category ? `${p.category}` : ""}
         </div>
       </td>
       <td>${currentStock} ${p.unit || ""}</td>
       <td><input type="number" data-id="${p.id}" value="${currentStock}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
+      <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
         <button class="btn-table btn-table-delete small" data-id="${p.id}">Simpan</button>
       </td>
@@ -1656,6 +1657,7 @@ async function saveOpnameRow(id) {
     showToast("Gagal menyimpan opname", "error");
   }
 }
+
 // ================= LOAD OPNAME LOGS =================
 async function loadOpnameLogs() {
   try {
@@ -1678,6 +1680,8 @@ async function loadOpnameLogs() {
     console.error("loadOpnameLogs error:", err);
   }
 }
+
+
 
 // ================= REPORT (LAPORAN) =================
 function ensureReportDateDefaults() {
