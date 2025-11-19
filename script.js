@@ -1091,25 +1091,81 @@ function updatePrintAreaFromSale(saleDoc) {
     )
     .join("");
 
+  function updatePrintAreaFromSale(saleDoc) {
+  if (!printArea) return;
+
+  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
+  const waktu = formatDateTime(d);
+  const kasir = saleDoc.createdBy || "-";
+
+  const itemsHtml = (saleDoc.items || [])
+    .map(
+      (it) => `
+      <div class="receipt-item">
+        <div class="receipt-item-left">
+          <div class="receipt-item-name">${it.name}</div>
+          <div class="receipt-item-qty">x${it.qty} @ ${formatCurrency(it.price)}</div>
+        </div>
+        <div>${formatCurrency(it.subtotal)}</div>
+      </div>`
+    )
+    .join("");
+
   printArea.innerHTML = `
-    <div style="text-align:center;font-weight:700;margin-bottom:4px;">F&B POS</div>
-    <div style="font-size:11px;margin-bottom:6px;">
-      ${waktu}<br/>Kasir: ${kasir}
+    <div class="receipt">
+      <div class="receipt-header">
+        <div class="receipt-title">F&amp;B POS</div>
+        <div class="receipt-subtitle">Jl. Nama Jalan No. 123, Kota</div>
+      </div>
+
+      <div class="receipt-meta">
+        <div class="receipt-row">
+          <span>Tanggal</span><span>${waktu}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Kasir</span><span>${kasir}</span>
+        </div>
+      </div>
+
+      <div class="receipt-items">
+        <div class="receipt-items-header">
+          <span>Item</span><span>Subtotal</span>
+        </div>
+        ${itemsHtml || '<div style="font-size:11px;">(Tidak ada item)</div>'}
+      </div>
+
+      <div class="receipt-footer">
+        <div class="receipt-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(saleDoc.subtotal || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Diskon</span>
+          <span>${saleDoc.discountPercent ? saleDoc.discountPercent + '%' : '-'}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Voucher</span>
+          <span>${saleDoc.voucher ? formatCurrency(saleDoc.voucher) : '-'}</span>
+        </div>
+        <div class="receipt-row" style="font-weight:700;">
+          <span>Total</span>
+          <span>${formatCurrency(saleDoc.total || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Bayar</span>
+          <span>${formatCurrency(saleDoc.pay || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Kembalian</span>
+          <span>${formatCurrency(saleDoc.change || 0)}</span>
+        </div>
+      </div>
+
+      <div class="receipt-thankyou">
+        Terima kasih &nbsp;•&nbsp; Follow IG: @akun_toko
+      </div>
     </div>
-    <hr/>
-    ${itemsHtml || '<div style="font-size:11px;">(Tidak ada item)</div>'}
-    <hr/>
-    <div style="font-size:11px;">
-      <div style="display:flex;justify-content:space-between;">
-        <span>Total</span><span>${formatCurrency(saleDoc.total)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;">
-        <span>Bayar</span><span>${formatCurrency(saleDoc.pay)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;">
-        <span>Kembalian</span><span>${formatCurrency(saleDoc.change)}</span>
-      </div>
-    </div>`;
+  `;
 }
 
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
