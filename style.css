@@ -1452,19 +1452,15 @@ td {
    PRINT – HANYA STRUK (#printArea) YANG CETAK
 ========================================= */
 @media print {
-
-  /* SEMUA elemen hilang dulu */
   body * {
     display: none !important;
   }
 
-  /* HANYA #printArea dan isinya yang muncul */
   #printArea,
   #printArea * {
     display: block !important;
   }
 
-  /* Styling struk di kertas */
   #printArea {
     position: absolute;
     left: 0;
@@ -1478,8 +1474,8 @@ td {
     background: #ffffff !important;
   }
 
-  /* Pastikan tombol Print ikut hilang kalau masih kebaca */
-  #btnPrint {
+  #btnPrint,
+  #strukTitle {
     display: none !important;
   }
 }
