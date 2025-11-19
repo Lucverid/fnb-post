@@ -53,20 +53,31 @@
 /* --------------------------------------------------
   GLOBAL
 -------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
 }
 
-/* hide by default */
 .hidden { display: none !important; }
 
 h2 {
   margin: 0 0 12px;
   font-size: 22px;
+}
+
+/* Section wrapper (halaman Kasir, Inventory, dll) */
+.section {
+  max-width: 1100px;
+  margin: 0 auto 24px;
 }
 
 /* --------------------------------------------------
@@ -106,15 +117,12 @@ h2 {
 /* --------------------------------------------------
   AUTH PAGE (LOGIN/REGISTER)
 -------------------------------------------------- */
-
-/* wrapper card */
 .auth-card {
   max-width: 430px;
   margin: 40px auto;
   padding: 0 16px;
 }
 
-/* kotak putih di dalam */
 .auth-box {
   background: var(--bg-card);
   padding: 22px 20px 18px;
@@ -123,7 +131,6 @@ h2 {
   border: 1px solid var(--border);
 }
 
-/* judul & label biar rapi */
 .auth-box h2 {
   margin: 0 0 10px;
   font-size: 22px;
@@ -145,7 +152,6 @@ h2 {
   margin-bottom: 4px;
 }
 
-/* input & select */
 .auth-box input,
 .auth-box select {
   width: 100%;
@@ -166,7 +172,7 @@ h2 {
   background: #ffffff;
 }
 
-/* tombol */
+/* tombol auth */
 .btn-primary,
 .btn-secondary {
   padding: 10px 14px;
@@ -210,7 +216,7 @@ h2 {
 .app-header {
   position: fixed;
   top: 0;
-  left: 0;
+  left: 260px;                      /* offset sidebar */
   width: calc(100% - 260px);
   height: 60px;
   display: flex;
@@ -225,6 +231,14 @@ h2 {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  position: relative;
 }
 
 .logo {
@@ -258,23 +272,28 @@ h2 {
   cursor: pointer;
   font-size: 20px;
   color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
 }
 
 .notif-count {
   position: absolute;
-  top: -2px;
+  top: -4px;
   right: -6px;
   background: var(--danger);
   color: white;
   font-size: 10px;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 999px;
+  font-weight: 600;
 }
 
 .notif-panel {
   position: absolute;
   top: 58px;
-  right: 10px;
+  right: 0;
   width: 240px;
   background: var(--bg-card);
   border-radius: 14px;
@@ -298,6 +317,8 @@ h2 {
   border: none;
   background: transparent;
   cursor: pointer;
+  padding: 6px 4px;
+  margin-right: 4px;
 }
 
 .burger-btn span {
@@ -329,7 +350,7 @@ h2 {
   transform: translateX(-100%);
 }
 
-/* Button */
+/* Button menu */
 .side-item {
   width: 100%;
   padding: 10px 12px;
@@ -468,6 +489,87 @@ td {
   color: var(--text);
 }
 
+/* Cart di Kasir */
+.cart-box {
+  background: var(--bg-card);
+  padding: 14px 14px 16px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.cart-box h3 {
+  margin: 0 0 10px;
+}
+
+.cart-summary {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.cart-summary label {
+  display: block;
+  margin-top: 8px;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cart-summary input {
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  background: #f9fafb;
+}
+
+.cart-summary input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
+  background: #ffffff;
+}
+
+/* --------------------------------------------------
+  FORM INVENTORY
+-------------------------------------------------- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.form-grid > div label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 3px;
+  color: var(--text-muted);
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f9fafb;
+  font-size: 13px;
+}
+
+.form-grid input:focus,
+.form-grid select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
+  background: #ffffff;
+}
+
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
 /* --------------------------------------------------
   PRINT AREA
 -------------------------------------------------- */
@@ -489,16 +591,18 @@ td {
 }
 
 /* --------------------------------------------------
-  RESPONSIVE (MOBILE)
+  RESPONSIVE
 -------------------------------------------------- */
 
-/* layar <= 900px (tablet / hp) */
+/* Tablet / HP */
 @media (max-width: 900px) {
-  .burger-btn { display: flex; }
+  .burger-btn { 
+    display: flex; 
+  }
 
   .app-header {
-    width: 100%;
     left: 0;
+    width: 100%;
   }
 
   .app-main {
@@ -518,9 +622,18 @@ td {
   .pos-layout {
     flex-direction: column;
   }
+
+  .section {
+    margin: 0 0 24px;
+    padding: 0 4px;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-/* layar kecil banget (hp) – fokus ke login biar nggak "over" */
+/* HP kecil */
 @media (max-width: 480px) {
   .auth-card {
     margin: 20px auto 24px;
@@ -554,9 +667,20 @@ td {
     font-size: 14px;
     padding: 9px 12px;
   }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-row {
+    flex-direction: column;
+  }
 }
 
+/* --------------------------------------------------
+  ANIMATIONS
+-------------------------------------------------- */
 @keyframes fadeIn {
   from { opacity:0; transform:translateY(-5px); }
-  to { opacity:1; transform:translateY(0); }
+  to   { opacity:1; transform:translateY(0); }
 }
