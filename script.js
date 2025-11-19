@@ -1075,115 +1075,84 @@ function updateCartSummary() {
   if (el) el.addEventListener("input", updateCartSummary);
 });
 
-// ================= STRUK PRINT (TEXT MODE) =================
+// ================= STRUK PRINT (HTML CARD) =================
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
 
   const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
-  const items = saleDoc.items || [];
+  const waktu = formatDateTime(d);
+  const kasir = saleDoc.createdBy || "-";
 
-  // tanggal format sederhana: 19/11/2025 19:58
-  const pad = (n) => String(n).padStart(2, "0");
-  const waktu =
-    `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const itemsHtml = (saleDoc.items || [])
+    .map(
+      (it) => `
+        <div class="receipt-item">
+          <div class="receipt-item-left">
+            <div class="receipt-item-name">${it.name}</div>
+            <div class="receipt-item-qty">x${it.qty} @ ${formatCurrency(it.price)}</div>
+          </div>
+          <div class="receipt-item-sub">${formatCurrency(it.subtotal)}</div>
+        </div>
+      `
+    )
+    .join("");
 
-  // helper angka tanpa "Rp "
-  function formatNumberPlain(num) {
-    const n = Number(num || 0);
-    return n.toLocaleString("id-ID");
-  }
-
-  const line = "-".repeat(39); // ---------------------------------------
-
-  // lebar kolom
-  const nameWidth = 18;
-  const qtyWidth  = 6;
-  const subWidth  = 11;
-
-  function makeItemLine(name, qty, subtotal) {
-    const nm     = (name || "").substring(0, nameWidth);
-    const qtyStr = "x" + qty;
-    const subStr = formatNumberPlain(subtotal);
-
-    return (
-      nm.padEnd(nameWidth) +
-      qtyStr.padEnd(qtyWidth) +
-      subStr.padStart(subWidth)
-    );
-  }
-
-  let text = "";
-
-  // ===== HEADER TOKO =====
-  text += "F&B Cafe\n";
-  text += "Jl. Mawar No.123 - Bandung\n";
-  text += line + "\n";
-
-  // ===== HEADER KOLOM =====
-  text +=
-    "Item".padEnd(nameWidth) +
-    "Qty".padEnd(qtyWidth) +
-    "Subtotal".padStart(subWidth) +
-    "\n";
-
-  // ===== ITEM =====
-  items.forEach((it) => {
-    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
-  });
-
-  text += line + "\n";
-
-  // ===== RINGKASAN =====
-  const labelWidth = 14;
-  function row(label, value) {
-    // label rata kiri, value rata kanan kolom 11
-    const valStr = String(value || "");
-    return (
-      label.padEnd(labelWidth) +
-      valStr.padStart(11) +
-      "\n"
-    );
-  }
-
-  const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
-  const diskonLabel = saleDoc.discountPercent
-    ? `Diskon (${saleDoc.discountPercent}%)`
-    : "Diskon";
-
-  const diskonStr =
-    saleDoc.discountAmount && saleDoc.discountAmount > 0
-      ? formatNumberPlain(saleDoc.discountAmount)
-      : "-";
-
-  const voucherStr =
-    saleDoc.voucher && saleDoc.voucher > 0
-      ? formatNumberPlain(saleDoc.voucher)
-      : "-";
-
-  const totalStr   = formatNumberPlain(saleDoc.total || 0);
-  const bayarStr   = formatNumberPlain(saleDoc.pay || 0);
-  const kembaliStr = formatNumberPlain(saleDoc.change || 0);
-
-  text += row("Subtotal :", subtotalStr);
-  text += row(diskonLabel + " :", diskonStr);
-  text += row("Voucher :", voucherStr);
-  text += row("Total :", totalStr);
-  text += row("Bayar :", bayarStr);
-  text += row("Kembalian :", kembaliStr);
-
-  text += line + "\n";
-  text += "Terima kasih!\n";
-  text += "Follow IG @fnbcafe\n";
-
-  // tempel ke DOM
   printArea.innerHTML = `
     <div class="receipt">
-      <pre class="receipt-pre">${text}</pre>
+      <div class="receipt-header">
+        <div class="receipt-store-name">F&amp;B Cafe</div>
+        <div class="receipt-store-address">Jl. Mawar No.123 - Bandung</div>
+      </div>
+
+      <div class="receipt-meta">
+        <div class="receipt-row">
+          <span>Tanggal</span><span>${waktu}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Kasir</span><span>${kasir}</span>
+        </div>
+      </div>
+
+      <div class="receipt-items">
+        <div class="receipt-items-header">
+          <span>Item</span><span>Subtotal</span>
+        </div>
+        ${itemsHtml || '<div class="receipt-empty">(Tidak ada item)</div>'}
+      </div>
+
+      <div class="receipt-footer">
+        <div class="receipt-row">
+          <span>Subtotal</span>
+          <span>${formatCurrency(saleDoc.subtotal || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Diskon</span>
+          <span>${saleDoc.discountPercent ? saleDoc.discountPercent + '%' : '-'}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Voucher</span>
+          <span>${saleDoc.voucher ? formatCurrency(saleDoc.voucher) : '-'}</span>
+        </div>
+        <div class="receipt-row receipt-row-total">
+          <span>Total</span>
+          <span>${formatCurrency(saleDoc.total || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Bayar</span>
+          <span>${formatCurrency(saleDoc.pay || 0)}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Kembalian</span>
+          <span>${formatCurrency(saleDoc.change || 0)}</span>
+        </div>
+      </div>
+
+      <div class="receipt-thankyou">
+        <strong>Terima kasih</strong> &nbsp;&bull;&nbsp; Follow IG @fnbcafe
+      </div>
     </div>
   `;
 }
-
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
   const shortage = [];
