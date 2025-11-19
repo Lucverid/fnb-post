@@ -194,7 +194,7 @@
 
               <h3 id="strukTitle">Struk</h3>
               <div id="printArea" class="print-area">Belum ada transaksi</div>
-              <button onclick="window.print()" class="btn-secondary">Print</button>
+              <button onclick="window.print()" class="btn-secondary" type="button">Print</button>
             </div>
           </div>
         </div>
@@ -406,28 +406,29 @@
         </div>
       </section>
 
-     <!-- 📋 OPNAME -->
-<section id="opnameSection" class="section hidden">
-  <h2>Stok Opname</h2>
+      <!-- 📋 OPNAME -->
+      <section id="opnameSection" class="section hidden">
+        <h2>Stok Opname</h2>
 
-  <!-- 🔍 Search -->
-  <input id="opnameSearch" class="search-bar" placeholder="Cari item..." />
+        <!-- 🔍 Search -->
+        <input id="opnameSearch" class="search-bar" placeholder="Cari item..." />
 
-  <div class="table-wrap opname-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th>Sistem</th>
-          <th>Fisik</th>
-          <th>Selisih</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="opnameTable"></tbody>
-    </table>
-  </div>
-</section>
+        <div class="table-wrap opname-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Sistem</th>
+                <th>Fisik</th>
+                <th>Selisih</th>
+                <th>Status</th>
+                <th>Aksi</th> <!-- kolom tombol Simpan -->
+              </tr>
+            </thead>
+            <tbody id="opnameTable"></tbody>
+          </table>
+        </div>
+      </section>
 
       <!-- 🧾 LAPORAN -->
       <section id="reportsSection" class="section hidden">
