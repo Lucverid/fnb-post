@@ -1417,16 +1417,24 @@ function updateCharts() {
     monthData.push(sum);
   }
 
-  // 🔢 TOTAL HARI INI & BULAN INI (langsung dari data src)
-  const todayKeyStr = todayKey(today);
-  const ymThis = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  // 🔢 TOTAL HARI & BULAN BERDASARKAN TANGGAL FILTER ("Dari tanggal")
+  // kalau user belum pilih, pakai hari ini
+  let refDate = today;
+  if (filterStart && filterStart.value) {
+    refDate = new Date(filterStart.value + "T00:00:00");
+  }
 
+  const refKey = todayKey(refDate); // YYYY-MM-DD acuan
+  const ymRef  = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}`;
+
+  // total untuk "hari ini" = total di tanggal acuan
   const todayTotal = src
-    .filter((s) => s.dateKey === todayKeyStr)
+    .filter((s) => s.dateKey === refKey)
     .reduce((n, s) => n + Number(s.total || 0), 0);
 
+  // total untuk "bulan ini" = semua transaksi di bulan acuan
   const thisMonthTotal = src
-    .filter((s) => (s.dateKey || "").startsWith(ymThis))
+    .filter((s) => (s.dateKey || "").startsWith(ymRef))
     .reduce((n, s) => n + Number(s.total || 0), 0);
 
   if (dailyTotalLabel) {
