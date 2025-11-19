@@ -253,6 +253,9 @@ let editingRecipeId = null;
 let currentReportRows = [];
 let currentReportKind = "sales_day";
 
+// filter status untuk tampilan opname (null = semua)
+let opnameStatusFilter = null;
+
 // ================= CONNECTION LABEL + NOTIF =================
 let lastOnlineState = navigator.onLine;
 
@@ -353,19 +356,21 @@ function showSection(name) {
     reportsSection.classList.remove("hidden");
 
   document.querySelectorAll(".side-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.section === name);
-  });
-
-  if (window.innerWidth <= 900 && sidebar) {
-    sidebar.classList.remove("open");
-  }
-}
-
-document.querySelectorAll(".side-item").forEach((btn) => {
   btn.addEventListener("click", () => {
-    if (btn.dataset.section) showSection(btn.dataset.section);
+    const section = btn.dataset.section;
+    if (!section) return;
+
+    // kalau buka opname dari sidebar → reset filter status
+    if (section === "opname") {
+      opnameStatusFilter = null;
+      if (opnameSearch) opnameSearch.value = "";
+      renderOpnameTable();
+    }
+
+    showSection(section);
   });
 });
+
 
 // burger
 if (burgerBtn && sidebar) {
@@ -386,8 +391,10 @@ if (burgerBtn && sidebar) {
   });
 }
 
-// ================= INIT KLIK METRIC (PINDAH KE OPNAME) =================
+
+// ================= CLICK METRIC -> BUKA OPNAME + FILTER =================
 let metricClickInited = false;
+let opnameStatusFilter = null; // global filter
 
 function initMetricClickToOpname() {
   if (metricClickInited) return;
@@ -396,7 +403,21 @@ function initMetricClickToOpname() {
     if (!card) return;
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
+      if (card === metricEmptyCard) {
+        opnameStatusFilter = "Habis";
+      } else if (card === metricLowCard) {
+        opnameStatusFilter = "Hampir habis";
+      } else if (card === metricOkCard) {
+        opnameStatusFilter = "Aman";
+      } else {
+        opnameStatusFilter = null;
+      }
+
+      if (opnameSearch) opnameSearch.value = "";
+
       showSection("opname");
+      renderOpnameTable();
+
       if (opnameSection) {
         opnameSection.scrollIntoView({ behavior: "smooth" });
       }
@@ -1557,6 +1578,14 @@ function renderOpnameTable() {
   // filter hanya bahan baku
   let bahan = productsCache.filter((p) => p.type === "bahan_baku");
 
+  // 🔹 filter berdasarkan status (Habis / Hampir habis / Aman)
+  if (opnameStatusFilter) {
+    bahan = bahan.filter(
+      (p) => productStatus(p).label === opnameStatusFilter
+    );
+  }
+
+  // 🔍 filter berdasarkan teks pencarian
   const q = (opnameSearch?.value || "").trim().toLowerCase();
   if (q) {
     bahan = bahan.filter(
@@ -1572,6 +1601,8 @@ function renderOpnameTable() {
     opnameTable.appendChild(tr);
     return;
   }
+
+  // ... sisanya biarkan sama seperti sekarang ...
 
   bahan.forEach((p) => {
     const st = productStatus(p);
