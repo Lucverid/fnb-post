@@ -566,9 +566,9 @@ if (btnSaveProduct) {
   btnSaveProduct.addEventListener("click", async () => {
     try {
       const name = (productName?.value || "").trim();
-      const type = productType?.value || "bahan_baku"; // bisa bahan_baku/menu
+      const type = "bahan_baku"; // <<–– dipaksa bahan baku
       const category = productCategory?.value || "lainnya";
-      const price = Number(productPrice?.value || 0);
+      const price = 0;                          // ga dipakai untuk bahan baku
       const stock = Number(productStock?.value || 0);
       const minStock = Number(productMinStock?.value || 0);
       const unit = (productUnit?.value || "").trim();
@@ -577,18 +577,14 @@ if (btnSaveProduct) {
         showToast("Nama produk wajib diisi", "error");
         return;
       }
-      if (type === "menu" && (!price || price <= 0)) {
-        showToast("Harga menu wajib diisi", "error");
-        return;
-      }
 
       const payload = {
         name,
         type,
         category,
-        price: type === "menu" ? price : 0,
-        stock: type === "bahan_baku" ? stock : 0,
-        minStock: type === "bahan_baku" ? minStock : 0,
+        price,
+        stock,
+        minStock,
         unit,
         updatedAt: serverTimestamp(),
       };
@@ -603,9 +599,9 @@ if (btnSaveProduct) {
         });
         showToast("Produk ditambahkan", "success");
       }
+
       editingProductId = null;
       if (productName) productName.value = "";
-      if (productPrice) productPrice.value = "";
       if (productStock) productStock.value = "";
       if (productMinStock) productMinStock.value = "";
       if (productUnit) productUnit.value = "";
