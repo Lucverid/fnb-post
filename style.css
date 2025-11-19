@@ -1449,56 +1449,39 @@ td {
   }
 }
 /* =========================================
-   PRINT – HANYA STRUK YANG TERCETAK
+   PRINT – HANYA #printArea YANG TERCETAK
 ========================================= */
 @media print {
 
-  /* Sembunyikan layout lain */
-  .app-header,
-  .sidebar,
-  .pos-left,
-  .cart-summary,
-  .welcome-banner,
-  .metric-row,
-  .chart-card,
-  #inventorySection,
-  #recipeSection,
-  #dashboardSection,
-  #opnameSection,
-  #reportsSection {
-    display: none !important;
+  /* Sembunyikan semua elemen dulu */
+  body * {
+    visibility: hidden !important;
   }
 
-  /* Sembunyikan judul "Daftar Pesanan", judul "Struk",
-     dan tabel cart (Item | Qty | Subtotal) */
-  .cart-box h3:first-child, /* Daftar Pesanan */
-  #strukTitle,
-  .cart-items-wrapper,
-  #btnPrint {
-    display: none !important;
+  /* Tampilkan hanya konten struk */
+  #printArea,
+  #printArea * {
+    visibility: visible !important;
   }
 
-  /* Fokuskan area struk */
-  .cart-box {
+  /* Pindahkan struk ke pojok atas halaman */
+  #printArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0 6px;          /* boleh diubah kalau mau lebih mepet */
     box-shadow: none !important;
     border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  body {
-    margin: 0;
-    padding: 0;
     background: #ffffff;
   }
 
-  .app-main,
-  #salesSection {
-    margin: 0;
-    padding: 0;
+  /* Hilangkan tombol Print (kalau dia anak dari cart-box dll) */
+  #btnPrint {
+    display: none !important;
   }
 }
-
 /* --------------------------------------------------
   ANIMATIONS
 -------------------------------------------------- */
