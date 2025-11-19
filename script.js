@@ -1,35 +1,35 @@
-// script.js (offline-ready: queue transaksi, sync, notif, search history + inventory rules + BOM)
+// script.js (offline-ready + BOM / Resep)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
-  getAuth,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
+getAuth,
+onAuthStateChanged,
+createUserWithEmailAndPassword,
+signInWithEmailAndPassword,
+signOut,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
+getFirestore,
+collection,
+addDoc,
+getDocs,
+query,
+where,
+orderBy,
+updateDoc,
+deleteDoc,
+doc,
+serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
-  authDomain: "app-387dc.firebaseapp.com",
-  projectId: "app-387dc",
-  storageBucket: "app-387dc.firebasestorage.app",
-  messagingSenderId: "227151496412",
-  appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
-  measurementId: "G-9E282TKXSJ",
+apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
+authDomain: "app-387dc.firebaseapp.com",
+projectId: "app-387dc",
+storageBucket: "app-387dc.firebasestorage.app",
+messagingSenderId: "227151496412",
+appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
+measurementId: "G-9E282TKXSJ",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -41,55 +41,53 @@ const $ = (id) => document.getElementById(id);
 
 const toastContainer = $("toast-container");
 function showToast(msg, type = "info", time = 3000) {
-  if (!toastContainer) return;
-  const div = document.createElement("div");
-  div.className = `toast toast-${type}`;
-  div.textContent = msg;
-  toastContainer.appendChild(div);
-  setTimeout(() => div.remove(), time);
+if (!toastContainer) return;
+const div = document.createElement("div");
+div.className = toast toast-${type};
+div.textContent = msg;
+toastContainer.appendChild(div);
+setTimeout(() => div.remove(), time);
 }
 
 function formatCurrency(num) {
-  const n = Number(num || 0);
-  return "Rp " + n.toLocaleString("id-ID");
+const n = Number(num || 0);
+return "Rp " + n.toLocaleString("id-ID");
 }
 function todayKey(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+const y = d.getFullYear();
+const m = String(d.getMonth() + 1).padStart(2, "0");
+const day = String(d.getDate()).padStart(2, "0");
+return ${y}-${m}-${day};
 }
 function formatDateTime(d) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+const pad = (n) => String(n).padStart(2, "0");
+return ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(   d.getHours()   )}:${pad(d.getMinutes())};
 }
 
 // ================= OFFLINE QUEUE =================
 const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
 
 function loadOfflineQueue() {
-  try {
-    const raw = localStorage.getItem(OFFLINE_SALES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+try {
+const raw = localStorage.getItem(OFFLINE_SALES_KEY);
+if (!raw) return [];
+const parsed = JSON.parse(raw);
+return Array.isArray(parsed) ? parsed : [];
+} catch {
+return [];
+}
 }
 function saveOfflineQueue(list) {
-  try {
-    localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
-  } catch {
-    // abaikan kalau storage penuh
-  }
+try {
+localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
+} catch {
+// abaikan jika penuh
+}
 }
 function queueOfflineSale(saleDoc) {
-  const list = loadOfflineQueue();
-  list.push(saleDoc);
-  saveOfflineQueue(list);
+const list = loadOfflineQueue();
+list.push(saleDoc);
+saveOfflineQueue(list);
 }
 
 // ================= ELEMENTS =================
@@ -112,6 +110,7 @@ const bannerRole = $("bannerRole");
 const welcomeBanner = $("welcomeBanner");
 const salesSection = $("salesSection");
 const inventorySection = $("inventorySection");
+const recipeSection = $("recipeSection");
 const dashboardSection = $("dashboardSection");
 const opnameSection = $("opnameSection");
 
@@ -135,7 +134,7 @@ const saleChange = $("saleChange");
 const btnSaveSale = $("btnSaveSale");
 const printArea = $("printArea");
 
-// Inventory
+// Inventory (bahan baku)
 const productName = $("productName");
 const productType = $("productType");
 const productCategory = $("productCategory");
@@ -145,16 +144,22 @@ const productMinStock = $("productMinStock");
 const productUnit = $("productUnit");
 const btnSaveProduct = $("btnSaveProduct");
 const productTable = $("productTable");
+const inventorySearch = $("inventorySearch");
 
 // group wrapper form inventory
 const groupPrice = $("groupPrice");
 const groupStock = $("groupStock");
 const groupMinStock = $("groupMinStock");
 
-// BOM / Resep menu
-const bomWrapper = $("bomWrapper");
+// Resep / Menu
+const recipeName = $("recipeName");
+const recipeCategory = $("recipeCategory");
+const recipePrice = $("recipePrice");
 const bomList = $("bomList");
 const btnAddBomRow = $("btnAddBomRow");
+const btnSaveRecipe = $("btnSaveRecipe");
+const recipeTable = $("recipeTable");
+const recipeSearch = $("recipeSearch");
 
 // Dashboard
 const metricEmptyCount = $("metricEmptyCount");
@@ -190,45 +195,46 @@ let productsCache = [];
 let salesCache = [];
 let currentCart = [];
 let editingProductId = null;
+let editingRecipeId = null;
 
 // ================= CONNECTION LABEL + NOTIF =================
 let lastOnlineState = navigator.onLine;
 
 function updateConnectionStatus(showNotif = false) {
-  if (!connectionStatus) return;
+if (!connectionStatus) return;
 
-  const isOnline = navigator.onLine;
+const isOnline = navigator.onLine;
 
-  if (isOnline) {
-    connectionStatus.textContent = "Online";
-    connectionStatus.classList.remove("offline");
-    connectionStatus.classList.add("online");
-  } else {
-    connectionStatus.textContent = "Offline";
-    connectionStatus.classList.remove("online");
-    connectionStatus.classList.add("offline");
-  }
+if (isOnline) {
+connectionStatus.textContent = "Online";
+connectionStatus.classList.remove("offline");
+connectionStatus.classList.add("online");
+} else {
+connectionStatus.textContent = "Offline";
+connectionStatus.classList.remove("online");
+connectionStatus.classList.add("offline");
+}
 
-  if (showNotif && isOnline !== lastOnlineState) {
-    if (!isOnline) {
-      showToast(
-        "Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
-        "error",
-        4000
-      );
-    } else {
-      showToast(
-        "Koneksi kembali online. Menyinkronkan transaksi offline...",
-        "info",
-        4000
-      );
-      if (currentUser) {
-        syncOfflineSales();
-      }
-    }
-  }
+if (showNotif && isOnline !== lastOnlineState) {
+if (!isOnline) {
+showToast(
+"Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
+"error",
+4000
+);
+} else {
+showToast(
+"Koneksi kembali online. Menyinkronkan transaksi offline...",
+"info",
+4000
+);
+if (currentUser) {
+syncOfflineSales();
+}
+}
+}
 
-  lastOnlineState = isOnline;
+lastOnlineState = isOnline;
 }
 updateConnectionStatus(false);
 
@@ -237,514 +243,652 @@ window.addEventListener("offline", () => updateConnectionStatus(true));
 
 // ================= ROLE =================
 async function getUserRole(uid) {
-  try {
-    const qRole = query(colUsers, where("uid", "==", uid));
-    const snap = await getDocs(qRole);
-    if (snap.empty) return null;
-    let role;
-    snap.forEach((d) => {
-      const data = d.data();
-      if (data.role) role = data.role;
-    });
-    return role || "kasir";
-  } catch (e) {
-    console.error("getUserRole", e);
-    return "kasir";
-  }
+try {
+const qRole = query(colUsers, where("uid", "==", uid));
+const snap = await getDocs(qRole);
+if (snap.empty) return null;
+let role;
+snap.forEach((d) => {
+const data = d.data();
+if (data.role) role = data.role;
+});
+return role || "kasir";
+} catch (e) {
+console.error("getUserRole", e);
+return "kasir";
+}
 }
 
 function applyRoleUI(role) {
-  currentRole = role || "kasir";
+currentRole = role || "kasir";
 
-  // show/hide menu admin
-  const adminEls = document.querySelectorAll(".admin-only");
-  adminEls.forEach((el) => {
-    if (currentRole === "admin") el.classList.remove("hidden");
-    else el.classList.add("hidden");
-  });
+const adminEls = document.querySelectorAll(".admin-only");
+adminEls.forEach((el) => {
+if (currentRole === "admin") el.classList.remove("hidden");
+else el.classList.add("hidden");
+});
 
-  if (bannerRole)
-    bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
+if (bannerRole)
+bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
 
 // ================= NAV =================
 function showSection(name) {
-  [salesSection, inventorySection, dashboardSection, opnameSection].forEach(
-    (sec) => sec && sec.classList.add("hidden")
-  );
-  if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
-  if (name === "inventory" && inventorySection)
-    inventorySection.classList.remove("hidden");
-  if (name === "dashboard" && dashboardSection)
-    dashboardSection.classList.remove("hidden");
-  if (name === "opname" && opnameSection)
-    opnameSection.classList.remove("hidden");
+[salesSection, inventorySection, recipeSection, dashboardSection, opnameSection].forEach(
+(sec) => sec && sec.classList.add("hidden")
+);
+if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
+if (name === "inventory" && inventorySection)
+inventorySection.classList.remove("hidden");
+if (name === "recipe" && recipeSection)
+recipeSection.classList.remove("hidden");
+if (name === "dashboard" && dashboardSection)
+dashboardSection.classList.remove("hidden");
+if (name === "opname" && opnameSection)
+opnameSection.classList.remove("hidden");
 
-  document.querySelectorAll(".side-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.section === name);
-  });
+document.querySelectorAll(".side-item").forEach((btn) => {
+btn.classList.toggle("active", btn.dataset.section === name);
+});
 
-  if (window.innerWidth <= 900 && sidebar) {
-    sidebar.classList.remove("open");
-  }
+if (window.innerWidth <= 900 && sidebar) {
+sidebar.classList.remove("open");
+}
 }
 
 document.querySelectorAll(".side-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    if (btn.dataset.section) showSection(btn.dataset.section);
-  });
+btn.addEventListener("click", () => {
+if (btn.dataset.section) showSection(btn.dataset.section);
+});
 });
 
 // burger
 if (burgerBtn && sidebar) {
-  burgerBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    sidebar.classList.toggle("open");
-  });
+burgerBtn.addEventListener("click", (e) => {
+e.stopPropagation();
+sidebar.classList.toggle("open");
+});
 
-  document.addEventListener("click", (e) => {
-    if (
-      window.innerWidth <= 900 &&
-      sidebar.classList.contains("open") &&
-      !sidebar.contains(e.target) &&
-      !burgerBtn.contains(e.target)
-    ) {
-      sidebar.classList.remove("open");
-    }
-  });
+document.addEventListener("click", (e) => {
+if (
+window.innerWidth <= 900 &&
+sidebar.classList.contains("open") &&
+!sidebar.contains(e.target) &&
+!burgerBtn.contains(e.target)
+) {
+sidebar.classList.remove("open");
+}
+});
 }
 
 // ================= NOTIF STOK =================
 function productStatus(prod) {
-  if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
-  const stock = Number(prod.stock || 0);
-  const min = Number(prod.minStock || 0);
-  if (stock <= 0) return { label: "Habis", cls: "red" };
-  if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
-  return { label: "Aman", cls: "green" };
+if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
+const stock = Number(prod.stock || 0);
+const min = Number(prod.minStock || 0);
+if (stock <= 0) return { label: "Habis", cls: "red" };
+if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
+return { label: "Aman", cls: "green" };
 }
 
 function updateStockNotif() {
-  if (!notifList || !notifBadge) return;
+if (!notifList || !notifBadge) return;
 
-  notifList.innerHTML = "";
-  let count = 0;
+notifList.innerHTML = "";
+let count = 0;
 
-  const emptyItems = productsCache.filter(
-    (p) => productStatus(p).label === "Habis"
-  );
-  const lowItems = productsCache.filter(
-    (p) => productStatus(p).label === "Hampir habis"
-  );
+const emptyItems = productsCache.filter(
+(p) => productStatus(p).label === "Habis"
+);
+const lowItems = productsCache.filter(
+(p) => productStatus(p).label === "Hampir habis"
+);
 
-  emptyItems.forEach((p) => {
-    const li = document.createElement("li");
-    li.textContent = `Stok habis: ${p.name}`;
-    notifList.appendChild(li);
-    count++;
-  });
-  lowItems.forEach((p) => {
-    const li = document.createElement("li");
-    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""})`;
-    notifList.appendChild(li);
-    count++;
-  });
+emptyItems.forEach((p) => {
+const li = document.createElement("li");
+li.textContent = Stok habis: ${p.name};
+notifList.appendChild(li);
+count++;
+});
+lowItems.forEach((p) => {
+const li = document.createElement("li");
+li.textContent = Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""});
+notifList.appendChild(li);
+count++;
+});
 
-  if (count === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Tidak ada notifikasi stok.";
-    notifList.appendChild(li);
-  }
-  notifBadge.textContent = String(count);
+if (count === 0) {
+const li = document.createElement("li");
+li.textContent = "Tidak ada notifikasi stok.";
+notifList.appendChild(li);
+}
+notifBadge.textContent = String(count);
 }
 
 if (notifBtn && notifPanel) {
-  notifBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    notifPanel.classList.toggle("hidden");
-  });
-  document.addEventListener("click", (e) => {
-    if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
-      notifPanel.classList.add("hidden");
-    }
-  });
+notifBtn.addEventListener("click", (e) => {
+e.stopPropagation();
+notifPanel.classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
+notifPanel.classList.add("hidden");
+}
+});
 }
 
 // ================= INVENTORY FORM VISIBILITY =================
 function updateInventoryFormVisibility() {
-  const type = productType?.value || "bahan_baku";
-  if (!groupPrice || !groupStock || !groupMinStock) return;
+const type = productType?.value || "bahan_baku";
+if (!groupPrice || !groupStock || !groupMinStock) return;
 
-  if (type === "bahan_baku") {
-    // Bahan baku: harga disembunyikan, stok+min stok muncul, BOM disembunyikan
-    groupPrice.classList.add("hidden");
-    groupStock.classList.remove("hidden");
-    groupMinStock.classList.remove("hidden");
-    if (bomWrapper) bomWrapper.classList.add("hidden");
-    if (productPrice) productPrice.value = "";
-    if (bomList) bomList.innerHTML = "";
-  } else {
-    // Menu: harga muncul, stok+min stok disembunyikan, BOM muncul
-    groupPrice.classList.remove("hidden");
-    groupStock.classList.add("hidden");
-    groupMinStock.classList.add("hidden");
-    if (bomWrapper) bomWrapper.classList.remove("hidden");
-    if (productStock) productStock.value = "";
-    if (productMinStock) productMinStock.value = "";
-  }
+if (type === "bahan_baku") {
+groupPrice.classList.add("hidden");
+groupStock.classList.remove("hidden");
+groupMinStock.classList.remove("hidden");
+if (productPrice) productPrice.value = "";
+} else {
+groupPrice.classList.remove("hidden");
+groupStock.classList.add("hidden");
+groupMinStock.classList.add("hidden");
+if (productStock) productStock.value = "";
+if (productMinStock) productMinStock.value = "";
+}
 }
 
 if (productType) {
-  productType.addEventListener("change", updateInventoryFormVisibility);
-  updateInventoryFormVisibility();
-}
-
-// ================= BOM / RESEP MENU =================
-function createBomRow(selectedId = "", qty = "") {
-  if (!bomList) return null;
-
-  const materials = productsCache.filter((p) => p.type === "bahan_baku");
-
-  const row = document.createElement("div");
-  row.className = "bom-row";
-  row.innerHTML = `
-    <select data-field="material">
-      <option value="">Pilih bahan...</option>
-      ${materials
-        .map(
-          (m) => `
-        <option value="${m.id}" ${m.id === selectedId ? "selected" : ""}>
-          ${m.name} ${m.unit ? "(" + m.unit + ")" : ""}
-        </option>`
-        )
-        .join("")}
-    </select>
-    <input type="number" min="0" step="0.01" data-field="qty" placeholder="Qty" value="${qty}">
-    <button type="button" class="btn-table btn-table-delete small" data-act="remove-bom">×</button>
-  `;
-
-  const btnRemove = row.querySelector("[data-act='remove-bom']");
-  if (btnRemove) {
-    btnRemove.addEventListener("click", () => row.remove());
-  }
-
-  bomList.appendChild(row);
-  return row;
-}
-
-// tombol "+ Tambah Bahan"
-if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => {
-    createBomRow();
-  });
+productType.addEventListener("change", updateInventoryFormVisibility);
+updateInventoryFormVisibility();
 }
 
 // ================= AUTH BTN =================
 if (btnLogin) {
-  btnLogin.addEventListener("click", async () => {
-    try {
-      const email = (loginEmail?.value || "").trim();
-      const pass = (loginPassword?.value || "").trim();
-      if (!email || !pass) {
-        showToast("Email & password wajib diisi", "error");
-        return;
-      }
-      await signInWithEmailAndPassword(auth, email, pass);
-      showToast("Login berhasil", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("Login gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnLogin.addEventListener("click", async () => {
+try {
+const email = (loginEmail?.value || "").trim();
+const pass = (loginPassword?.value || "").trim();
+if (!email || !pass) {
+showToast("Email & password wajib diisi", "error");
+return;
+}
+await signInWithEmailAndPassword(auth, email, pass);
+showToast("Login berhasil", "success");
+} catch (err) {
+console.error(err);
+showToast("Login gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 if (btnRegister) {
-  btnRegister.addEventListener("click", async () => {
-    try {
-      const email = (registerEmail?.value || "").trim();
-      const pass = (registerPassword?.value || "").trim();
-      const role = registerRole?.value || "kasir";
-      if (!email || !pass) {
-        showToast("Email & password wajib diisi", "error");
-        return;
-      }
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await addDoc(colUsers, {
-        uid: cred.user.uid,
-        email,
-        role,
-        createdAt: serverTimestamp(),
-      });
-      showToast("User berhasil dibuat", "success");
-      if (registerEmail) registerEmail.value = "";
-      if (registerPassword) registerPassword.value = "";
-    } catch (err) {
-      console.error(err);
-      showToast("Register gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnRegister.addEventListener("click", async () => {
+try {
+const email = (registerEmail?.value || "").trim();
+const pass = (registerPassword?.value || "").trim();
+const role = registerRole?.value || "kasir";
+if (!email || !pass) {
+showToast("Email & password wajib diisi", "error");
+return;
+}
+const cred = await createUserWithEmailAndPassword(auth, email, pass);
+await addDoc(colUsers, {
+uid: cred.user.uid,
+email,
+role,
+createdAt: serverTimestamp(),
+});
+showToast("User berhasil dibuat", "success");
+if (registerEmail) registerEmail.value = "";
+if (registerPassword) registerPassword.value = "";
+} catch (err) {
+console.error(err);
+showToast("Register gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error(err);
-      showToast("Logout gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnLogout.addEventListener("click", async () => {
+try {
+await signOut(auth);
+} catch (err) {
+console.error(err);
+showToast("Logout gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 // ================= LOAD PRODUCTS =================
 async function loadProducts() {
-  try {
-    const snap = await getDocs(query(colProducts, orderBy("name", "asc")));
-    productsCache = [];
-    snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
+try {
+const snap = await getDocs(query(colProducts, orderBy("name", "asc")));
+productsCache = [];
+snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
 
-    renderProductTable();
-    renderSaleMenu();
-    updateStockMetrics();
-    updateStockNotif();
-    renderOpnameTable();
-  } catch (err) {
-    console.error("loadProducts error:", err);
-    showToast("Gagal mengambil data produk", "error");
-  }
+renderProductTable();  
+renderRecipeTable();  
+renderSaleMenu();  
+updateStockMetrics();  
+updateStockNotif();  
+renderOpnameTable();
+
+} catch (err) {
+console.error("loadProducts error:", err);
+showToast("Gagal mengambil data produk", "error");
+}
 }
 
+// ================= INVENTORY (BAHAN BAKU) =================
 function renderProductTable() {
-  if (!productTable) return;
-  productTable.innerHTML = "";
+if (!productTable) return;
+productTable.innerHTML = "";
 
-  productsCache.forEach((p) => {
-    const st = productStatus(p); // { label, cls }
+let bahanList = productsCache.filter((p) => p.type === "bahan_baku");
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${p.name || "-"}</td>
-      <td>${p.type === "menu" ? "Menu" : "Bahan Baku"}</td>
-      <td>${p.category || "-"}</td>
-      <td>${p.type === "menu" ? formatCurrency(p.price || 0) : "-"}</td>
-      <td>${p.type === "bahan_baku" ? (p.stock || 0) : "-"}</td>
-      <td>
-        <span class="status-badge ${st.cls}">${st.label}</span>
-      </td>
-      <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>
-        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>
-      </td>
-    `;
-    productTable.appendChild(tr);
-  });
+const q = (inventorySearch?.value || "").trim().toLowerCase();
+if (q) {
+bahanList = bahanList.filter(
+(p) =>
+(p.name || "").toLowerCase().includes(q) ||
+(p.category || "").toLowerCase().includes(q)
+);
+}
 
-  // event listener Edit / Hapus
-  productTable.querySelectorAll("button").forEach((btn) => {
-    const id = btn.getAttribute("data-id");
-    const act = btn.getAttribute("data-act");
-    if (act === "edit") btn.addEventListener("click", () => fillProductForm(id));
-    if (act === "del") btn.addEventListener("click", () => deleteProduct(id));
-  });
+if (!bahanList.length) {
+const tr = document.createElement("tr");
+tr.innerHTML =
+'<td colspan="7">Belum ada bahan baku yang cocok.</td>';
+productTable.appendChild(tr);
+return;
+}
+
+bahanList.forEach((p) => {
+const st = productStatus(p);
+
+const tr = document.createElement("tr");  
+tr.innerHTML = `  
+  <td>${p.name || "-"}</td>  
+  <td>Bahan Baku</td>  
+  <td>${p.category || "-"}</td>  
+  <td>-</td>  
+  <td>${p.stock || 0}</td>  
+  <td><span class="status-badge ${st.cls}">${st.label}</span></td>  
+  <td class="table-actions">  
+    <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>  
+    <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>  
+  </td>  
+`;  
+productTable.appendChild(tr);
+
+});
+
+productTable.querySelectorAll("button").forEach((btn) => {
+const id = btn.getAttribute("data-id");
+const act = btn.getAttribute("data-act");
+if (act === "edit") btn.addEventListener("click", () => fillProductForm(id));
+if (act === "del") btn.addEventListener("click", () => deleteProduct(id));
+});
+}
+
+if (inventorySearch) {
+inventorySearch.addEventListener("input", renderProductTable);
 }
 
 function fillProductForm(id) {
-  const p = productsCache.find((x) => x.id === id);
-  if (!p) return;
-  editingProductId = id;
-  if (productName) productName.value = p.name || "";
-  if (productType) productType.value = p.type || "bahan_baku";
-  if (productCategory) productCategory.value = p.category || "makanan";
-  if (productPrice) productPrice.value = p.price || "";
-  if (productStock) productStock.value = p.stock || "";
-  if (productMinStock) productMinStock.value = p.minStock || "";
-  if (productUnit) productUnit.value = p.unit || "";
-
-  updateInventoryFormVisibility();
-
-  // isi BOM jika menu
-  if (bomList) {
-    bomList.innerHTML = "";
-    if (p.type === "menu" && Array.isArray(p.bom)) {
-      p.bom.forEach((row) => {
-        createBomRow(row.materialId, row.qty);
-      });
-    }
-  }
+const p = productsCache.find((x) => x.id === id);
+if (!p) return;
+editingProductId = id;
+if (productName) productName.value = p.name || "";
+if (productType) productType.value = p.type || "bahan_baku";
+if (productCategory) productCategory.value = p.category || "makanan";
+if (productPrice) productPrice.value = p.price || "";
+if (productStock) productStock.value = p.stock || "";
+if (productMinStock) productMinStock.value = p.minStock || "";
+if (productUnit) productUnit.value = p.unit || "";
+updateInventoryFormVisibility();
 }
 
 async function deleteProduct(id) {
-  const p = productsCache.find((x) => x.id === id);
-  if (!p) return;
-  if (!confirm(`Hapus "${p.name}"?`)) return;
-  try {
-    await deleteDoc(doc(db, "products", id));
-    showToast("Produk dihapus", "success");
-    await loadProducts();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menghapus produk", "error");
-  }
+const p = productsCache.find((x) => x.id === id);
+if (!p) return;
+if (!confirm(Hapus "${p.name}"?)) return;
+try {
+await deleteDoc(doc(db, "products", id));
+showToast("Produk dihapus", "success");
+await loadProducts();
+} catch (e) {
+console.error(e);
+showToast("Gagal menghapus produk", "error");
+}
 }
 
 if (btnSaveProduct) {
-  btnSaveProduct.addEventListener("click", async () => {
-    try {
-      const name = (productName?.value || "").trim();
-      const type = productType?.value || "bahan_baku";
-      const category = productCategory?.value || "lainnya";
-      const price = Number(productPrice?.value || 0);
-      const stock = Number(productStock?.value || 0);
-      const minStock = Number(productMinStock?.value || 0);
-      const unit = (productUnit?.value || "").trim();
+btnSaveProduct.addEventListener("click", async () => {
+try {
+const name = (productName?.value || "").trim();
+const type = productType?.value || "bahan_baku"; // boleh pilih tapi list tetap pisah
+const category = productCategory?.value || "lainnya";
+const price = Number(productPrice?.value || 0);
+const stock = Number(productStock?.value || 0);
+const minStock = Number(productMinStock?.value || 0);
+const unit = (productUnit?.value || "").trim();
 
-      if (!name) {
-        showToast("Nama produk wajib diisi", "error");
-        return;
-      }
-      if (type === "menu" && (!price || price <= 0)) {
-        showToast("Harga menu wajib diisi", "error");
-        return;
-      }
+if (!name) {  
+    showToast("Nama produk wajib diisi", "error");  
+    return;  
+  }  
+  if (type === "menu" && (!price || price <= 0)) {  
+    showToast("Harga menu wajib diisi", "error");  
+    return;  
+  }  
 
-      // ambil BOM (resep) kalau tipe menu
-      let bom = [];
-      if (type === "menu" && bomList) {
-        const rows = bomList.querySelectorAll(".bom-row");
-        rows.forEach((row) => {
-          const sel = row.querySelector("select[data-field='material']");
-          const qtyInput = row.querySelector("input[data-field='qty']");
-          const materialId = sel?.value || "";
-          const qtyVal = Number(qtyInput?.value || 0);
-          if (materialId && qtyVal > 0) {
-            bom.push({ materialId, qty: qtyVal });
-          }
-        });
-      }
+  const payload = {  
+    name,  
+    type,  
+    category,  
+    price: type === "menu" ? price : 0,  
+    stock: type === "bahan_baku" ? stock : 0,  
+    minStock: type === "bahan_baku" ? minStock : 0,  
+    unit,  
+    updatedAt: serverTimestamp(),  
+  };  
 
-      const payload = {
-        name,
-        type,
-        category,
-        price: type === "menu" ? price : 0,
-        stock: type === "bahan_baku" ? stock : 0,
-        minStock: type === "bahan_baku" ? minStock : 0,
-        unit,
-        bom: type === "menu" ? bom : [],
-        updatedAt: serverTimestamp(),
-      };
+  if (editingProductId) {  
+    await updateDoc(doc(db, "products", editingProductId), payload);  
+    showToast("Produk diupdate", "success");  
+  } else {  
+    await addDoc(colProducts, {  
+      ...payload,  
+      createdAt: serverTimestamp(),  
+    });  
+    showToast("Produk ditambahkan", "success");  
+  }  
+  editingProductId = null;  
+  if (productName) productName.value = "";  
+  if (productPrice) productPrice.value = "";  
+  if (productStock) productStock.value = "";  
+  if (productMinStock) productMinStock.value = "";  
+  if (productUnit) productUnit.value = "";  
+  await loadProducts();  
+} catch (err) {  
+  console.error(err);  
+  showToast("Gagal menyimpan produk", "error");  
+}
 
-      if (editingProductId) {
-        await updateDoc(doc(db, "products", editingProductId), payload);
-        showToast("Produk diupdate", "success");
-      } else {
-        await addDoc(colProducts, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
-        showToast("Produk ditambahkan", "success");
-      }
-      editingProductId = null;
-      if (productName) productName.value = "";
-      if (productPrice) productPrice.value = "";
-      if (productStock) productStock.value = "";
-      if (productMinStock) productMinStock.value = "";
-      if (productUnit) productUnit.value = "";
-      if (bomList) bomList.innerHTML = "";
-      updateInventoryFormVisibility();
-      await loadProducts();
-    } catch (err) {
-      console.error(err);
-      showToast("Gagal menyimpan produk", "error");
-    }
-  });
+});
+}
+
+// ================= RESEP / BOM (MENU) =================
+function addBomRow(selectedId = "", qty = 1) {
+if (!bomList) return;
+
+const bahanList = productsCache.filter((p) => p.type === "bahan_baku");
+if (!bahanList.length) {
+showToast("Belum ada bahan baku di Inventory", "error");
+return;
+}
+
+const row = document.createElement("div");
+row.className = "bom-row";
+row.innerHTML =   <select class="bom-material">   <option value="">Pilih bahan...</option>   ${bahanList   .map(   (b) =>
+<option value="${b.id}" ${b.id === selectedId ? "selected" : ""}>
+${b.name} (${b.stock || 0} ${b.unit || ""})
+</option>  )   .join("")}   </select>   <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">   <button type="button" class="btn-table small bom-remove">x</button>  ;
+bomList.appendChild(row);
+
+row.querySelector(".bom-remove").addEventListener("click", () => row.remove());
+}
+
+if (btnAddBomRow) {
+btnAddBomRow.addEventListener("click", () => addBomRow());
+}
+
+function renderRecipeTable() {
+if (!recipeTable) return;
+recipeTable.innerHTML = "";
+
+let menus = productsCache.filter((p) => p.type === "menu");
+
+const q = (recipeSearch?.value || "").trim().toLowerCase();
+if (q) {
+menus = menus.filter(
+(m) =>
+(m.name || "").toLowerCase().includes(q) ||
+(m.category || "").toLowerCase().includes(q)
+);
+}
+
+if (!menus.length) {
+const tr = document.createElement("tr");
+tr.innerHTML = '<td colspan="5">Belum ada menu / resep.</td>';
+recipeTable.appendChild(tr);
+return;
+}
+
+menus.forEach((m) => {
+const bomText =
+(m.bom || [])
+.map(
+(b) =>
+${b.materialName || "?"} ${b.qty}${   b.unit ? " " + b.unit : ""   }
+)
+.join("<br>") || "-";
+
+const tr = document.createElement("tr");  
+tr.innerHTML = `  
+  <td>${m.name || "-"}</td>  
+  <td>${m.category || "-"}</td>  
+  <td>${formatCurrency(m.price || 0)}</td>  
+  <td>${bomText}</td>  
+  <td class="table-actions">  
+    <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>  
+    <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>  
+  </td>  
+`;  
+recipeTable.appendChild(tr);
+
+});
+
+recipeTable.querySelectorAll("button").forEach((btn) => {
+const id = btn.getAttribute("data-id");
+const act = btn.getAttribute("data-act");
+if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
+if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
+});
+}
+
+if (recipeSearch) {
+recipeSearch.addEventListener("input", renderRecipeTable);
+}
+
+function fillRecipeForm(id) {
+const m = productsCache.find((x) => x.id === id && x.type === "menu");
+if (!m) return;
+editingRecipeId = id;
+if (recipeName) recipeName.value = m.name || "";
+if (recipeCategory) recipeCategory.value = m.category || "makanan";
+if (recipePrice) recipePrice.value = m.price || 0;
+
+if (bomList) {
+bomList.innerHTML = "";
+(m.bom || []).forEach((b) => addBomRow(b.materialId, b.qty));
+}
+}
+
+async function deleteRecipe(id) {
+const m = productsCache.find((x) => x.id === id && x.type === "menu");
+if (!m) return;
+if (!confirm(Hapus resep/menu "${m.name}"?)) return;
+try {
+await deleteDoc(doc(db, "products", id));
+showToast("Resep dihapus", "success");
+await loadProducts();
+} catch (e) {
+console.error(e);
+showToast("Gagal menghapus resep", "error");
+}
+}
+
+if (btnSaveRecipe) {
+btnSaveRecipe.addEventListener("click", async () => {
+try {
+const name = (recipeName?.value || "").trim();
+const category = recipeCategory?.value || "lainnya";
+const price = Number(recipePrice?.value || 0);
+
+if (!name) {  
+    showToast("Nama menu wajib diisi", "error");  
+    return;  
+  }  
+  if (!price || price <= 0) {  
+    showToast("Harga jual wajib diisi", "error");  
+    return;  
+  }  
+
+  const bom = [];  
+  if (bomList) {  
+    bomList.querySelectorAll(".bom-row").forEach((row) => {  
+      const sel = row.querySelector(".bom-material");  
+      const inp = row.querySelector(".bom-qty");  
+      const materialId = sel?.value || "";  
+      const qty = Number(inp?.value || 0);  
+      if (!materialId || qty <= 0) return;  
+      const bahan = productsCache.find((p) => p.id === materialId);  
+      bom.push({  
+        materialId,  
+        materialName: bahan?.name || "",  
+        qty,  
+        unit: bahan?.unit || "",  
+      });  
+    });  
+  }  
+
+  const payload = {  
+    name,  
+    type: "menu",  
+    category,  
+    price,  
+    bom,  
+    stock: 0,  
+    minStock: 0,  
+    updatedAt: serverTimestamp(),  
+  };  
+
+  if (editingRecipeId) {  
+    await updateDoc(doc(db, "products", editingRecipeId), payload);  
+    showToast("Resep diupdate", "success");  
+  } else {  
+    await addDoc(colProducts, {  
+      ...payload,  
+      createdAt: serverTimestamp(),  
+    });  
+    showToast("Resep ditambahkan", "success");  
+  }  
+
+  editingRecipeId = null;  
+  if (recipeName) recipeName.value = "";  
+  if (recipePrice) recipePrice.value = "";  
+  if (bomList) bomList.innerHTML = "";  
+
+  await loadProducts();  
+} catch (err) {  
+  console.error(err);  
+  showToast("Gagal menyimpan resep", "error");  
+}
+
+});
 }
 
 // ================= POS =================
 function renderSaleMenu() {
-  if (!saleMenuBody) return;
-  saleMenuBody.innerHTML = "";
-  let list = productsCache.filter((p) => p.type === "menu");
-  const q = (saleSearch?.value || "").trim().toLowerCase();
-  if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
+if (!saleMenuBody) return;
+saleMenuBody.innerHTML = "";
+let list = productsCache.filter((p) => p.type === "menu");
+const q = (saleSearch?.value || "").trim().toLowerCase();
+if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
 
-  list.forEach((m) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.name || "-"}</td>
-      <td>${formatCurrency(m.price || 0)}</td>
-      <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>
-    `;
-    saleMenuBody.appendChild(tr);
-  });
+list.forEach((m) => {
+const tr = document.createElement("tr");
+tr.innerHTML =   <td>${m.name || "-"}</td>   <td>${formatCurrency(m.price || 0)}</td>   <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>  ;
+saleMenuBody.appendChild(tr);
+});
 
-  saleMenuBody.querySelectorAll("button").forEach((b) => {
-    const id = b.getAttribute("data-id");
-    b.addEventListener("click", () => addToCart(id));
-  });
+saleMenuBody.querySelectorAll("button").forEach((b) => {
+const id = b.getAttribute("data-id");
+b.addEventListener("click", () => addToCart(id));
+});
 }
 if (saleSearch) saleSearch.addEventListener("input", renderSaleMenu);
 
 function addToCart(productId) {
-  const menu = productsCache.find((p) => p.id === productId);
-  if (!menu) return;
-  const existing = currentCart.find((i) => i.productId === productId);
-  if (existing) {
-    existing.qty += 1;
-    existing.subtotal += menu.price || 0;
-  } else {
-    currentCart.push({
-      productId,
-      name: menu.name || "-",
-      qty: 1,
-      price: menu.price || 0,
-      subtotal: menu.price || 0,
-    });
-  }
-  renderCart();
+const menu = productsCache.find((p) => p.id === productId);
+if (!menu) return;
+const existing = currentCart.find((i) => i.productId === productId);
+if (existing) {
+existing.qty += 1;
+existing.subtotal += menu.price || 0;
+} else {
+currentCart.push({
+productId,
+name: menu.name || "-",
+qty: 1,
+price: menu.price || 0,
+subtotal: menu.price || 0,
+});
+}
+renderCart();
 }
 function renderCart() {
-  if (!cartBody) return;
-  cartBody.innerHTML = "";
-  currentCart.forEach((it, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${it.name}</td>
-      <td>${it.qty}</td>
-      <td>${formatCurrency(it.subtotal)}</td>
-      <td><button class="btn-table small" data-idx="${idx}">x</button></td>
-    `;
-    cartBody.appendChild(tr);
-  });
-  cartBody.querySelectorAll("button").forEach((btn) => {
-    const idx = Number(btn.getAttribute("data-idx"));
-    btn.addEventListener("click", () => {
-      currentCart.splice(idx, 1);
-      renderCart();
-    });
-  });
-  updateCartSummary();
+if (!cartBody) return;
+cartBody.innerHTML = "";
+currentCart.forEach((it, idx) => {
+const tr = document.createElement("tr");
+tr.innerHTML =   <td>${it.name}</td>   <td>${it.qty}</td>   <td>${formatCurrency(it.subtotal)}</td>   <td><button class="btn-table small" data-idx="${idx}">x</button></td>  ;
+cartBody.appendChild(tr);
+});
+cartBody.querySelectorAll("button").forEach((btn) => {
+const idx = Number(btn.getAttribute("data-idx"));
+btn.addEventListener("click", () => {
+currentCart.splice(idx, 1);
+renderCart();
+});
+});
+updateCartSummary();
 }
+function updateCartSummary() {
+const subtotal = currentCart.reduce(
+(sum, it) => sum + Number(it.subtotal || 0),
+0
+);
 function updateCartSummary() {
   const subtotal = currentCart.reduce(
     (sum, it) => sum + Number(it.subtotal || 0),
     0
   );
-  if (cartSubtotalLabel) cartSubtotalLabel.textContent = formatCurrency(subtotal);
+
+  if (cartSubtotalLabel) {
+    cartSubtotalLabel.textContent = formatCurrency(subtotal);
+  }
+
   const discPct = Number(saleDiscount?.value || 0);
   const voucher = Number(saleVoucher?.value || 0);
+
   let discAmount = discPct > 0 ? subtotal * (discPct / 100) : 0;
   let total = subtotal - discAmount - voucher;
   if (total < 0) total = 0;
+
   if (saleTotal) saleTotal.value = total;
+
   const pay = Number(salePay?.value || 0);
   const change = pay > total ? pay - total : 0;
   if (saleChange) saleChange.value = change;
 }
+
 [saleDiscount, saleVoucher, salePay].forEach((el) => {
   if (el) el.addEventListener("input", updateCartSummary);
 });
 
+// ================= STRUK PRINT =================
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
   const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
@@ -759,6 +903,7 @@ function updatePrintAreaFromSale(saleDoc) {
       </div>`
     )
     .join("");
+
   printArea.innerHTML = `
     <div style="text-align:center;font-weight:700;margin-bottom:4px;">F&B POS</div>
     <div style="font-size:11px;margin-bottom:6px;">
@@ -780,47 +925,42 @@ function updatePrintAreaFromSale(saleDoc) {
     </div>`;
 }
 
-// ================= BOM KONSUMSI STOK =================
-function calculateUsedMaterialsFromSaleItems(items) {
-  const used = {}; // { materialId: totalQty }
+// ================= BOM STOCK HELPER =================
+// Mengurangi stok bahan baku berdasarkan BOM tiap menu di transaksi
+async function applyBomForSale(saleDoc) {
+  if (!saleDoc || !Array.isArray(saleDoc.items)) return;
 
-  items.forEach((cartItem) => {
-    const menu = productsCache.find((p) => p.id === cartItem.productId);
-    if (!menu || menu.type !== "menu" || !Array.isArray(menu.bom)) return;
+  const bahanDelta = {}; // { productIdBahan: totalPerubahanStok(negatif) }
 
-    const qtySale = Number(cartItem.qty || 0);
-    menu.bom.forEach((row) => {
-      const materialId = row.materialId;
-      const perPortion = Number(row.qty || 0);
-      if (!materialId || perPortion <= 0) return;
+  saleDoc.items.forEach((it) => {
+    const menu = productsCache.find(
+      (p) => p.id === it.productId && p.type === "menu"
+    );
+    if (!menu || !Array.isArray(menu.bom)) return;
 
-      const totalUse = qtySale * perPortion;
-      if (!used[materialId]) used[materialId] = 0;
-      used[materialId] += totalUse;
+    menu.bom.forEach((b) => {
+      if (!b.materialId || !b.qty) return;
+      const totalUse = Number(b.qty) * Number(it.qty || 0);
+      if (!bahanDelta[b.materialId]) bahanDelta[b.materialId] = 0;
+      bahanDelta[b.materialId] -= totalUse; // dikurangi stok
     });
   });
 
-  return Object.entries(used).map(([materialId, qty]) => ({ materialId, qty }));
-}
+  const tasks = Object.entries(bahanDelta).map(async ([id, delta]) => {
+    const prod = productsCache.find((p) => p.id === id);
+    const cur = Number(prod?.stock || 0);
+    let next = cur + delta; // delta negatif
+    if (next < 0) next = 0;
 
-async function applyBomStockReduction(usedMaterials) {
-  if (!Array.isArray(usedMaterials) || !usedMaterials.length) return;
+    await updateDoc(doc(db, "products", id), {
+      stock: next,
+      updatedAt: serverTimestamp(),
+    });
+  });
 
-  try {
-    for (const item of usedMaterials) {
-      const prod = productsCache.find(
-        (p) => p.id === item.materialId && p.type === "bahan_baku"
-      );
-      if (!prod) continue;
-
-      const currentStock = Number(prod.stock || 0);
-      const newStock = currentStock - Number(item.qty || 0);
-      await updateDoc(doc(db, "products", prod.id), { stock: newStock });
-    }
-
-    await loadProducts();
-  } catch (err) {
-    console.error("applyBomStockReduction error:", err);
+  if (tasks.length) {
+    await Promise.all(tasks);
+    await loadProducts(); // refresh tabel + notifikasi stok
   }
 }
 
@@ -832,6 +972,7 @@ if (btnSaveSale) {
         showToast("Keranjang kosong", "error");
         return;
       }
+
       const subtotal = currentCart.reduce(
         (sum, it) => sum + Number(it.subtotal || 0),
         0
@@ -840,17 +981,18 @@ if (btnSaveSale) {
       const voucher = Number(saleVoucher?.value || 0);
       const discountAmount =
         discountPercent > 0 ? subtotal * (discountPercent / 100) : 0;
+
       let total = subtotal - discountAmount - voucher;
       if (total < 0) total = 0;
+
       const pay = Number(salePay?.value || 0);
       if (pay < total) {
         showToast("Uang bayar kurang dari total", "error");
         return;
       }
+
       const change = pay - total;
       const now = new Date();
-
-      const usedMaterials = calculateUsedMaterialsFromSaleItems(currentCart);
 
       const saleDoc = {
         items: currentCart.map((it) => ({ ...it })),
@@ -865,11 +1007,10 @@ if (btnSaveSale) {
         createdAtLocal: now.toISOString(),
         createdBy: currentUser?.email || "-",
         createdByUid: currentUser?.uid || null,
-        usedMaterials,
       };
 
       if (!navigator.onLine) {
-        // OFFLINE
+        // OFFLINE → simpan ke localStorage, stok akan dikurangi saat sync
         queueOfflineSale(saleDoc);
         showToast(
           "Transaksi disimpan di perangkat (offline). Akan disinkron saat online.",
@@ -886,9 +1027,10 @@ if (btnSaveSale) {
         return;
       }
 
-      // ONLINE
+      // ONLINE → simpan ke Firestore lalu kurangi stok bahan baku via BOM
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
-      await applyBomStockReduction(usedMaterials);
+      await applyBomForSale(saleDoc);
+
       showToast("Transaksi tersimpan", "success");
       currentCart = [];
       renderCart();
@@ -911,33 +1053,14 @@ async function syncOfflineSales() {
   if (!queue.length) return;
 
   try {
-    // agregasi pemakaian bahan dari semua transaksi offline
-    const aggregatedUsed = {};
-
     for (const sale of queue) {
       await addDoc(colSales, {
         ...sale,
         createdAt: serverTimestamp(),
       });
-
-      if (Array.isArray(sale.usedMaterials)) {
-        sale.usedMaterials.forEach((um) => {
-          const id = um.materialId;
-          const qty = Number(um.qty || 0);
-          if (!id || qty <= 0) return;
-          if (!aggregatedUsed[id]) aggregatedUsed[id] = 0;
-          aggregatedUsed[id] += qty;
-        });
-      }
+      // kurangi stok bahan sesuai BOM ketika transaksi offline disinkron
+      await applyBomForSale(sale);
     }
-
-    const usedMaterials = Object.entries(aggregatedUsed).map(
-      ([materialId, qty]) => ({ materialId, qty })
-    );
-    if (usedMaterials.length) {
-      await applyBomStockReduction(usedMaterials);
-    }
-
     saveOfflineQueue([]);
     showToast(`${queue.length} transaksi offline tersinkron`, "success", 4000);
     await loadSales();
