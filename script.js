@@ -1386,6 +1386,7 @@ function updateCharts() {
   const src = getFilteredSales();
   const today = new Date();
 
+  // --- HARIAN: 7 hari terakhir ---
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
@@ -1397,8 +1398,9 @@ function updateCharts() {
       .filter((s) => s.dateKey === key)
       .reduce((n, s) => n + Number(s.total || 0), 0);
     dayData.push(sum);
-  } 
+  }
 
+  // --- BULANAN: 6 bulan terakhir ---
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
@@ -1415,6 +1417,18 @@ function updateCharts() {
     monthData.push(sum);
   }
 
+  // 🔢 TOTAL = nilai titik terakhir di chart (sesuai data yang sudah difilter)
+  const todayTotal = dayData.length ? dayData[dayData.length - 1] : 0;
+  const thisMonthTotal = monthData.length ? monthData[monthData.length - 1] : 0;
+
+  if (dailyTotalLabel) {
+    dailyTotalLabel.textContent = formatCurrency(todayTotal);
+  }
+  if (monthlyTotalLabel) {
+    monthlyTotalLabel.textContent = formatCurrency(thisMonthTotal);
+  }
+
+  // --- Render chart ---
   if (dailyChart) dailyChart.destroy();
   if (monthlyChart) monthlyChart.destroy();
 
