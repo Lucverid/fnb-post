@@ -2026,20 +2026,7 @@ const url = URL.createObjectURL(blob);
 const a = document.createElement("a");
 
 const startLabel = reportStart?.value || "";
-const endLabel = reportEnd?
-
-
-
-
-
-
-
-
-
-
-
-
-  
+  const endLabel = reportEnd?.value || "";
   const baseName = currentReportKind.replace(/[^a-z0-9_-]/gi, "-");
 
   a.href = url;
@@ -2059,11 +2046,13 @@ if (reportType) {
     ensureReportDateDefaults();
   });
 }
+
 if (btnReportGenerate) {
   btnReportGenerate.addEventListener("click", () => {
     generateReport();
   });
 }
+
 if (btnReportDownload) {
   btnReportDownload.addEventListener("click", () => {
     downloadReportCSV();
@@ -2085,12 +2074,14 @@ attachRupiahFormatter([
 // ================= AUTH STATE =================
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
+
   if (user) {
     if (authCard) authCard.classList.add("hidden");
     if (appShell) appShell.classList.remove("hidden");
 
     const role = await getUserRole(user.uid);
     applyRoleUI(role);
+
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
@@ -2118,6 +2109,7 @@ onAuthStateChanged(auth, async (user) => {
     salesCache = [];
     opnameLogsCache = [];
     currentCart = [];
+
     if (authCard) authCard.classList.remove("hidden");
     if (appShell) appShell.classList.add("hidden");
     if (topbarEmail) topbarEmail.textContent = "–";
