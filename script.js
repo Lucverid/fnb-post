@@ -1,4 +1,4 @@
-// script.js (versi stabil + filter dashboard + menu terlaris)
+// script.js (versi stabil + filter dashboard + menu terlaris + history)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -129,12 +129,13 @@ const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
 let monthlyChart = null;
 
-// 🔍 filter tanggal + menu terlaris
+// 🔍 filter tanggal + menu terlaris + history
 const filterStart = $("filterStart");
 const filterEnd = $("filterEnd");
 const btnFilterApply = $("btnFilterApply");
 const btnFilterReset = $("btnFilterReset");
 const topMenuTable = $("topMenuTable");
+const historyTable = $("historyTable");
 
 // Opname
 const opnameTable = $("opnameTable");
@@ -690,6 +691,7 @@ async function loadSales() {
     });
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
   } catch (err) {
     console.error("loadSales error:", err);
     showToast("Gagal mengambil data penjualan", "error");
@@ -824,11 +826,46 @@ function updateTopMenu() {
   });
 }
 
+// 👉 History penjualan (tabel)
+function updateHistoryTable() {
+  if (!historyTable) return;
+
+  const src = getFilteredSales();
+  historyTable.innerHTML = "";
+
+  if (!src.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td colspan="3">Belum ada transaksi pada periode ini.</td>';
+    historyTable.appendChild(tr);
+    return;
+  }
+
+  src
+    .sort((a, b) => b.createdAtDate - a.createdAtDate)
+    .forEach((s) => {
+      const d = s.createdAtDate || new Date();
+      const timeStr = formatDateTime(d);
+      const itemsStr = (s.items || [])
+        .map((it) => `${it.name} x${it.qty}`)
+        .join(", ");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${timeStr}</td>
+        <td>${itemsStr}</td>
+        <td>${formatCurrency(s.total || 0)}</td>
+      `;
+      historyTable.appendChild(tr);
+    });
+}
+
 // event filter
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
   });
 }
 if (btnFilterReset) {
@@ -837,18 +874,21 @@ if (btnFilterReset) {
     if (filterEnd) filterEnd.value = "";
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
   });
 }
 if (filterStart) {
   filterStart.addEventListener("change", () => {
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
   });
 }
 if (filterEnd) {
   filterEnd.addEventListener("change", () => {
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
   });
 }
 
