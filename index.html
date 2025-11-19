@@ -262,31 +262,73 @@
 
       <!-- 📊 DASHBOARD -->
       <section id="dashboardSection" class="section hidden">
-        <h2>Dashboard Penjualan</h2>
+  <h2>Dashboard Penjualan</h2>
 
-        <div class="metric-row">
-          <div id="metricEmpty" class="metric-card red">
-            <i class="lucide-x-circle"></i>
-            <div><b id="metricEmptyCount">0</b> Habis</div>
-          </div>
+  <div class="metric-row">
+    <div id="metricEmpty" class="metric-card red">
+      <i class="lucide-x-circle"></i>
+      <div><b id="metricEmptyCount">0</b> Habis</div>
+    </div>
 
-          <div id="metricLow" class="metric-card yellow">
-            <i class="lucide-alert-triangle"></i>
-            <div><b id="metricLowCount">0</b> Hampir Habis</div>
-          </div>
+    <div id="metricLow" class="metric-card yellow">
+      <i class="lucide-alert-triangle"></i>
+      <div><b id="metricLowCount">0</b> Hampir Habis</div>
+    </div>
 
-          <div id="metricOk" class="metric-card green">
-            <i class="lucide-check-circle"></i>
-            <div><b id="metricOkCount">0</b> Aman</div>
-          </div>
-        </div>
+    <div id="metricOk" class="metric-card green">
+      <i class="lucide-check-circle"></i>
+      <div><b id="metricOkCount">0</b> Aman</div>
+    </div>
+  </div>
 
-        <div class="chart-grid">
-          <canvas id="dailyChart"></canvas>
-          <canvas id="monthlyChart"></canvas>
-        </div>
-      </section>
+  <!-- 🔍 FILTER TANGGAL -->
+  <div class="filter-row">
+    <div>
+      <label for="filterStart">Dari tanggal</label>
+      <input type="date" id="filterStart">
+    </div>
+    <div>
+      <label for="filterEnd">Sampai tanggal</label>
+      <input type="date" id="filterEnd">
+    </div>
+    <div class="filter-actions">
+      <button id="btnFilterApply" class="btn-secondary small">Terapkan</button>
+      <button id="btnFilterReset" class="btn-secondary small ghost">Reset</button>
+    </div>
+  </div>
 
+  <!-- 📈 CHART -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>Omzet Harian</h4>
+      <div class="chart-box">
+        <canvas id="dailyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h4>Omzet Bulanan</h4>
+      <div class="chart-box">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⭐ MENU TERLARIS -->
+  <h3 style="margin-top:18px;">Menu Terlaris</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Menu</th>
+          <th>Qty Terjual</th>
+          <th>Total Omzet</th>
+        </tr>
+      </thead>
+      <tbody id="topMenuTable"></tbody>
+    </table>
+  </div>
+</section>
       <!-- 📋 OPNAME -->
       <section id="opnameSection" class="section hidden">
         <h2>Stok Opname</h2>
