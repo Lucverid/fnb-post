@@ -1436,9 +1436,6 @@ function updatePrintAreaFromSale(saleDoc) {
   }
 }
 
-#printArea {
-  margin-top: 32px !important;
-}
 
 
 /* --------------------------------------------------
