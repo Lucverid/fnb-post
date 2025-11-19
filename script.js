@@ -1617,16 +1617,15 @@ async function saveOpnameRow(id) {
       createdBy: currentUser?.email || "-",
     };
 
-    // OFFLINE
+    // OFFLINE MODE
     if (!navigator.onLine) {
       queueOfflineOpname(opDoc);
 
-      // update stok lokal supaya UI langsung berubah
-      prod.stock = fisik;
+      prod.stock = fisik; // update UI stock lokal
       showToast(
-        `Opname (offline) tersimpan lokal untuk ${prod.name}. Akan disync saat online.`,
+        `Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`,
         "info",
-        4000
+        3500
       );
 
       renderProductTable();
@@ -1636,7 +1635,7 @@ async function saveOpnameRow(id) {
       return;
     }
 
-    // ONLINE
+    // ONLINE MODE
     await addDoc(colOpname, {
       ...opDoc,
       createdAt: serverTimestamp(),
@@ -1649,6 +1648,7 @@ async function saveOpnameRow(id) {
 
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
 
+    // Refresh data
     await loadProducts();
     await loadOpnameLogs();
   } catch (err) {
@@ -1656,7 +1656,6 @@ async function saveOpnameRow(id) {
     showToast("Gagal menyimpan opname", "error");
   }
 }
-
 // ================= LOAD OPNAME LOGS =================
 async function loadOpnameLogs() {
   try {
