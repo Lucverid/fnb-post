@@ -1,4 +1,4 @@
-// script.js (offline-ready + BOM / Resep)
+// script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -68,6 +68,7 @@ function formatDateTime(d) {
 
 // ================= OFFLINE QUEUE =================
 const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
+const OFFLINE_OPNAME_KEY = "fnb_offline_opname_v1";
 
 function loadOfflineQueue() {
   try {
@@ -90,6 +91,30 @@ function queueOfflineSale(saleDoc) {
   const list = loadOfflineQueue();
   list.push(saleDoc);
   saveOfflineQueue(list);
+}
+
+// ==== OFFLINE OPNAME ====
+function loadOfflineOpnameQueue() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_OPNAME_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function saveOfflineOpnameQueue(list) {
+  try {
+    localStorage.setItem(OFFLINE_OPNAME_KEY, JSON.stringify(list || []));
+  } catch {
+    // abaikan
+  }
+}
+function queueOfflineOpname(opDoc) {
+  const list = loadOfflineOpnameQueue();
+  list.push(opDoc);
+  saveOfflineOpnameQueue(list);
 }
 
 // ================= ELEMENTS =================
@@ -115,7 +140,7 @@ const inventorySection = $("inventorySection");
 const recipeSection = $("recipeSection");
 const dashboardSection = $("dashboardSection");
 const opnameSection = $("opnameSection");
-const reportsSection = $("reportsSection"); // ⚠️ sesuai HTML
+const reportsSection = $("reportsSection");
 
 const sidebar = $("sidebar");
 const burgerBtn = $("burgerBtn");
@@ -157,7 +182,7 @@ const groupMinStock = $("groupMinStock");
 const recipeName = $("recipeName");
 const recipeCategory = $("recipeCategory");
 const recipePrice = $("recipePrice");
-const recipeDesc = $("recipeDesc");        // <== DESKRIPSI MENU
+const recipeDesc = $("recipeDesc");
 const bomList = $("bomList");
 const btnAddBomRow = $("btnAddBomRow");
 const btnSaveRecipe = $("btnSaveRecipe");
@@ -190,6 +215,7 @@ const historySearch = $("historySearch");
 
 // Opname
 const opnameTable = $("opnameTable");
+const opnameSearch = $("opnameSearch"); // kalau belum ada di HTML, tidak masalah
 
 // REPORT DOM
 const reportType = $("reportType");
@@ -247,12 +273,13 @@ function updateConnectionStatus(showNotif = false) {
       );
     } else {
       showToast(
-        "Koneksi kembali online. Menyinkronkan transaksi offline...",
+        "Koneksi kembali online. Menyinkronkan data offline...",
         "info",
         4000
       );
       if (currentUser) {
         syncOfflineSales();
+        syncOfflineOpname();
       }
     }
   }
@@ -1208,6 +1235,37 @@ async function syncOfflineSales() {
   }
 }
 
+// ================= SYNC OFFLINE OPNAME =================
+async function syncOfflineOpname() {
+  const queue = loadOfflineOpnameQueue();
+  if (!queue.length) return;
+
+  try {
+    for (const op of queue) {
+      await addDoc(colOpname, {
+        ...op,
+        createdAt: serverTimestamp(),
+      });
+
+      if (op.productId && typeof op.physicalStock === "number") {
+        await updateDoc(doc(db, "products", op.productId), {
+          stock: op.physicalStock,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+
+    saveOfflineOpnameQueue([]);
+    showToast(`${queue.length} data opname offline tersinkron`, "success", 4000);
+
+    await loadProducts();
+    await loadOpnameLogs();
+  } catch (err) {
+    console.error("syncOfflineOpname error:", err);
+    showToast("Gagal menyinkronkan sebagian data opname offline", "error");
+  }
+}
+
 // ================= SALES / CHART / TOP MENU / HISTORY =================
 async function loadSales() {
   try {
@@ -1469,14 +1527,40 @@ function renderOpnameTable() {
   if (!opnameTable) return;
   opnameTable.innerHTML = "";
 
-  const bahan = productsCache.filter((p) => p.type === "bahan_baku");
+  // filter hanya bahan baku
+  let bahan = productsCache.filter((p) => p.type === "bahan_baku");
+
+  const q = (opnameSearch?.value || "").trim().toLowerCase();
+  if (q) {
+    bahan = bahan.filter(
+      (p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
+    );
+  }
+
+  if (!bahan.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="5">Belum ada data bahan baku untuk opname.</td>`;
+    opnameTable.appendChild(tr);
+    return;
+  }
 
   bahan.forEach((p) => {
+    const st = productStatus(p);
+    const currentStock = Number(p.stock || 0);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${p.name}</td>
-      <td>${p.stock || 0} ${p.unit || ""}</td>
-      <td><input type="number" data-id="${p.id}" value="${p.stock || 0}"></td>
+      <td>
+        <div>${p.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+          <span class="status-badge ${st.cls}">${st.label}</span>
+          ${p.category ? ` • ${p.category}` : ""}
+        </div>
+      </td>
+      <td>${currentStock} ${p.unit || ""}</td>
+      <td><input type="number" data-id="${p.id}" value="${currentStock}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
       <td class="table-actions">
         <button class="btn-table btn-table-delete small" data-id="${p.id}">Simpan</button>
@@ -1485,6 +1569,7 @@ function renderOpnameTable() {
     opnameTable.appendChild(tr);
   });
 
+  // hitung selisih realtime
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
     const prod = productsCache.find((p) => p.id === id);
@@ -1496,34 +1581,74 @@ function renderOpnameTable() {
     });
   });
 
+  // tombol simpan per-baris
   opnameTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     btn.addEventListener("click", () => saveOpnameRow(id));
   });
 }
 
+if (opnameSearch) {
+  opnameSearch.addEventListener("input", renderOpnameTable);
+}
+
 async function saveOpnameRow(id) {
   try {
     const prod = productsCache.find((p) => p.id === id);
     if (!prod) return;
+
     const inp = opnameTable.querySelector(`input[data-id="${id}"]`);
     if (!inp) return;
+
     const fisik = Number(inp.value || 0);
-    const selisih = fisik - Number(prod.stock || 0);
+    const systemStock = Number(prod.stock || 0);
+    const selisih = fisik - systemStock;
     const now = new Date();
-    await addDoc(colOpname, {
+
+    const opDoc = {
       productId: id,
       productName: prod.name,
-      systemStock: prod.stock || 0,
+      systemStock,
       physicalStock: fisik,
       diff: selisih,
       unit: prod.unit || "",
       dateKey: todayKey(now),
-      createdAt: serverTimestamp(),
+      createdAtLocal: now.toISOString(),
       createdBy: currentUser?.email || "-",
+    };
+
+    // OFFLINE
+    if (!navigator.onLine) {
+      queueOfflineOpname(opDoc);
+
+      // update stok lokal supaya UI langsung berubah
+      prod.stock = fisik;
+      showToast(
+        `Opname (offline) tersimpan lokal untuk ${prod.name}. Akan disync saat online.`,
+        "info",
+        4000
+      );
+
+      renderProductTable();
+      renderOpnameTable();
+      updateStockMetrics();
+      updateStockNotif();
+      return;
+    }
+
+    // ONLINE
+    await addDoc(colOpname, {
+      ...opDoc,
+      createdAt: serverTimestamp(),
     });
-    await updateDoc(doc(db, "products", id), { stock: fisik });
+
+    await updateDoc(doc(db, "products", id), {
+      stock: fisik,
+      updatedAt: serverTimestamp(),
+    });
+
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
+
     await loadProducts();
     await loadOpnameLogs();
   } catch (err) {
@@ -1837,6 +1962,7 @@ onAuthStateChanged(auth, async (user) => {
 
     if (navigator.onLine) {
       syncOfflineSales();
+      syncOfflineOpname();
     }
 
     ensureReportDateDefaults();
