@@ -1451,42 +1451,40 @@ td {
 /* =========================================
    PRINT – HANYA STRUK (#printArea) YANG CETAK
 ========================================= */
-@media print {
+/* === STRUK / RECEIPT === */
+.receipt-pre {
+  white-space: pre;
+  font-family: monospace;
+  font-size: 10pt;
+  color: #000;            /* paksa TEKS HITAM */
+}
 
-  /* Sembunyikan seluruh layout utama */
-  header,
-  aside,
-  nav,
-  .app-header,
-  .sidebar,
-  .pos-left,
-  .pos-right > *:not(#printArea),
-  .section,
-  .app-main > *:not(#salesSection),
-  #salesSection > *:not(.pos-right),
-  .cart-summary,
-  .cart-items-wrapper,
-  #saleMenuBody,
-  #saleSearch,
-  #btnSaveSale,
-  #strukTitle,
-  #btnPrint {
-    display: none !important;
+/* === PRINT HANYA #printArea === */
+@media print {
+  /* Sembunyikan semua dulu (tapi pakai visibility, bukan display) */
+  body * {
+    visibility: hidden !important;
   }
 
-  /* TAMPILKAN hanya struk */
+  /* Tampilkan hanya struk */
+  #printArea,
+  #printArea * {
+    visibility: visible !important;
+    color: #000 !important;
+    background: #ffffff !important;
+  }
+
+  /* Taruh struk di pojok kiri atas halaman print */
   #printArea {
-    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    padding: 8px;
-    background: #fff !important;
-  }
-
-  #printArea * {
-    display: block !important;
+    margin: 0;
+    padding: 6px;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
   }
 }
 /* --------------------------------------------------
