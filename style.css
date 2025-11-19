@@ -200,6 +200,18 @@ h2 {
 
 .btn-secondary:hover { opacity: 0.9; }
 
+/* versi kecil (filter, bom, dll) */
+.btn-secondary.small {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.btn-secondary.small.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 /* --------------------------------------------------
   APP SHELL
 -------------------------------------------------- */
@@ -216,7 +228,7 @@ h2 {
 .app-header {
   position: fixed;
   top: 0;
-  left: 260px;                      /* offset sidebar */
+  left: 260px;
   width: calc(100% - 260px);
   height: 60px;
   display: flex;
@@ -264,6 +276,14 @@ h2 {
   color: var(--text-muted);
 }
 
+.connection.online {
+  color: #22c55e;
+}
+
+.connection.offline {
+  color: #ef4444;
+}
+
 /* Notifikasi */
 .notif-btn {
   position: relative;
@@ -307,6 +327,24 @@ h2 {
   margin-bottom: 8px;
 }
 
+#notifList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+#notifList li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+#notifList li:last-child {
+  border-bottom: none;
+}
+
 /* --------------------------------------------------
   BURGER BUTTON (MOBILE)
 -------------------------------------------------- */
@@ -345,9 +383,19 @@ h2 {
   border-right: 1px solid var(--sidebar-border);
 }
 
-/* Slide-in (mobile) */
 .sidebar.closed {
   transform: translateX(-100%);
+}
+
+.sidebar-group {
+  margin-bottom: 20px;
+}
+
+.sidebar-footer {
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
 }
 
 /* Button menu */
@@ -364,6 +412,10 @@ h2 {
   background: transparent;
   color: #e5e7eb;
   font-size: 14px;
+}
+
+.side-item i {
+  font-size: 16px;
 }
 
 .side-item:hover {
@@ -501,24 +553,6 @@ td {
   font-size: 13px;
 }
 
-.filter-actions {
-  display: flex;
-  gap: 8px;
-}
-
-/* Tombol kecil untuk filter */
-.btn-secondary.small {
-  width: auto;
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-.btn-secondary.small.ghost {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
 /* Chart layout */
 .chart-grid {
   display: grid;
@@ -540,18 +574,7 @@ td {
 
 .chart-box {
   position: relative;
-  height: 260px;   /* tinggi chart */
-}
-
-/* Mobile */
-@media (max-width: 900px) {
-  .chart-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-box {
-    height: 220px;
-  }
+  height: 260px;
 }
 
 /* --------------------------------------------------
@@ -575,7 +598,7 @@ td {
   color: var(--text);
 }
 
-/* 🔹 Tombol "Tambah" di daftar menu kasir */
+/* Tombol "Tambah" di daftar menu kasir */
 #saleMenuBody td:last-child {
   text-align: right;
 }
@@ -684,8 +707,15 @@ td {
 }
 
 /* --------------------------------------------------
-   BOM / RESEP MENU (Inventory)
+   BOM / RESEP MENU (di Inventory)
 -------------------------------------------------- */
+
+#bomWrapper label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
 
 .bom-list {
   display: flex;
@@ -694,7 +724,6 @@ td {
   margin-top: 4px;
 }
 
-/* 3 kolom: Nama Bahan (select), Qty, tombol X */
 .bom-row {
   display: grid;
   grid-template-columns: 2fr 1fr auto;
@@ -720,8 +749,9 @@ td {
   background: #ffffff;
 }
 
-/* tombol hapus bahan di baris BOM */
-.bom-remove-btn {
+/* tombol hapus bahan di baris BOM
+   (class ini match dengan JS: .bom-remove) */
+.bom-row .bom-remove {
   border-radius: 999px;
   border: 1px solid var(--danger);
   background: #fee2e2;
@@ -731,7 +761,7 @@ td {
   cursor: pointer;
 }
 
-.bom-remove-btn:hover {
+.bom-row .bom-remove:hover {
   background: #fecaca;
 }
 
@@ -756,18 +786,18 @@ td {
 }
 
 .status-badge.green {
-  background: #dcfce7;   /* hijau muda */
-  color: #166534;        /* hijau tua */
+  background: #dcfce7;
+  color: #166534;
 }
 
 .status-badge.yellow {
-  background: #fef9c3;   /* kuning muda */
-  color: #854d0e;        /* kuning tua */
+  background: #fef9c3;
+  color: #854d0e;
 }
 
 .status-badge.red {
-  background: #fee2e2;   /* merah muda */
-  color: #b91c1c;        /* merah tua */
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 /* --------------------------------------------------
@@ -814,14 +844,10 @@ td {
   background: #fee2e2;
 }
 
-
-
-
 /* --------------------------------------------------
   PRINT AREA
 -------------------------------------------------- */
 
-/* jarak heading "Struk" dari tombol simpan */
 #strukTitle {
   margin-top: 26px;
 }
@@ -832,7 +858,7 @@ td {
   border-radius: 12px;
   background: var(--bg-card);
   font-size: 13px;
-  margin-top: 8px;   /* sedikit jarak dari teks Struk */
+  margin-top: 8px;
 }
 
 @media print {
@@ -850,8 +876,8 @@ td {
 
 /* Tablet / HP */
 @media (max-width: 900px) {
-  .burger-btn { 
-    display: flex; 
+  .burger-btn {
+    display: flex;
   }
 
   .app-header {
@@ -884,6 +910,14 @@ td {
 
   .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-box {
+    height: 220px;
   }
 }
 
