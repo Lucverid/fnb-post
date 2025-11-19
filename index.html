@@ -85,42 +85,47 @@
       </div>
     </header>
 
-    <!-- 🧭 SIDEBAR -->
-    <aside id="sidebar" class="sidebar">
-      <nav>
-        <div class="sidebar-group">
-          <button class="side-item active" data-section="sales">
-            <i class="lucide-shopping-cart"></i> <span>Kasir</span>
-          </button>
+   <!-- 🧭 SIDEBAR -->
+<aside id="sidebar" class="sidebar">
+  <nav>
+    <div class="sidebar-group">
 
-          <button class="side-item admin-only" data-section="inventory">
-            <i class="lucide-box"></i> <span>Inventory</span>
-          </button>
+      <!-- ADMIN ONLY — Dashboard paling atas -->
+      <button class="side-item admin-only" data-section="dashboard">
+        <i class="lucide-bar-chart"></i> <span>Dashboard</span>
+      </button>
 
-          <button class="side-item admin-only" data-section="recipe">
-            <i class="lucide-utensils"></i> <span>Resep</span>
-          </button>
+      <!-- KASIR (semua role) -->
+      <button class="side-item" data-section="sales">
+        <i class="lucide-shopping-cart"></i> <span>Kasir</span>
+      </button>
 
-          <button class="side-item admin-only" data-section="dashboard">
-            <i class="lucide-bar-chart"></i> <span>Dashboard</span>
-          </button>
+      <!-- ADMIN ONLY -->
+      <button class="side-item admin-only" data-section="inventory">
+        <i class="lucide-box"></i> <span>Inventory</span>
+      </button>
 
-          <button class="side-item admin-only" data-section="opname">
-            <i class="lucide-clipboard-list"></i> <span>Opname</span>
-          </button>
+      <button class="side-item admin-only" data-section="recipe">
+        <i class="lucide-utensils"></i> <span>Resep</span>
+      </button>
 
-          <button class="side-item admin-only" data-section="reports">
-            <i class="lucide-file-text"></i> <span>Laporan</span>
-          </button>
-        </div>
+      <button class="side-item admin-only" data-section="opname">
+        <i class="lucide-clipboard-list"></i> <span>Opname</span>
+      </button>
 
-        <div class="sidebar-footer">
-          <button id="btnLogout" class="logout-btn">
-            <i class="lucide-log-out"></i> Logout
-          </button>
-        </div>
-      </nav>
-    </aside>
+      <button class="side-item admin-only" data-section="reports">
+        <i class="lucide-file-text"></i> <span>Laporan</span>
+      </button>
+
+    </div>
+
+    <div class="sidebar-footer">
+      <button id="btnLogout" class="logout-btn">
+        <i class="lucide-log-out"></i> Logout
+      </button>
+    </div>
+  </nav>
+</aside>
 
     <!-- 📌 MAIN CONTENT -->
     <main class="app-main">
