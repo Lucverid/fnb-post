@@ -585,6 +585,30 @@ td {
   padding: 14px 16px;
 }
 
+/* --------------------------------------------------
+   CART SCROLL BOX
+-------------------------------------------------- */
+.cart-items-wrapper {
+  max-height: 250px;      /* batas tinggi daftar pesanan */
+  overflow-y: auto;       /* aktifkan scroll */
+  scrollbar-width: thin;  /* firefox */
+  margin-bottom: 12px;
+}
+
+.cart-items-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cart-items-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+}
+
+.cart-items-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
 .chart-card h4 {
   margin: 0 0 8px;
   font-size: 15px;
