@@ -891,104 +891,97 @@ td {
   background: #fee2e2;
 }
 
-/* ====== STRUK / RECEIPT ====== */
+// ================= STRUK PRINT (TEXT MODE) =================
+function updatePrintAreaFromSale(saleDoc) {
+  if (!printArea) return;
 
-#printArea {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
-}
+  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
+  const waktu = formatDateTime(d);
+  const items = saleDoc.items || [];
 
-/* kartu struk di dalam card ungu */
-.receipt {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 16px 18px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
-}
+  // helper angka tanpa "Rp "
+  function formatNumberPlain(num) {
+    const n = Number(num || 0);
+    return n.toLocaleString("id-ID");
+  }
 
-/* header toko */
-.receipt-header {
-  text-align: center;
-  margin-bottom: 8px;
-}
-.receipt-title {
-  font-weight: 700;
-  font-size: 14px;
-}
-.receipt-subtitle {
-  font-size: 11px;
-  color: #666;
-}
+  const line = "-".repeat(39);   // ---------------------------------------
 
-/* bagian informasi tanggal & kasir */
-.receipt-meta {
-  border-top: 1px dashed #ccc;
-  padding-top: 8px;
-  margin-top: 8px;
-}
+  // lebar kolom
+  const nameWidth = 18;
+  const qtyWidth  = 6;
+  const subWidth  = 11;
 
-/* baris kiri–kanan (label : nilai) */
-.receipt-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  margin-bottom: 2px;
-}
-.receipt-row span:first-child {
-  color: #555;
-}
-.receipt-row span:last-child {
-  font-weight: 500;
-}
+  function makeItemLine(name, qty, subtotal) {
+    const nm = (name || "").substring(0, nameWidth);
+    const qtyStr = "x" + qty;
+    const subStr = formatNumberPlain(subtotal);
+    return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
+  }
 
-/* daftar item */
-.receipt-items {
-  border-top: 1px dashed #ccc;
-  border-bottom: 1px dashed #ccc;
-  padding: 8px 0;
-  margin: 8px 0;
-}
-.receipt-items-header {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 12px;
-  margin-bottom: 4px;
-}
+  let text = "";
 
-/* setiap item */
-.receipt-item {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  margin-bottom: 2px;
-}
-.receipt-item-left {
-  max-width: 65%;
-}
-.receipt-item-name {
-  font-weight: 500;
-}
-.receipt-item-qty {
-  font-size: 11px;
-  color: #666;
-}
+  // ===== HEADER TOKO =====
+  text += "F&B Cafe\n";
+  text += "Jl. Mawar No.123 - Bandung\n";
+  text += waktu + "\n";
+  text += line + "\n";
 
-/* bagian total, bayar, kembalian */
-.receipt-footer {
-  border-top: 1px dashed #ccc;
-  padding-top: 8px;
-  margin-top: 8px;
-}
+  // ===== HEADER KOLOM =====
+  text +=
+    "Item".padEnd(nameWidth) +
+    "Qty".padEnd(qtyWidth) +
+    "Subtotal".padStart(subWidth) +
+    "\n";
 
-/* tulisan terima kasih */
-.receipt-thankyou {
-  text-align: center;
-  margin-top: 10px;
-  font-size: 11px;
-  color: #666;
-}
+  // ===== ITEM =====
+  items.forEach((it) => {
+    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
+  });
 
+  text += line + "\n";
+
+  // ===== RINGKASAN =====
+  const labelWidth = 18;
+  function row(label, value) {
+    return label.padEnd(labelWidth) + value + "\n";
+  }
+
+  const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
+  const diskonLabel = saleDoc.discountPercent
+    ? `Diskon (${saleDoc.discountPercent}%) :`
+    : "Diskon :";
+  const diskonStr =
+    saleDoc.discountAmount && saleDoc.discountAmount > 0
+      ? formatNumberPlain(saleDoc.discountAmount)
+      : "-";
+  const voucherStr =
+    saleDoc.voucher && saleDoc.voucher > 0
+      ? formatNumberPlain(saleDoc.voucher)
+      : "-";
+
+  const totalStr   = formatNumberPlain(saleDoc.total || 0);
+  const bayarStr   = formatNumberPlain(saleDoc.pay || 0);
+  const kembaliStr = formatNumberPlain(saleDoc.change || 0);
+
+  text += row("Subtotal :", subtotalStr);
+  text += row(diskonLabel, diskonStr);
+  text += row("Voucher :", voucherStr);
+  text += row("Total :", totalStr);
+  text += row("Bayar :", bayarStr);
+  text += row("Kembalian :", kembaliStr);
+
+  text += line + "\n";
+  text += "Terima kasih!\n";
+  text += "Follow IG @fnbcafe\n";
+
+  // tempel ke DOM
+  printArea.innerHTML = `
+    <div class="receipt">
+      <pre class="receipt-pre">${text}</pre>
+    </div>
+  `;
+}
 /* --------------------------------------------------
   RECIPE TABLE (BOM kolom rapi)
 -------------------------------------------------- */
