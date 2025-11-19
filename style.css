@@ -1448,67 +1448,54 @@ td {
     max-width: 150px;
   }
 }
-/* ==================================================
-   PRINT – HANYA CETAK STRUK
-================================================== */
+/* =========================================
+   PRINT – HANYA STRUK YANG TERCETAK
+========================================= */
 @media print {
+
+  /* Sembunyikan layout lain */
+  .app-header,
+  .sidebar,
+  .pos-left,
+  .cart-summary,
+  .welcome-banner,
+  .metric-row,
+  .chart-card,
+  #inventorySection,
+  #recipeSection,
+  #dashboardSection,
+  #opnameSection,
+  #reportsSection {
+    display: none !important;
+  }
+
+  /* Sembunyikan judul "Daftar Pesanan", judul "Struk",
+     dan tabel cart (Item | Qty | Subtotal) */
+  .cart-box h3:first-child, /* Daftar Pesanan */
+  #strukTitle,
+  .cart-items-wrapper,
+  #btnPrint {
+    display: none !important;
+  }
+
+  /* Fokuskan area struk */
+  .cart-box {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   body {
     margin: 0;
     padding: 0;
     background: #ffffff;
   }
 
-  /* sembunyiin semua chrome UI */
-  .app-header,
-  .sidebar,
-  #toast-container {
-    display: none !important;
-  }
-
-  /* cuma tampilkan section Kasir */
-  .app-main {
+  .app-main,
+  #salesSection {
     margin: 0;
     padding: 0;
-  }
-
-  .app-main > *:not(#salesSection) {
-    display: none !important;
-  }
-
-  /* di Kasir: sembunyiin list menu & form ringkasan, sisakan struk saja */
-  #salesSection h2,
-  #salesSection .pos-left,
-  #salesSection .cart-summary,
-  #salesSection #strukTitle,
-  #salesSection #btnPrint {
-    display: none !important;
-  }
-
-  .cart-box {
-    box-shadow: none;
-    border: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  #printArea {
-    display: block !important;
-    padding: 8px;
-  }
-
-  .receipt {
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-    border-radius: 0;
-    border: none;
-  }
-
-  /* paksa font mono & format text pre */
-  .receipt-pre {
-    font-family: "SF Mono", "Roboto Mono", monospace;
-    font-size: 12px;
-    white-space: pre;
   }
 }
 
