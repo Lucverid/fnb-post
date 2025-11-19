@@ -205,8 +205,13 @@ const metricEmptyCard = $("metricEmpty");
 const metricLowCard   = $("metricLow");
 const metricOkCard    = $("metricOk");
 
-const dailyChartCanvas = $("dailyChart");
+const dailyChartCanvas   = $("dailyChart");
 const monthlyChartCanvas = $("monthlyChart");
+
+// 🔢 label total omzet
+const dailyTotalLabel   = $("dailyTotalLabel");
+const monthlyTotalLabel = $("monthlyTotalLabel");
+
 let dailyChart = null;
 let monthlyChart = null;
 
