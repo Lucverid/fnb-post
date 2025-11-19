@@ -112,9 +112,11 @@ const bannerRole = $("bannerRole");
 const welcomeBanner = $("welcomeBanner");
 const salesSection = $("salesSection");
 const inventorySection = $("inventorySection");
-const recipeSection = $("recipeSection"); // boleh null kalau belum ada di HTML
+const recipeSection = $("recipeSection");
 const dashboardSection = $("dashboardSection");
 const opnameSection = $("opnameSection");
+// 🔹 Section laporan baru
+const reportSection = $("reportSection");
 
 const sidebar = $("sidebar");
 const burgerBtn = $("burgerBtn");
@@ -153,7 +155,7 @@ const groupPrice = $("groupPrice");
 const groupStock = $("groupStock");
 const groupMinStock = $("groupMinStock");
 
-// Resep / Menu (opsional, kalau kamu punya halaman khusus)
+// Resep / Menu
 const recipeName = $("recipeName");
 const recipeCategory = $("recipeCategory");
 const recipePrice = $("recipePrice");
@@ -184,6 +186,15 @@ const historySearch = $("historySearch");
 // Opname
 const opnameTable = $("opnameTable");
 
+// 🔹 Elemen Laporan
+const reportType = $("reportType");
+const reportStart = $("reportStart");
+const reportEnd = $("reportEnd");
+const btnReportGenerate = $("btnReportGenerate");
+const btnReportDownload = $("btnReportDownload");
+const reportTableBody = $("reportTableBody");
+const reportSummary = $("reportSummary");
+
 // ================= FIRESTORE COLLECTION =================
 const colUsers = collection(db, "users");
 const colProducts = collection(db, "products");
@@ -195,9 +206,14 @@ let currentUser = null;
 let currentRole = null;
 let productsCache = [];
 let salesCache = [];
+let opnameLogsCache = [];          // 🔹 untuk laporan opname
 let currentCart = [];
 let editingProductId = null;
 let editingRecipeId = null;
+
+// state laporan
+let currentReportRows = [];
+let currentReportKind = "sales-daily";
 
 // ================= CONNECTION LABEL + NOTIF =================
 let lastOnlineState = navigator.onLine;
@@ -276,9 +292,15 @@ function applyRoleUI(role) {
 
 // ================= NAV =================
 function showSection(name) {
-  [salesSection, inventorySection, recipeSection, dashboardSection, opnameSection].forEach(
-    (sec) => sec && sec.classList.add("hidden")
-  );
+  [
+    salesSection,
+    inventorySection,
+    recipeSection,
+    dashboardSection,
+    opnameSection,
+    reportSection, // 🔹 tambahkan reportSection
+  ].forEach((sec) => sec && sec.classList.add("hidden"));
+
   if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
   if (name === "inventory" && inventorySection)
     inventorySection.classList.remove("hidden");
@@ -288,6 +310,8 @@ function showSection(name) {
     dashboardSection.classList.remove("hidden");
   if (name === "opname" && opnameSection)
     opnameSection.classList.remove("hidden");
+  if (name === "report" && reportSection)
+    reportSection.classList.remove("hidden");
 
   document.querySelectorAll(".side-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.section === name);
@@ -1453,10 +1477,283 @@ async function saveOpnameRow(id) {
     await updateDoc(doc(db, "products", id), { stock: fisik });
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
     await loadProducts();
+    await loadOpnameLogs(); // refresh cache laporan opname
   } catch (err) {
     console.error(err);
     showToast("Gagal menyimpan opname", "error");
   }
+}
+
+// ================= LOAD OPNAME LOGS (untuk laporan) =================
+async function loadOpnameLogs() {
+  try {
+    const snap = await getDocs(query(colOpname, orderBy("createdAt", "desc")));
+    opnameLogsCache = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      let createdDate = new Date();
+      if (data.createdAt && typeof data.createdAt.toDate === "function") {
+        createdDate = data.createdAt.toDate();
+      }
+      opnameLogsCache.push({
+        id: d.id,
+        ...data,
+        createdAtDate: createdDate,
+        dateKey: data.dateKey || todayKey(createdDate),
+      });
+    });
+  } catch (err) {
+    console.error("loadOpnameLogs error:", err);
+  }
+}
+
+// ================= REPORT (LAPORAN) =================
+function ensureReportDateDefaults() {
+  if (!reportStart || !reportEnd || !reportType) return;
+  const today = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+
+  function setInputDate(el, d) {
+    if (!el) return;
+    const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    el.value = v;
+  }
+
+  const type = reportType.value || "sales-daily";
+
+  if (!reportStart.value && !reportEnd.value) {
+    if (type === "sales-daily") {
+      setInputDate(reportStart, today);
+      setInputDate(reportEnd, today);
+    } else if (type === "sales-weekly" || type === "opname-weekly") {
+      const start = new Date(today);
+      const day = start.getDay(); // 0 Minggu, 1 Senin, ...
+      const diff = (day === 0 ? 6 : day - 1); // mundur ke Senin
+      start.setDate(start.getDate() - diff);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    } else if (type === "sales-monthly") {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    } else if (type === "sales-yearly") {
+      const start = new Date(today.getFullYear(), 0, 1);
+      const end = new Date(today.getFullYear(), 11, 31);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    }
+  }
+}
+
+function parseDateInput(value, isEnd = false) {
+  if (!value) return null;
+  if (isEnd) {
+    return new Date(value + "T23:59:59");
+  }
+  return new Date(value + "T00:00:00");
+}
+
+function buildSalesReportRows(startDate, endDate) {
+  const rows = [];
+  let totalOmzet = 0;
+
+  salesCache.forEach((s) => {
+    const d = s.createdAtDate || new Date();
+    if (d < startDate || d > endDate) return;
+    const timeStr = formatDateTime(d);
+    const itemsStr = (s.items || [])
+      .map((it) => `${it.name} x${it.qty}`)
+      .join(", ");
+
+    rows.push({
+      tanggal: timeStr,
+      items: itemsStr,
+      total: Number(s.total || 0),
+      kasir: s.createdBy || "-",
+    });
+
+    totalOmzet += Number(s.total || 0);
+  });
+
+  return { rows, totalOmzet };
+}
+
+function buildOpnameWeeklyRows(startDate, endDate) {
+  const rows = [];
+
+  opnameLogsCache.forEach((o) => {
+    const d = o.createdAtDate || new Date();
+    if (d < startDate || d > endDate) return;
+
+    const timeStr = formatDateTime(d);
+    rows.push({
+      tanggal: timeStr,
+      produk: o.productName || "-",
+      systemStock: Number(o.systemStock ?? 0),
+      physicalStock: Number(o.physicalStock ?? 0),
+      diff: Number(o.diff ?? 0),
+      unit: o.unit || "",
+      user: o.createdBy || "-",
+    });
+  });
+
+  return rows;
+}
+
+function renderReportTable() {
+  if (!reportTableBody || !reportSummary) return;
+
+  reportTableBody.innerHTML = "";
+  reportSummary.textContent = "";
+
+  if (!currentReportRows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="5">Tidak ada data untuk periode ini.</td>`;
+    reportTableBody.appendChild(tr);
+    return;
+  }
+
+  // cek jenis laporan dari currentReportKind
+  if (currentReportKind.startsWith("sales")) {
+    // kolom: Tanggal, Item, Total, Kasir
+    currentReportRows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.tanggal}</td>
+        <td>${r.items}</td>
+        <td>${formatCurrency(r.total)}</td>
+        <td>${r.kasir}</td>
+      `;
+      reportTableBody.appendChild(tr);
+    });
+
+    const total = currentReportRows.reduce((sum, r) => sum + Number(r.total || 0), 0);
+    reportSummary.textContent = `Total Omzet: ${formatCurrency(total)} (${currentReportRows.length} transaksi)`;
+  } else if (currentReportKind === "opname-weekly") {
+    // kolom: Tanggal, Produk, Stok Sistem, Stok Fisik, Selisih, User
+    currentReportRows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.tanggal}</td>
+        <td>${r.produk}</td>
+        <td>${r.systemStock} ${r.unit || ""}</td>
+        <td>${r.physicalStock} ${r.unit || ""}</td>
+        <td>${r.diff}</td>
+        <td>${r.user}</td>
+      `;
+      reportTableBody.appendChild(tr);
+    });
+
+    reportSummary.textContent = `Total baris opname: ${currentReportRows.length}`;
+  }
+}
+
+function generateReport() {
+  if (!reportType || !reportStart || !reportEnd) return;
+
+  const type = reportType.value || "sales-daily";
+  const startDate = parseDateInput(reportStart.value, false);
+  const endDate = parseDateInput(reportEnd.value, true);
+
+  if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate)) {
+    showToast("Tanggal awal & akhir laporan wajib diisi", "error");
+    return;
+  }
+
+  if (endDate < startDate) {
+    showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
+    return;
+  }
+
+  if (type === "opname-weekly") {
+    currentReportKind = "opname-weekly";
+    currentReportRows = buildOpnameWeeklyRows(startDate, endDate);
+  } else {
+    // semua tipe sales (harian/mingguan/bulanan/tahunan) pakai sumber sama, beda preset tanggal aja
+    currentReportKind = type; // misal sales-daily, sales-weekly, ...
+    const { rows } = buildSalesReportRows(startDate, endDate);
+    currentReportRows = rows;
+  }
+
+  renderReportTable();
+  showToast("Laporan diperbarui", "success");
+}
+
+function downloadReportCSV() {
+  if (!currentReportRows.length) {
+    showToast("Tidak ada data laporan untuk diunduh", "error");
+    return;
+  }
+
+  let csv = "";
+  const sep = ",";
+
+  if (currentReportKind.startsWith("sales")) {
+    csv += ["Tanggal", "Items", "Total", "Kasir"].join(sep) + "\n";
+    currentReportRows.forEach((r) => {
+      const row = [
+        `"${r.tanggal}"`,
+        `"${(r.items || "").replace(/"/g, '""')}"`,
+        r.total,
+        `"${(r.kasir || "").replace(/"/g, '""')}"`,
+      ];
+      csv += row.join(sep) + "\n";
+    });
+  } else if (currentReportKind === "opname-weekly") {
+    csv += ["Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Satuan", "User"].join(sep) + "\n";
+    currentReportRows.forEach((r) => {
+      const row = [
+        `"${r.tanggal}"`,
+        `"${(r.produk || "").replace(/"/g, '""')}"`,
+        r.systemStock,
+        r.physicalStock,
+        r.diff,
+        `"${(r.unit || "").replace(/"/g, '""')}"`,
+        `"${(r.user || "").replace(/"/g, '""')}"`,
+      ];
+      csv += row.join(sep) + "\n";
+    });
+  }
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  const startLabel = reportStart?.value || "";
+  const endLabel = reportEnd?.value || "";
+  const baseName = currentReportKind.replace(/[^a-z0-9_-]/gi, "-");
+
+  a.href = url;
+  a.download = `laporan-${baseName}-${startLabel}_sd_${endLabel}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast("Laporan CSV diunduh", "success");
+}
+
+// event laporan
+if (reportType) {
+  reportType.addEventListener("change", () => {
+    // reset tanggal saat user ganti jenis laporan
+    if (reportStart) reportStart.value = "";
+    if (reportEnd) reportEnd.value = "";
+    ensureReportDateDefaults();
+  });
+}
+if (btnReportGenerate) {
+  btnReportGenerate.addEventListener("click", () => {
+    generateReport();
+  });
+}
+if (btnReportDownload) {
+  btnReportDownload.addEventListener("click", () => {
+    downloadReportCSV();
+  });
 }
 
 // ================= AUTH STATE =================
@@ -1473,16 +1770,19 @@ onAuthStateChanged(auth, async (user) => {
 
     await loadProducts();
     await loadSales();
+    await loadOpnameLogs(); // 🔹 supaya laporan opname siap
 
     if (navigator.onLine) {
       syncOfflineSales();
     }
 
+    ensureReportDateDefaults();
     showSection("sales");
   } else {
     currentRole = null;
     productsCache = [];
     salesCache = [];
+    opnameLogsCache = [];
     currentCart = [];
     if (authCard) authCard.classList.remove("hidden");
     if (appShell) appShell.classList.add("hidden");
