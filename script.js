@@ -1078,21 +1078,6 @@ function updateCartSummary() {
 // ================= STRUK PRINT =================
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
-  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
-  const waktu = formatDateTime(d);
-  const kasir = saleDoc.createdBy || "-";
-  const itemsHtml = (saleDoc.items || [])
-    .map(
-      (it) => `
-      <div style="display:flex;justify-content:space-between;font-size:12px;">
-        <span>${it.name} x${it.qty}</span>
-        <span>${formatCurrency(it.subtotal)}</span>
-      </div>`
-    )
-    .join("");
-
-  function updatePrintAreaFromSale(saleDoc) {
-  if (!printArea) return;
 
   const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
   const waktu = formatDateTime(d);
