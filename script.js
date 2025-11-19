@@ -1417,9 +1417,17 @@ function updateCharts() {
     monthData.push(sum);
   }
 
-  // 🔢 TOTAL = nilai titik terakhir di chart (sesuai data yang sudah difilter)
-  const todayTotal = dayData.length ? dayData[dayData.length - 1] : 0;
-  const thisMonthTotal = monthData.length ? monthData[monthData.length - 1] : 0;
+  // 🔢 TOTAL HARI INI & BULAN INI (langsung dari data src)
+  const todayKeyStr = todayKey(today);
+  const ymThis = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  const todayTotal = src
+    .filter((s) => s.dateKey === todayKeyStr)
+    .reduce((n, s) => n + Number(s.total || 0), 0);
+
+  const thisMonthTotal = src
+    .filter((s) => (s.dateKey || "").startsWith(ymThis))
+    .reduce((n, s) => n + Number(s.total || 0), 0);
 
   if (dailyTotalLabel) {
     dailyTotalLabel.textContent = formatCurrency(todayTotal);
