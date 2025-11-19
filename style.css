@@ -891,97 +891,31 @@ td {
   background: #fee2e2;
 }
 
-// ================= STRUK PRINT (TEXT MODE) =================
-function updatePrintAreaFromSale(saleDoc) {
-  if (!printArea) return;
+/* ====== STRUK / RECEIPT (TEXT MODE) ====== */
 
-  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
-  const waktu = formatDateTime(d);
-  const items = saleDoc.items || [];
-
-  // helper angka tanpa "Rp "
-  function formatNumberPlain(num) {
-    const n = Number(num || 0);
-    return n.toLocaleString("id-ID");
-  }
-
-  const line = "-".repeat(39);   // ---------------------------------------
-
-  // lebar kolom
-  const nameWidth = 18;
-  const qtyWidth  = 6;
-  const subWidth  = 11;
-
-  function makeItemLine(name, qty, subtotal) {
-    const nm = (name || "").substring(0, nameWidth);
-    const qtyStr = "x" + qty;
-    const subStr = formatNumberPlain(subtotal);
-    return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
-  }
-
-  let text = "";
-
-  // ===== HEADER TOKO =====
-  text += "F&B Cafe\n";
-  text += "Jl. Mawar No.123 - Bandung\n";
-  text += waktu + "\n";
-  text += line + "\n";
-
-  // ===== HEADER KOLOM =====
-  text +=
-    "Item".padEnd(nameWidth) +
-    "Qty".padEnd(qtyWidth) +
-    "Subtotal".padStart(subWidth) +
-    "\n";
-
-  // ===== ITEM =====
-  items.forEach((it) => {
-    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
-  });
-
-  text += line + "\n";
-
-  // ===== RINGKASAN =====
-  const labelWidth = 18;
-  function row(label, value) {
-    return label.padEnd(labelWidth) + value + "\n";
-  }
-
-  const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
-  const diskonLabel = saleDoc.discountPercent
-    ? `Diskon (${saleDoc.discountPercent}%) :`
-    : "Diskon :";
-  const diskonStr =
-    saleDoc.discountAmount && saleDoc.discountAmount > 0
-      ? formatNumberPlain(saleDoc.discountAmount)
-      : "-";
-  const voucherStr =
-    saleDoc.voucher && saleDoc.voucher > 0
-      ? formatNumberPlain(saleDoc.voucher)
-      : "-";
-
-  const totalStr   = formatNumberPlain(saleDoc.total || 0);
-  const bayarStr   = formatNumberPlain(saleDoc.pay || 0);
-  const kembaliStr = formatNumberPlain(saleDoc.change || 0);
-
-  text += row("Subtotal :", subtotalStr);
-  text += row(diskonLabel, diskonStr);
-  text += row("Voucher :", voucherStr);
-  text += row("Total :", totalStr);
-  text += row("Bayar :", bayarStr);
-  text += row("Kembalian :", kembaliStr);
-
-  text += line + "\n";
-  text += "Terima kasih!\n";
-  text += "Follow IG @fnbcafe\n";
-
-  // tempel ke DOM
-  printArea.innerHTML = `
-    <div class="receipt">
-      <pre class="receipt-pre">${text}</pre>
-    </div>
-  `;
+#printArea {
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier", monospace;
+  font-size: 13px;
 }
+
+.receipt {
+  margin-top: 18px;          /* jarak dari tombol Simpan Transaksi */
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  border: 1px dashed #e5e7eb;
+  overflow-x: auto;          /* kalau kepanjangan bisa di-scroll */
+}
+
+.receipt-pre {
+  margin: 0;
+  white-space: pre;          /* jaga alignment kolom */
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* --------------------------------------------------
   RECIPE TABLE (BOM kolom rapi)
 -------------------------------------------------- */
