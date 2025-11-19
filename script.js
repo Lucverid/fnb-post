@@ -887,7 +887,7 @@ function updateCartSummary() {
 [saleDiscount, saleVoucher, salePay].forEach((el) => {
   if (el) el.addEventListener("input", updateCartSummary);
 });
-
+ 
 // ================= STRUK PRINT =================
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
