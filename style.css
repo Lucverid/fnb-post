@@ -891,43 +891,44 @@ td {
   background: #fee2e2;
 }
 
-/* ====== STRUK / RECEIPT (CARD MODE) ====== */
+/* ====== STRUK / RECEIPT (HTML CARD) ====== */
 
 #printArea {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
 }
 
-/* kartu struk dalam box putih */
+/* kartu struk di dalam section kasir */
 .receipt {
-  margin-top: 18px; /* jarak dari tombol Simpan Transaksi */
   background: #ffffff;
   border-radius: 16px;
   padding: 16px 18px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-  border: 1px solid #e5e7eb;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  margin-top: 18px;               /* 🔹 jarak dari tombol Simpan Transaksi */
 }
 
 /* header toko */
 .receipt-header {
   text-align: center;
   margin-bottom: 8px;
-}
-.receipt-title {
-  font-weight: 700;
-  font-size: 14px;
-}
-.receipt-subtitle {
-  font-size: 11px;
-  color: #6b7280;
+  line-height: 1.4;
 }
 
-/* info tanggal & kasir */
+.receipt-store-name {
+  font-weight: 700;               /* 🔹 nama toko bold */
+  font-size: 14px;
+}
+
+.receipt-store-address {
+  font-size: 11px;
+  color: #666;
+}
+
+/* bagian info tanggal & kasir */
 .receipt-meta {
-  border-top: 1px dashed #d1d5db;
+  border-top: 1px dashed #ccc;
   padding-top: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 /* baris kiri–kanan */
@@ -935,22 +936,25 @@ td {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
+
 .receipt-row span:first-child {
-  color: #4b5563;
+  color: #555;
 }
-.receipt-row span:last-child {
-  font-weight: 500;
+
+.receipt-row-total span:last-child {
+  font-weight: 700;
 }
 
 /* daftar item */
 .receipt-items {
-  border-top: 1px dashed #d1d5db;
-  border-bottom: 1px dashed #d1d5db;
+  border-top: 1px dashed #ccc;
+  border-bottom: 1px dashed #ccc;
   padding: 8px 0;
   margin: 8px 0;
 }
+
 .receipt-items-header {
   display: flex;
   justify-content: space-between;
@@ -964,33 +968,37 @@ td {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
+
 .receipt-item-left {
   max-width: 65%;
 }
+
 .receipt-item-name {
   font-weight: 500;
 }
+
 .receipt-item-qty {
   font-size: 11px;
-  color: #6b7280;
+  color: #666;
 }
 
 /* bagian total, bayar, kembalian */
 .receipt-footer {
-  border-top: 1px dashed #d1d5db;
+  border-top: 1px dashed #ccc;
   padding-top: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
-/* tulisan terima kasih */
+/* footer kecil di tengah */
 .receipt-thankyou {
   text-align: center;
   margin-top: 10px;
   font-size: 11px;
-  color: #6b7280;
+  color: #666;
 }
+
 /* --------------------------------------------------
   RECIPE TABLE (BOM kolom rapi)
 -------------------------------------------------- */
