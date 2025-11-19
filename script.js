@@ -198,8 +198,14 @@ const bomModalClose = $("bomModalClose");
 
 // Dashboard
 const metricEmptyCount = $("metricEmptyCount");
-const metricLowCount = $("metricLowCount");
-const metricOkCount = $("metricOkCount");
+const metricLowCount   = $("metricLowCount");
+const metricOkCount    = $("metricOkCount");
+
+// kartu metric (buat klik ke opname)
+const metricEmptyCard = $("metricEmpty");
+const metricLowCard   = $("metricLow");
+const metricOkCard    = $("metricOk");
+
 const dailyChartCanvas = $("dailyChart");
 const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
@@ -379,6 +385,22 @@ if (burgerBtn && sidebar) {
     }
   });
 }
+
+// ================= CLICK METRIC -> BUKA OPNAME =================
+[metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
+  if (!card) return;
+  card.style.cursor = "pointer";
+  card.addEventListener("click", () => {
+    // pindah ke halaman opname
+    showSection("opname");
+
+    // kalau mau langsung scroll ke tabel opname
+    if (opnameSection) {
+      opnameSection.scrollIntoView({ behavior: "smooth" });
+    }
+  });
+});
+
 
 // ================= NOTIF STOK =================
 function productStatus(prod) {
