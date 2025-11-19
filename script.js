@@ -469,15 +469,17 @@ async function loadProducts() {
 function renderProductTable() {
   if (!productTable) return;
   productTable.innerHTML = "";
+
   productsCache.forEach((p) => {
-    const st = productStatus(p);
+    const st = productStatus(p); // { label, cls }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.name || "-"}</td>
       <td>${p.type === "menu" ? "Menu" : "Bahan Baku"}</td>
       <td>${p.category || "-"}</td>
       <td>${p.type === "menu" ? formatCurrency(p.price || 0) : "-"}</td>
-      <td>${p.type === "bahan_baku" ? p.stock || 0 : "-"}</td>
+      <td>${p.type === "bahan_baku" ? (p.stock || 0) : "-"}</td>
       <td>
         <span class="status-badge ${st.cls}">${st.label}</span>
       </td>
@@ -489,6 +491,7 @@ function renderProductTable() {
     productTable.appendChild(tr);
   });
 
+  // event listener Edit / Hapus
   productTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
