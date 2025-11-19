@@ -1,4 +1,4 @@
-// script.js (versi stabil + filter dashboard + menu terlaris + riwayat + search)
+// script.js (offline-ready: queue transaksi, sync, notif, search history)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -66,6 +66,32 @@ function formatDateTime(d) {
   )}:${pad(d.getMinutes())}`;
 }
 
+// ================= OFFLINE QUEUE =================
+const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
+
+function loadOfflineQueue() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_SALES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function saveOfflineQueue(list) {
+  try {
+    localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
+  } catch {
+    // abaikan kalau storage penuh
+  }
+}
+function queueOfflineSale(saleDoc) {
+  const list = loadOfflineQueue();
+  list.push(saleDoc);
+  saveOfflineQueue(list);
+}
+
 // ================= ELEMENTS =================
 const authCard = $("auth-card");
 const appShell = $("app-shell");
@@ -129,7 +155,7 @@ const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
 let monthlyChart = null;
 
-// 🔍 filter tanggal + menu terlaris + riwayat
+// filter + menu terlaris + riwayat
 const filterStart = $("filterStart");
 const filterEnd = $("filterEnd");
 const btnFilterApply = $("btnFilterApply");
@@ -155,10 +181,15 @@ let salesCache = [];
 let currentCart = [];
 let editingProductId = null;
 
-// ================= CONNECTION LABEL =================
-function updateConnectionStatus() {
+// ================= CONNECTION LABEL + NOTIF =================
+let lastOnlineState = navigator.onLine;
+
+function updateConnectionStatus(showNotif = false) {
   if (!connectionStatus) return;
-  if (navigator.onLine) {
+
+  const isOnline = navigator.onLine;
+
+  if (isOnline) {
     connectionStatus.textContent = "Online";
     connectionStatus.classList.remove("offline");
     connectionStatus.classList.add("online");
@@ -167,10 +198,33 @@ function updateConnectionStatus() {
     connectionStatus.classList.remove("online");
     connectionStatus.classList.add("offline");
   }
+
+  if (showNotif && isOnline !== lastOnlineState) {
+    if (!isOnline) {
+      showToast(
+        "Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
+        "error",
+        4000
+      );
+    } else {
+      showToast(
+        "Koneksi kembali online. Menyinkronkan transaksi offline...",
+        "info",
+        4000
+      );
+      // coba sync kalau user sudah login
+      if (currentUser) {
+        syncOfflineSales();
+      }
+    }
+  }
+
+  lastOnlineState = isOnline;
 }
-updateConnectionStatus();
-window.addEventListener("online", updateConnectionStatus);
-window.addEventListener("offline", updateConnectionStatus);
+updateConnectionStatus(false);
+
+window.addEventListener("online", () => updateConnectionStatus(true));
+window.addEventListener("offline", () => updateConnectionStatus(true));
 
 // ================= ROLE =================
 async function getUserRole(uid) {
@@ -190,11 +244,7 @@ async function getUserRole(uid) {
   }
 }
 
-/**
- * Untuk sementara: jangan sembunyikan menu admin.
- * Biar semua role tetap bisa klik Dashboard / Inventory / Opname,
- * jadi nggak kejadian "nggak bisa buka dashboard".
- */
+// Untuk sementara semua role boleh lihat dashboard
 function applyRoleUI(role) {
   currentRole = role || "kasir";
   if (bannerRole)
@@ -610,6 +660,7 @@ function updatePrintAreaFromSale(saleDoc) {
     </div>`;
 }
 
+// ================== SAVE SALE (ONLINE + OFFLINE) ==================
 if (btnSaveSale) {
   btnSaveSale.addEventListener("click", async () => {
     try {
@@ -648,6 +699,27 @@ if (btnSaveSale) {
         createdBy: currentUser?.email || "-",
         createdByUid: currentUser?.uid || null,
       };
+
+      if (!navigator.onLine) {
+        // ===== OFFLINE MODE =====
+        queueOfflineSale(saleDoc);
+        showToast(
+          "Transaksi disimpan di perangkat (offline). Akan disinkron saat online.",
+          "info",
+          4000
+        );
+        updatePrintAreaFromSale(saleDoc);
+        // kosongkan keranjang & form
+        currentCart = [];
+        renderCart();
+        if (saleDiscount) saleDiscount.value = 0;
+        if (saleVoucher) saleVoucher.value = 0;
+        if (salePay) salePay.value = "";
+        if (saleChange) saleChange.value = "";
+        return;
+      }
+
+      // ===== ONLINE MODE =====
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
       showToast("Transaksi tersimpan", "success");
       currentCart = [];
@@ -665,7 +737,28 @@ if (btnSaveSale) {
   });
 }
 
-// ================= SALES / CHART =================
+// ================= SYNC OFFLINE SALES =================
+async function syncOfflineSales() {
+  const queue = loadOfflineQueue();
+  if (!queue.length) return;
+
+  try {
+    for (const sale of queue) {
+      await addDoc(colSales, {
+        ...sale,
+        createdAt: serverTimestamp(),
+      });
+    }
+    saveOfflineQueue([]);
+    showToast(`${queue.length} transaksi offline tersinkron`, "success", 4000);
+    await loadSales();
+  } catch (err) {
+    console.error("syncOfflineSales error:", err);
+    showToast("Gagal menyinkronkan sebagian transaksi offline", "error");
+  }
+}
+
+// ================= SALES / CHART / TOP MENU / HISTORY =================
 async function loadSales() {
   try {
     const snap = await getDocs(query(colSales, orderBy("createdAt", "desc")));
@@ -694,7 +787,7 @@ async function loadSales() {
   }
 }
 
-// 👉 ambil penjualan sesuai filter tanggal
+// filter berdasar tanggal
 function getFilteredSales() {
   if (!salesCache.length) return [];
   let list = [...salesCache];
@@ -724,7 +817,7 @@ function updateCharts() {
   const src = getFilteredSales();
   const today = new Date();
 
-  // ---- Harian (7 hari) ----
+  // 7 hari
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
@@ -738,7 +831,7 @@ function updateCharts() {
     dayData.push(sum);
   }
 
-  // ---- Bulanan (6 bulan) ----
+  // 6 bulan
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
@@ -782,7 +875,7 @@ function updateCharts() {
   });
 }
 
-// 👉 Menu terlaris
+// menu terlaris
 function updateTopMenu() {
   if (!topMenuTable) return;
 
@@ -822,7 +915,7 @@ function updateTopMenu() {
   });
 }
 
-// 👉 Riwayat penjualan
+// riwayat
 function updateHistoryTable() {
   if (!historyTable) return;
 
@@ -871,7 +964,7 @@ function updateHistoryTable() {
     });
 }
 
-// event filter tanggal & search
+// event filter & search
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
@@ -1002,6 +1095,12 @@ onAuthStateChanged(auth, async (user) => {
 
     await loadProducts();
     await loadSales();
+
+    // kalau baru login & online, sync transaksi offline
+    if (navigator.onLine) {
+      syncOfflineSales();
+    }
+
     showSection("sales");
   } else {
     currentRole = null;
