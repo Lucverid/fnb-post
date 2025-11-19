@@ -2025,7 +2025,6 @@ onAuthStateChanged(auth, async (user) => {
     await loadSales();
     await loadOpnameLogs();
 
-    // aktifkan klik metric -> opname + filter
     initMetricClickToOpname();
 
     if (navigator.onLine) {
@@ -2034,7 +2033,14 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     ensureReportDateDefaults();
-    showSection("sales");
+
+    // 🔥 DI SINI BEDAIN:
+    if (role === "admin") {
+      showSection("dashboard");  // admin masuk ke Dashboard dulu
+    } else {
+      showSection("sales");      // kasir masuk ke Kasir
+    }
+
   } else {
     currentRole = null;
     productsCache = [];
