@@ -1,4 +1,4 @@
-// script.js (offline-ready: queue transaksi, sync, notif, search history)
+// script.js (offline-ready: queue transaksi, sync, notif, search history + inventory rules)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -146,6 +146,11 @@ const productUnit = $("productUnit");
 const btnSaveProduct = $("btnSaveProduct");
 const productTable = $("productTable");
 
+// group wrapper form inventory (html pakai id groupPrice/Stock/MinStock)
+const groupPrice = $("groupPrice");
+const groupStock = $("groupStock");
+const groupMinStock = $("groupMinStock");
+
 // Dashboard
 const metricEmptyCount = $("metricEmptyCount");
 const metricLowCount = $("metricLowCount");
@@ -212,7 +217,6 @@ function updateConnectionStatus(showNotif = false) {
         "info",
         4000
       );
-      // coba sync kalau user sudah login
       if (currentUser) {
         syncOfflineSales();
       }
@@ -244,9 +248,16 @@ async function getUserRole(uid) {
   }
 }
 
-// Untuk sementara semua role boleh lihat dashboard
 function applyRoleUI(role) {
   currentRole = role || "kasir";
+
+  // show/hide menu admin
+  const adminEls = document.querySelectorAll(".admin-only");
+  adminEls.forEach((el) => {
+    if (currentRole === "admin") el.classList.remove("hidden");
+    else el.classList.add("hidden");
+  });
+
   if (bannerRole)
     bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
@@ -354,6 +365,32 @@ if (notifBtn && notifPanel) {
   });
 }
 
+// ================= INVENTORY FORM VISIBILITY =================
+function updateInventoryFormVisibility() {
+  const type = productType?.value || "bahan_baku";
+  if (!groupPrice || !groupStock || !groupMinStock) return;
+
+  if (type === "bahan_baku") {
+    // Bahan baku: harga disembunyikan, stok+min stok muncul
+    groupPrice.classList.add("hidden");
+    groupStock.classList.remove("hidden");
+    groupMinStock.classList.remove("hidden");
+    if (productPrice) productPrice.value = "";
+  } else {
+    // Menu: harga muncul, stok+min stok disembunyikan
+    groupPrice.classList.remove("hidden");
+    groupStock.classList.add("hidden");
+    groupMinStock.classList.add("hidden");
+    if (productStock) productStock.value = "";
+    if (productMinStock) productMinStock.value = "";
+  }
+}
+
+if (productType) {
+  productType.addEventListener("change", updateInventoryFormVisibility);
+  updateInventoryFormVisibility();
+}
+
 // ================= AUTH BTN =================
 if (btnLogin) {
   btnLogin.addEventListener("click", async () => {
@@ -441,10 +478,12 @@ function renderProductTable() {
       <td>${p.category || "-"}</td>
       <td>${p.type === "menu" ? formatCurrency(p.price || 0) : "-"}</td>
       <td>${p.type === "bahan_baku" ? p.stock || 0 : "-"}</td>
-      <td>${st.label}</td>
       <td>
-        <button data-act="edit" data-id="${p.id}">Edit</button>
-        <button data-act="del" data-id="${p.id}">Hapus</button>
+        <span class="status-badge ${st.cls}">${st.label}</span>
+      </td>
+      <td class="table-actions">
+        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>
+        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>
       </td>
     `;
     productTable.appendChild(tr);
@@ -469,6 +508,8 @@ function fillProductForm(id) {
   if (productStock) productStock.value = p.stock || "";
   if (productMinStock) productMinStock.value = p.minStock || "";
   if (productUnit) productUnit.value = p.unit || "";
+
+  updateInventoryFormVisibility();
 }
 
 async function deleteProduct(id) {
@@ -553,7 +594,7 @@ function renderSaleMenu() {
     tr.innerHTML = `
       <td>${m.name || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
-      <td><button data-id="${m.id}">Tambah</button></td>
+      <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>
     `;
     saleMenuBody.appendChild(tr);
   });
@@ -592,7 +633,7 @@ function renderCart() {
       <td>${it.name}</td>
       <td>${it.qty}</td>
       <td>${formatCurrency(it.subtotal)}</td>
-      <td><button data-idx="${idx}">x</button></td>
+      <td><button class="btn-table small" data-idx="${idx}">x</button></td>
     `;
     cartBody.appendChild(tr);
   });
@@ -701,7 +742,7 @@ if (btnSaveSale) {
       };
 
       if (!navigator.onLine) {
-        // ===== OFFLINE MODE =====
+        // OFFLINE
         queueOfflineSale(saleDoc);
         showToast(
           "Transaksi disimpan di perangkat (offline). Akan disinkron saat online.",
@@ -709,7 +750,6 @@ if (btnSaveSale) {
           4000
         );
         updatePrintAreaFromSale(saleDoc);
-        // kosongkan keranjang & form
         currentCart = [];
         renderCart();
         if (saleDiscount) saleDiscount.value = 0;
@@ -719,7 +759,7 @@ if (btnSaveSale) {
         return;
       }
 
-      // ===== ONLINE MODE =====
+      // ONLINE
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
       showToast("Transaksi tersimpan", "success");
       currentCart = [];
@@ -1030,7 +1070,7 @@ function renderOpnameTable() {
       <td>${p.stock || 0} ${p.unit || ""}</td>
       <td><input type="number" data-id="${p.id}" value="${p.stock || 0}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
-      <td><button data-id="${p.id}">Simpan</button></td>
+      <td><button class="btn-table small" data-id="${p.id}">Simpan</button></td>
     `;
     opnameTable.appendChild(tr);
   });
@@ -1096,7 +1136,6 @@ onAuthStateChanged(auth, async (user) => {
     await loadProducts();
     await loadSales();
 
-    // kalau baru login & online, sync transaksi offline
     if (navigator.onLine) {
       syncOfflineSales();
     }
