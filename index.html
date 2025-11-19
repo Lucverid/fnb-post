@@ -422,6 +422,47 @@
         </div>
       </section>
 
+
+<section id="reportsSection" class="page-section hidden">
+  <h2 class="page-title">Laporan</h2>
+
+  <div class="card">
+    <div class="field">
+      <label for="reportType">Jenis Laporan</label>
+      <select id="reportType">
+        <option value="sales_day">Penjualan per Hari</option>
+        <option value="sales_week">Penjualan per Minggu</option>
+        <option value="sales_month">Penjualan per Bulan</option>
+        <option value="sales_year">Penjualan per Tahun</option>
+        <option value="opname_week">Stok Opname per Minggu</option>
+      </select>
+    </div>
+
+    <div class="field two-col">
+      <div>
+        <label for="reportStart">Tanggal Mulai</label>
+        <input type="date" id="reportStart">
+      </div>
+      <div>
+        <label for="reportEnd">Tanggal Sampai</label>
+        <input type="date" id="reportEnd">
+      </div>
+    </div>
+
+    <div class="field">
+      <button id="btnReportGenerate" class="btn-primary">Generate</button>
+      <button id="btnReportDownload" class="btn-outline">Download CSV</button>
+    </div>
+  </div>
+
+  <div class="card table-wrapper">
+    <table class="table" id="reportTable">
+      <thead id="reportTableHead"></thead>
+      <tbody id="reportTableBody"></tbody>
+    </table>
+  </div>
+</section>
+
     </main>
   </div>
 
