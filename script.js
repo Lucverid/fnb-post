@@ -1,5 +1,4 @@
 
-​Ini full script.js yang sudah aku gabungkan semuanya + pemisah ribuan di Inventory, Opname, BOM, dan Laporan Opname:
 
 // script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
