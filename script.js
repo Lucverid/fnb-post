@@ -157,11 +157,18 @@ const groupMinStock = $("groupMinStock");
 const recipeName = $("recipeName");
 const recipeCategory = $("recipeCategory");
 const recipePrice = $("recipePrice");
+const recipeDesc = $("recipeDesc");        // <== DESKRIPSI MENU
 const bomList = $("bomList");
 const btnAddBomRow = $("btnAddBomRow");
 const btnSaveRecipe = $("btnSaveRecipe");
 const recipeTable = $("recipeTable");
 const recipeSearch = $("recipeSearch");
+
+// Modal BOM
+const bomModal = $("bomModal");
+const bomModalTitle = $("bomModalTitle");
+const bomModalBody = $("bomModalBody");
+const bomModalClose = $("bomModalClose");
 
 // Dashboard
 const metricEmptyCount = $("metricEmptyCount");
@@ -671,6 +678,60 @@ if (btnAddBomRow) {
   btnAddBomRow.addEventListener("click", () => addBomRow());
 }
 
+function openBomModal(menuId) {
+  if (!bomModal || !bomModalBody || !bomModalTitle) return;
+  const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
+  if (!m) return;
+
+  bomModalTitle.textContent = `BOM: ${m.name || "-"}`;
+
+  const descHtml =
+    m.desc && String(m.desc).trim()
+      ? `
+      <div class="modal-section">
+        <div class="modal-sec-title">Deskripsi</div>
+        <p>${m.desc}</p>
+      </div>`
+      : "";
+
+  let bomHtml = "";
+  if (Array.isArray(m.bom) && m.bom.length) {
+    bomHtml = `
+      <div class="modal-section">
+        <div class="modal-sec-title">Bahan per 1 porsi</div>
+        <ul class="modal-bom-list">
+          ${m.bom
+            .map(
+              (b) =>
+                `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`
+            )
+            .join("")}
+        </ul>
+      </div>`;
+  } else {
+    bomHtml = `<p class="modal-empty">Belum ada BOM untuk menu ini.</p>`;
+  }
+
+  bomModalBody.innerHTML = descHtml + bomHtml;
+  bomModal.classList.remove("hidden");
+}
+
+// close modal (icon X + klik backdrop)
+if (bomModalClose && bomModal) {
+  bomModalClose.addEventListener("click", () => {
+    bomModal.classList.add("hidden");
+  });
+  const backdrop = bomModal.querySelector(".modal-backdrop");
+  if (backdrop) {
+    backdrop.addEventListener("click", () => {
+      bomModal.classList.add("hidden");
+    });
+  }
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") bomModal.classList.add("hidden");
+  });
+}
+
 function renderRecipeTable() {
   if (!recipeTable) return;
   recipeTable.innerHTML = "";
@@ -694,22 +755,16 @@ function renderRecipeTable() {
   }
 
   menus.forEach((m) => {
-    const bomText =
-      (m.bom || [])
-        .map(
-          (b) =>
-            `${b.materialName || "?"} ${b.qty}${
-              b.unit ? " " + b.unit : ""
-            }`
-        )
-        .join("<br>") || "-";
-
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${m.name || "-"}</td>
       <td>${m.category || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
-      <td>${bomText}</td>
+      <td class="bom-eye-cell">
+        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
+          <i class="lucide-eye"></i>
+        </button>
+      </td>
       <td class="table-actions">
         <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
         <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
@@ -723,6 +778,7 @@ function renderRecipeTable() {
     const act = btn.getAttribute("data-act");
     if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
     if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
+    if (act === "view-bom") btn.addEventListener("click", () => openBomModal(id));
   });
 }
 
@@ -737,6 +793,7 @@ function fillRecipeForm(id) {
   if (recipeName) recipeName.value = m.name || "";
   if (recipeCategory) recipeCategory.value = m.category || "makanan";
   if (recipePrice) recipePrice.value = m.price || 0;
+  if (recipeDesc) recipeDesc.value = m.desc || "";
 
   if (bomList) {
     bomList.innerHTML = "";
@@ -764,6 +821,7 @@ if (btnSaveRecipe) {
       const name = (recipeName?.value || "").trim();
       const category = recipeCategory?.value || "lainnya";
       const price = Number(recipePrice?.value || 0);
+      const desc = (recipeDesc?.value || "").trim();
 
       if (!name) {
         showToast("Nama menu wajib diisi", "error");
@@ -797,6 +855,7 @@ if (btnSaveRecipe) {
         type: "menu",
         category,
         price,
+        desc,
         bom,
         stock: 0,
         minStock: 0,
@@ -817,6 +876,7 @@ if (btnSaveRecipe) {
       editingRecipeId = null;
       if (recipeName) recipeName.value = "";
       if (recipePrice) recipePrice.value = "";
+      if (recipeDesc) recipeDesc.value = "";
       if (bomList) bomList.innerHTML = "";
 
       await loadProducts();
