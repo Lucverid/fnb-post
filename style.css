@@ -683,6 +683,64 @@ td {
   grid-column: 1 / -1;
 }
 
+/* --------------------------------------------------
+   BOM / RESEP MENU (Inventory)
+-------------------------------------------------- */
+
+.bom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* 3 kolom: Nama Bahan (select), Qty, tombol X */
+.bom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.bom-row select,
+.bom-row input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f9fafb;
+  font-size: 13px;
+}
+
+.bom-row select:focus,
+.bom-row input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px rgba(79,70,229,0.35);
+  background: #ffffff;
+}
+
+/* tombol hapus bahan di baris BOM */
+.bom-remove-btn {
+  border-radius: 999px;
+  border: 1px solid var(--danger);
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.bom-remove-btn:hover {
+  background: #fecaca;
+}
+
+/* di layar kecil, BOM satu kolom turun ke bawah */
+@media (max-width: 480px) {
+  .bom-row {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* --------------------------------------------------
    STATUS BADGE INVENTORY
