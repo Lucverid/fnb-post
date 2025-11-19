@@ -97,7 +97,6 @@
             <i class="lucide-box"></i> <span>Inventory</span>
           </button>
 
-          <!-- 🔥 Resep -->
           <button class="side-item admin-only" data-section="recipe">
             <i class="lucide-utensils"></i> <span>Resep</span>
           </button>
@@ -110,7 +109,6 @@
             <i class="lucide-clipboard-list"></i> <span>Opname</span>
           </button>
 
-          <!-- 🧾 LAPORAN -->
           <button class="side-item admin-only" data-section="reports">
             <i class="lucide-file-text"></i> <span>Laporan</span>
           </button>
@@ -161,16 +159,17 @@
             <div class="cart-box">
               <h3>Daftar Pesanan</h3>
 
+              <!-- scroll khusus cart items -->
               <div class="cart-items-wrapper">
-  <table>
-    <thead>
-      <tr>
-        <th>Item</th><th>Qty</th><th>Subtotal</th><th></th>
-      </tr>
-    </thead>
-    <tbody id="cartBody"></tbody>
-  </table>
-</div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th><th>Qty</th><th>Subtotal</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="cartBody"></tbody>
+                </table>
+              </div>
 
               <div class="cart-summary">
                 <div>Subtotal: <span id="cartSubtotal">Rp 0</span></div>
@@ -287,6 +286,12 @@
           <div>
             <label>Harga Jual</label>
             <input id="recipePrice" type="number">
+          </div>
+
+          <!-- Deskripsi menu -->
+          <div class="full">
+            <label>Deskripsi Menu</label>
+            <textarea id="recipeDesc" class="textarea"></textarea>
           </div>
 
           <div class="full">
@@ -442,7 +447,6 @@
             </div>
           </div>
 
-          <!-- tombol dibuat flex lewat class 'actions' -->
           <div class="field actions">
             <button id="btnReportGenerate" class="btn-primary">Generate</button>
             <button id="btnReportDownload" class="btn-outline">Download CSV</button>
@@ -456,6 +460,18 @@
           </table>
         </div>
       </section>
+
+      <!-- MODAL DETAIL BOM -->
+      <div id="bomModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3 id="bomModalTitle">Detail BOM</h3>
+            <button id="bomModalClose" class="btn-icon-close">&times;</button>
+          </div>
+          <div id="bomModalBody" class="modal-body"></div>
+        </div>
+      </div>
 
     </main>
   </div>
