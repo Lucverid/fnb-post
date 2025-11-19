@@ -369,6 +369,12 @@ document.querySelectorAll(".side-item").forEach((btn) => {
     const section = btn.dataset.section;
     if (!section) return;
 
+    // pindah kelas "active"
+    document.querySelectorAll(".side-item").forEach((b) => {
+      b.classList.remove("active");
+    });
+    btn.classList.add("active");
+
     // kalau buka opname dari sidebar → reset filter status
     if (section === "opname") {
       opnameStatusFilter = null;
@@ -383,7 +389,6 @@ document.querySelectorAll(".side-item").forEach((btn) => {
     }
   });
 });
-
 // burger
 if (burgerBtn && sidebar) {
   burgerBtn.addEventListener("click", (e) => {
