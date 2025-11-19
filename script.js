@@ -1,4 +1,4 @@
-// script.js (versi stabil + filter dashboard + menu terlaris + riwayat)
+// script.js (versi stabil + filter dashboard + menu terlaris + riwayat + search)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -136,6 +136,7 @@ const btnFilterApply = $("btnFilterApply");
 const btnFilterReset = $("btnFilterReset");
 const topMenuTable = $("topMenuTable");
 const historyTable = $("historyTable");
+const historySearch = $("historySearch");
 
 // Opname
 const opnameTable = $("opnameTable");
@@ -373,10 +374,6 @@ async function loadProducts() {
     updateStockMetrics();
     updateStockNotif();
     renderOpnameTable();
-
-    if (!productsCache.length) {
-      console.log("Belum ada produk di Firestore.");
-    }
   } catch (err) {
     console.error("loadProducts error:", err);
     showToast("Gagal mengambil data produk", "error");
@@ -689,6 +686,7 @@ async function loadSales() {
         dateKey: data.dateKey || todayKey(createdDate),
       });
     });
+    // penting: semua pakai fungsi yang sama supaya sinkron
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
@@ -725,7 +723,7 @@ function updateCharts() {
     return;
   }
 
-  const src = getFilteredSales(); // gunakan data terfilter
+  const src = getFilteredSales();
   const today = new Date();
 
   // ---- Harian (7 hari) ----
@@ -786,7 +784,7 @@ function updateCharts() {
   });
 }
 
-// 👉 Menu terlaris (berdasarkan filter)
+// 👉 Menu terlaris (5–10 besar) sesuai filter tanggal
 function updateTopMenu() {
   if (!topMenuTable) return;
 
@@ -804,7 +802,7 @@ function updateTopMenu() {
 
   const rows = Object.entries(agg)
     .sort((a, b) => b[1].qty - a[1].qty)
-    .slice(0, 5); // top 5
+    .slice(0, 10);
 
   topMenuTable.innerHTML = "";
   if (!rows.length) {
@@ -826,14 +824,31 @@ function updateTopMenu() {
   });
 }
 
-// 👉 Riwayat penjualan (semua transaksi sesuai filter)
+// 👉 Riwayat penjualan (semua transaksi sesuai filter + search)
 function updateHistoryTable() {
   if (!historyTable) return;
 
   const src = getFilteredSales();
   historyTable.innerHTML = "";
 
-  if (!src.length) {
+  const keyword = (historySearch?.value || "").trim().toLowerCase();
+
+  // filter lagi pakai keyword (tanggal / item)
+  let list = [...src];
+  if (keyword) {
+    list = list.filter((s) => {
+      const d = s.createdAtDate || new Date();
+      const timeStr = formatDateTime(d).toLowerCase();
+      const itemsStr = (s.items || [])
+        .map((it) => `${it.name} x${it.qty}`)
+        .join(", ")
+        .toLowerCase();
+
+      return timeStr.includes(keyword) || itemsStr.includes(keyword);
+    });
+  }
+
+  if (!list.length) {
     const tr = document.createElement("tr");
     tr.innerHTML =
       '<td colspan="3">Belum ada transaksi pada periode ini.</td>';
@@ -841,7 +856,7 @@ function updateHistoryTable() {
     return;
   }
 
-  src
+  list
     .sort((a, b) => b.createdAtDate - a.createdAtDate)
     .forEach((s) => {
       const d = s.createdAtDate || new Date();
@@ -860,7 +875,7 @@ function updateHistoryTable() {
     });
 }
 
-// event filter
+// event filter tanggal
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
@@ -888,6 +903,13 @@ if (filterEnd) {
   filterEnd.addEventListener("change", () => {
     updateCharts();
     updateTopMenu();
+    updateHistoryTable();
+  });
+}
+
+// event search riwayat
+if (historySearch) {
+  historySearch.addEventListener("input", () => {
     updateHistoryTable();
   });
 }
@@ -997,4 +1019,3 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = "–";
   }
 });
-```0
