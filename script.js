@@ -1065,7 +1065,9 @@ function updateStockMetrics() {
 function renderOpnameTable() {
   if (!opnameTable) return;
   opnameTable.innerHTML = "";
+
   const bahan = productsCache.filter((p) => p.type === "bahan_baku");
+
   bahan.forEach((p) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -1073,11 +1075,14 @@ function renderOpnameTable() {
       <td>${p.stock || 0} ${p.unit || ""}</td>
       <td><input type="number" data-id="${p.id}" value="${p.stock || 0}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
-      <td><button class="btn-table small" data-id="${p.id}">Simpan</button></td>
+      <td class="table-actions">
+        <button class="btn-table btn-table-delete small" data-id="${p.id}">Simpan</button>
+      </td>
     `;
     opnameTable.appendChild(tr);
   });
 
+  // hitung selisih pas input diubah
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
     const prod = productsCache.find((p) => p.id === id);
@@ -1089,6 +1094,7 @@ function renderOpnameTable() {
     });
   });
 
+  // tombol Simpan
   opnameTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     btn.addEventListener("click", () => saveOpnameRow(id));
