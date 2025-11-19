@@ -1,5 +1,5 @@
-// script.js
-// ========== IMPORT FIREBASE ==========
+// script.js (versi stabil)
+// ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
   getAuth,
@@ -22,7 +22,6 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// ========== FIREBASE CONFIG ==========
 const firebaseConfig = {
   apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
   authDomain: "app-387dc.firebaseapp.com",
@@ -37,10 +36,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ========== DOM HELPER ==========
+// ================= UTIL & DOM =================
 const $ = (id) => document.getElementById(id);
 
-// Toast sederhana
 const toastContainer = $("toast-container");
 function showToast(msg, type = "info", time = 3000) {
   if (!toastContainer) return;
@@ -51,7 +49,24 @@ function showToast(msg, type = "info", time = 3000) {
   setTimeout(() => div.remove(), time);
 }
 
-// ========== ELEMENTS DASAR ==========
+function formatCurrency(num) {
+  const n = Number(num || 0);
+  return "Rp " + n.toLocaleString("id-ID");
+}
+function todayKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function formatDateTime(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+// ================= ELEMENTS =================
 const authCard = $("auth-card");
 const appShell = $("app-shell");
 
@@ -81,7 +96,7 @@ const notifPanel = $("notifPanel");
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
-// ========== ELEMENTS POS (KASIR) ==========
+// POS
 const saleSearch = $("saleSearch");
 const saleMenuBody = $("saleMenuBody");
 const cartBody = $("cartBody");
@@ -94,7 +109,7 @@ const saleChange = $("saleChange");
 const btnSaveSale = $("btnSaveSale");
 const printArea = $("printArea");
 
-// ========== ELEMENTS INVENTORY ==========
+// Inventory
 const productName = $("productName");
 const productType = $("productType");
 const productCategory = $("productCategory");
@@ -105,7 +120,7 @@ const productUnit = $("productUnit");
 const btnSaveProduct = $("btnSaveProduct");
 const productTable = $("productTable");
 
-// ========== ELEMENTS DASHBOARD ==========
+// Dashboard
 const metricEmptyCount = $("metricEmptyCount");
 const metricLowCount = $("metricLowCount");
 const metricOkCount = $("metricOkCount");
@@ -114,57 +129,24 @@ const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
 let monthlyChart = null;
 
-// ========== ELEMENTS OPNAME ==========
+// Opname
 const opnameTable = $("opnameTable");
 
-// ========== COLLECTION ==========
+// ================= FIRESTORE COLLECTION =================
 const colUsers = collection(db, "users");
 const colProducts = collection(db, "products");
 const colSales = collection(db, "sales");
-const colRecipes = collection(db, "recipes");
 const colOpname = collection(db, "stock_opname");
 
-// ========== STATE ==========
+// ================= STATE =================
 let currentUser = null;
 let currentRole = null;
-
 let productsCache = [];
 let salesCache = [];
-let recipesCache = [];
 let currentCart = [];
 let editingProductId = null;
 
-// ========== UTIL ==========
-function formatCurrency(num) {
-  const n = Number(num || 0);
-  return "Rp " + n.toLocaleString("id-ID");
-}
-
-function todayKey(dateObj = new Date()) {
-  const d = dateObj;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatDateTime(d) {
-  const pad = (n) => String(n).padStart(2, "0");
-  const t = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-  const jam = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  return `${t} ${jam}`;
-}
-
-function productStatus(prod) {
-  if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
-  const stock = Number(prod.stock || 0);
-  const min = Number(prod.minStock || 0);
-  if (stock <= 0) return { label: "Habis", cls: "red" };
-  if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
-  return { label: "Aman", cls: "green" };
-}
-
-// ========== CONNECTION LABEL ==========
+// ================= CONNECTION LABEL =================
 function updateConnectionStatus() {
   if (!connectionStatus) return;
   if (navigator.onLine) {
@@ -181,40 +163,37 @@ updateConnectionStatus();
 window.addEventListener("online", updateConnectionStatus);
 window.addEventListener("offline", updateConnectionStatus);
 
-// ========== ROLE HANDLER ==========
+// ================= ROLE =================
 async function getUserRole(uid) {
   try {
     const qRole = query(colUsers, where("uid", "==", uid));
     const snap = await getDocs(qRole);
     if (snap.empty) return null;
-    let role = null;
+    let role;
     snap.forEach((d) => {
       const data = d.data();
       if (data.role) role = data.role;
     });
-    return role;
-  } catch (err) {
-    console.error("getUserRole error:", err);
-    return null;
+    return role || "kasir";
+  } catch (e) {
+    console.error("getUserRole", e);
+    return "kasir";
   }
 }
 
 function applyRoleUI(role) {
   currentRole = role || "kasir";
   const adminOnly = document.querySelectorAll(".admin-only");
-  if (currentRole === "admin") {
-    adminOnly.forEach((el) => el.classList.remove("hidden"));
-  } else {
-    adminOnly.forEach((el) => el.classList.add("hidden"));
-  }
-
-  if (bannerRole) {
-    bannerRole.textContent =
-      currentRole === "admin" ? "Administrator" : "Kasir";
-  }
+  adminOnly.forEach((el) =>
+    currentRole === "admin"
+      ? el.classList.remove("hidden")
+      : el.classList.add("hidden")
+  );
+  if (bannerRole)
+    bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
 
-// ========== NAVIGATION ==========
+// ================= NAV =================
 function showSection(name) {
   [salesSection, inventorySection, dashboardSection, opnameSection].forEach(
     (sec) => sec && sec.classList.add("hidden")
@@ -227,35 +206,28 @@ function showSection(name) {
   if (name === "opname" && opnameSection)
     opnameSection.classList.remove("hidden");
 
-  const sideItems = document.querySelectorAll(".side-item");
-  sideItems.forEach((btn) => {
-    const target = btn.dataset.section;
-    if (target === name) btn.classList.add("active");
-    else btn.classList.remove("active");
+  document.querySelectorAll(".side-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.section === name);
   });
 
-  // Tutup sidebar di mobile
   if (window.innerWidth <= 900 && sidebar) {
     sidebar.classList.remove("open");
   }
 }
 
-// Sidebar buttons
 document.querySelectorAll(".side-item").forEach((btn) => {
   btn.addEventListener("click", () => {
-    const target = btn.dataset.section;
-    if (target) showSection(target);
+    if (btn.dataset.section) showSection(btn.dataset.section);
   });
 });
 
-// Burger (slide-in sidebar di mobile)
+// burger
 if (burgerBtn && sidebar) {
   burgerBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     sidebar.classList.toggle("open");
   });
 
-  // klik luar menutup sidebar
   document.addEventListener("click", (e) => {
     if (
       window.innerWidth <= 900 &&
@@ -268,7 +240,16 @@ if (burgerBtn && sidebar) {
   });
 }
 
-// ========== NOTIFIKASI DARI STOK ==========
+// ================= NOTIF STOK =================
+function productStatus(prod) {
+  if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
+  const stock = Number(prod.stock || 0);
+  const min = Number(prod.minStock || 0);
+  if (stock <= 0) return { label: "Habis", cls: "red" };
+  if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
+  return { label: "Aman", cls: "green" };
+}
+
 function updateStockNotif() {
   if (!notifList || !notifBadge) return;
 
@@ -288,7 +269,6 @@ function updateStockNotif() {
     notifList.appendChild(li);
     count++;
   });
-
   lowItems.forEach((p) => {
     const li = document.createElement("li");
     li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""})`;
@@ -301,11 +281,9 @@ function updateStockNotif() {
     li.textContent = "Tidak ada notifikasi stok.";
     notifList.appendChild(li);
   }
-
   notifBadge.textContent = String(count);
 }
 
-// panel notif buka / tutup
 if (notifBtn && notifPanel) {
   notifBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -318,9 +296,7 @@ if (notifBtn && notifPanel) {
   });
 }
 
-// ========== AUTH HANDLERS ==========
-
-// Login
+// ================= AUTH BTN =================
 if (btnLogin) {
   btnLogin.addEventListener("click", async () => {
     try {
@@ -339,7 +315,6 @@ if (btnLogin) {
   });
 }
 
-// Register
 if (btnRegister) {
   btnRegister.addEventListener("click", async () => {
     try {
@@ -367,7 +342,6 @@ if (btnRegister) {
   });
 }
 
-// Logout
 if (btnLogout) {
   btnLogout.addEventListener("click", async () => {
     try {
@@ -379,20 +353,22 @@ if (btnLogout) {
   });
 }
 
-// ========== LOAD DATA PRODUCTS ==========
+// ================= LOAD PRODUCTS =================
 async function loadProducts() {
   try {
     const snap = await getDocs(query(colProducts, orderBy("name", "asc")));
     productsCache = [];
-    snap.forEach((d) => {
-      productsCache.push({ id: d.id, ...d.data() });
-    });
+    snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
 
     renderProductTable();
     renderSaleMenu();
     updateStockMetrics();
     updateStockNotif();
     renderOpnameTable();
+
+    if (!productsCache.length) {
+      console.log("Belum ada produk di Firestore.");
+    }
   } catch (err) {
     console.error("loadProducts error:", err);
     showToast("Gagal mengambil data produk", "error");
@@ -402,20 +378,16 @@ async function loadProducts() {
 function renderProductTable() {
   if (!productTable) return;
   productTable.innerHTML = "";
-
   productsCache.forEach((p) => {
+    const st = productStatus(p);
     const tr = document.createElement("tr");
-    const status = productStatus(p);
-    const hargaStr = p.type === "menu" ? formatCurrency(p.price || 0) : "-";
-    const stokStr = p.type === "bahan_baku" ? (p.stock || 0) : "-";
-
     tr.innerHTML = `
       <td>${p.name || "-"}</td>
       <td>${p.type === "menu" ? "Menu" : "Bahan Baku"}</td>
       <td>${p.category || "-"}</td>
-      <td>${hargaStr}</td>
-      <td>${stokStr}</td>
-      <td>${status.label}</td>
+      <td>${p.type === "menu" ? formatCurrency(p.price || 0) : "-"}</td>
+      <td>${p.type === "bahan_baku" ? p.stock || 0 : "-"}</td>
+      <td>${st.label}</td>
       <td>
         <button data-act="edit" data-id="${p.id}">Edit</button>
         <button data-act="del" data-id="${p.id}">Hapus</button>
@@ -427,18 +399,15 @@ function renderProductTable() {
   productTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-act");
-    if (act === "edit") {
-      btn.addEventListener("click", () => fillProductForm(id));
-    } else if (act === "del") {
-      btn.addEventListener("click", () => deleteProduct(id));
-    }
+    if (act === "edit") btn.addEventListener("click", () => fillProductForm(id));
+    if (act === "del") btn.addEventListener("click", () => deleteProduct(id));
   });
 }
 
 function fillProductForm(id) {
   const p = productsCache.find((x) => x.id === id);
   if (!p) return;
-  editingProductId = p.id;
+  editingProductId = id;
   if (productName) productName.value = p.name || "";
   if (productType) productType.value = p.type || "bahan_baku";
   if (productCategory) productCategory.value = p.category || "makanan";
@@ -451,13 +420,13 @@ function fillProductForm(id) {
 async function deleteProduct(id) {
   const p = productsCache.find((x) => x.id === id);
   if (!p) return;
-  if (!confirm(`Hapus item "${p.name}" ?`)) return;
+  if (!confirm(`Hapus "${p.name}"?`)) return;
   try {
     await deleteDoc(doc(db, "products", id));
     showToast("Produk dihapus", "success");
     await loadProducts();
-  } catch (err) {
-    console.error(err);
+  } catch (e) {
+    console.error(e);
     showToast("Gagal menghapus produk", "error");
   }
 }
@@ -503,14 +472,12 @@ if (btnSaveProduct) {
         });
         showToast("Produk ditambahkan", "success");
       }
-
       editingProductId = null;
       if (productName) productName.value = "";
       if (productPrice) productPrice.value = "";
       if (productStock) productStock.value = "";
       if (productMinStock) productMinStock.value = "";
       if (productUnit) productUnit.value = "";
-
       await loadProducts();
     } catch (err) {
       console.error(err);
@@ -519,16 +486,13 @@ if (btnSaveProduct) {
   });
 }
 
-// ========== POS (KASIR) ==========
+// ================= POS =================
 function renderSaleMenu() {
   if (!saleMenuBody) return;
   saleMenuBody.innerHTML = "";
-
   let list = productsCache.filter((p) => p.type === "menu");
   const q = (saleSearch?.value || "").trim().toLowerCase();
-  if (q) {
-    list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
-  }
+  if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
 
   list.forEach((m) => {
     const tr = document.createElement("tr");
@@ -540,20 +504,17 @@ function renderSaleMenu() {
     saleMenuBody.appendChild(tr);
   });
 
-  saleMenuBody.querySelectorAll("button").forEach((btn) => {
-    const id = btn.getAttribute("data-id");
-    btn.addEventListener("click", () => addToCart(id));
+  saleMenuBody.querySelectorAll("button").forEach((b) => {
+    const id = b.getAttribute("data-id");
+    b.addEventListener("click", () => addToCart(id));
   });
 }
-
-if (saleSearch) {
-  saleSearch.addEventListener("input", renderSaleMenu);
-}
+if (saleSearch) saleSearch.addEventListener("input", renderSaleMenu);
 
 function addToCart(productId) {
   const menu = productsCache.find((p) => p.id === productId);
   if (!menu) return;
-  const existing = currentCart.find((it) => it.productId === productId);
+  const existing = currentCart.find((i) => i.productId === productId);
   if (existing) {
     existing.qty += 1;
     existing.subtotal += menu.price || 0;
@@ -567,9 +528,7 @@ function addToCart(productId) {
     });
   }
   renderCart();
-  showToast("Item ditambahkan ke keranjang", "success");
 }
-
 function renderCart() {
   if (!cartBody) return;
   cartBody.innerHTML = "";
@@ -583,7 +542,6 @@ function renderCart() {
     `;
     cartBody.appendChild(tr);
   });
-
   cartBody.querySelectorAll("button").forEach((btn) => {
     const idx = Number(btn.getAttribute("data-idx"));
     btn.addEventListener("click", () => {
@@ -591,34 +549,24 @@ function renderCart() {
       renderCart();
     });
   });
-
   updateCartSummary();
 }
-
 function updateCartSummary() {
   const subtotal = currentCart.reduce(
     (sum, it) => sum + Number(it.subtotal || 0),
     0
   );
   if (cartSubtotalLabel) cartSubtotalLabel.textContent = formatCurrency(subtotal);
-
   const discPct = Number(saleDiscount?.value || 0);
   const voucher = Number(saleVoucher?.value || 0);
-
-  let discAmount = 0;
-  if (discPct > 0) {
-    discAmount = subtotal * (discPct / 100);
-  }
+  let discAmount = discPct > 0 ? subtotal * (discPct / 100) : 0;
   let total = subtotal - discAmount - voucher;
   if (total < 0) total = 0;
-
-  if (saleTotal) saleTotal.value = total || 0;
-
+  if (saleTotal) saleTotal.value = total;
   const pay = Number(salePay?.value || 0);
   const change = pay > total ? pay - total : 0;
   if (saleChange) saleChange.value = change;
 }
-
 [saleDiscount, saleVoucher, salePay].forEach((el) => {
   if (el) el.addEventListener("input", updateCartSummary);
 });
@@ -628,7 +576,6 @@ function updatePrintAreaFromSale(saleDoc) {
   const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
   const waktu = formatDateTime(d);
   const kasir = saleDoc.createdBy || "-";
-
   const itemsHtml = (saleDoc.items || [])
     .map(
       (it) => `
@@ -638,37 +585,16 @@ function updatePrintAreaFromSale(saleDoc) {
       </div>`
     )
     .join("");
-
   printArea.innerHTML = `
     <div style="text-align:center;font-weight:700;margin-bottom:4px;">F&B POS</div>
     <div style="font-size:11px;margin-bottom:6px;">
-      ${waktu}<br/>
-      Kasir: ${kasir}
+      ${waktu}<br/>Kasir: ${kasir}
     </div>
     <hr/>
     ${itemsHtml || '<div style="font-size:11px;">(Tidak ada item)</div>'}
     <hr/>
     <div style="font-size:11px;">
       <div style="display:flex;justify-content:space-between;">
-        <span>Subtotal</span><span>${formatCurrency(saleDoc.subtotal)}</span>
-      </div>
-      ${
-        saleDoc.discountPercent
-          ? `<div style="display:flex;justify-content:space-between;">
-               <span>Diskon (${saleDoc.discountPercent}%)</span>
-               <span>- ${formatCurrency(saleDoc.discountAmount)}</span>
-             </div>`
-          : ""
-      }
-      ${
-        saleDoc.voucher
-          ? `<div style="display:flex;justify-content:space-between;">
-               <span>Voucher</span>
-               <span>- ${formatCurrency(saleDoc.voucher)}</span>
-             </div>`
-          : ""
-      }
-      <div style="display:flex;justify-content:space-between;font-weight:700;">
         <span>Total</span><span>${formatCurrency(saleDoc.total)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;">
@@ -677,8 +603,7 @@ function updatePrintAreaFromSale(saleDoc) {
       <div style="display:flex;justify-content:space-between;">
         <span>Kembalian</span><span>${formatCurrency(saleDoc.change)}</span>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 if (btnSaveSale) {
@@ -694,13 +619,10 @@ if (btnSaveSale) {
       );
       const discountPercent = Number(saleDiscount?.value || 0);
       const voucher = Number(saleVoucher?.value || 0);
-      let discountAmount = 0;
-      if (discountPercent > 0) {
-        discountAmount = subtotal * (discountPercent / 100);
-      }
+      const discountAmount =
+        discountPercent > 0 ? subtotal * (discountPercent / 100) : 0;
       let total = subtotal - discountAmount - voucher;
       if (total < 0) total = 0;
-
       const pay = Number(salePay?.value || 0);
       if (pay < total) {
         showToast("Uang bayar kurang dari total", "error");
@@ -708,15 +630,8 @@ if (btnSaveSale) {
       }
       const change = pay - total;
       const now = new Date();
-
       const saleDoc = {
-        items: currentCart.map((it) => ({
-          productId: it.productId,
-          name: it.name,
-          qty: it.qty,
-          price: it.price,
-          subtotal: it.subtotal,
-        })),
+        items: currentCart.map((it) => ({ ...it })),
         subtotal,
         discountPercent,
         discountAmount,
@@ -729,12 +644,7 @@ if (btnSaveSale) {
         createdBy: currentUser?.email || "-",
         createdByUid: currentUser?.uid || null,
       };
-
-      await addDoc(colSales, {
-        ...saleDoc,
-        createdAt: serverTimestamp(),
-      });
-
+      await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
       showToast("Transaksi tersimpan", "success");
       currentCart = [];
       renderCart();
@@ -743,16 +653,15 @@ if (btnSaveSale) {
       if (salePay) salePay.value = "";
       if (saleChange) saleChange.value = "";
       updatePrintAreaFromSale(saleDoc);
-
       await loadSales();
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
       showToast("Gagal menyimpan transaksi", "error");
     }
   });
 }
 
-// ========== SALES & DASHBOARD ==========
+// ================= SALES / CHART =================
 async function loadSales() {
   try {
     const snap = await getDocs(query(colSales, orderBy("createdAt", "desc")));
@@ -772,7 +681,6 @@ async function loadSales() {
         dateKey: data.dateKey || todayKey(createdDate),
       });
     });
-
     updateCharts();
   } catch (err) {
     console.error("loadSales error:", err);
@@ -781,26 +689,30 @@ async function loadSales() {
 }
 
 function updateCharts() {
-  if (!dailyChartCanvas || !monthlyChartCanvas) return;
+  if (
+    !dailyChartCanvas ||
+    !monthlyChartCanvas ||
+    typeof Chart === "undefined"
+  ) {
+    // kalau Chart.js belum ada, jangan bikin error
+    console.warn("Chart.js belum siap, chart dilewati");
+    return;
+  }
 
   const today = new Date();
-
-  // 7 hari terakhir
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const key = todayKey(d);
-    const label = `${d.getDate()}/${d.getMonth() + 1}`;
-    dayLabels.push(label);
+    dayLabels.push(`${d.getDate()}/${d.getMonth() + 1}`);
     const sum = salesCache
       .filter((s) => s.dateKey === key)
       .reduce((n, s) => n + Number(s.total || 0), 0);
     dayData.push(sum);
   }
 
-  // 6 bulan terakhir
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
@@ -822,46 +734,21 @@ function updateCharts() {
 
   dailyChart = new Chart(dailyChartCanvas.getContext("2d"), {
     type: "line",
-    data: {
-      labels: dayLabels,
-      datasets: [
-        {
-          label: "Omzet",
-          data: dayData,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true },
-      },
-    },
+    data: { labels: dayLabels, datasets: [{ label: "Omzet", data: dayData }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
   });
 
   monthlyChart = new Chart(monthlyChartCanvas.getContext("2d"), {
     type: "bar",
     data: {
       labels: monthLabels,
-      datasets: [
-        {
-          label: "Omzet",
-          data: monthData,
-        },
-      ],
+      datasets: [{ label: "Omzet", data: monthData }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true },
-      },
-    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
   });
 }
 
-// ========== METRIC STOK ==========
+// ================= METRIC STOK =================
 function updateStockMetrics() {
   let empty = 0,
     low = 0,
@@ -873,20 +760,17 @@ function updateStockMetrics() {
     else if (st === "Hampir habis") low++;
     else if (st === "Aman") ok++;
   });
-
   if (metricEmptyCount) metricEmptyCount.textContent = empty;
   if (metricLowCount) metricLowCount.textContent = low;
   if (metricOkCount) metricOkCount.textContent = ok;
 }
 
-// ========== OPNAME ==========
+// ================= OPNAME =================
 function renderOpnameTable() {
   if (!opnameTable) return;
   opnameTable.innerHTML = "";
-
-  const bahanList = productsCache.filter((p) => p.type === "bahan_baku");
-
-  bahanList.forEach((p) => {
+  const bahan = productsCache.filter((p) => p.type === "bahan_baku");
+  bahan.forEach((p) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.name}</td>
@@ -898,7 +782,6 @@ function renderOpnameTable() {
     opnameTable.appendChild(tr);
   });
 
-  // hitung selisih
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
     const prod = productsCache.find((p) => p.id === id);
@@ -910,7 +793,6 @@ function renderOpnameTable() {
     });
   });
 
-  // simpan
   opnameTable.querySelectorAll("button").forEach((btn) => {
     const id = btn.getAttribute("data-id");
     btn.addEventListener("click", () => saveOpnameRow(id));
@@ -926,7 +808,6 @@ async function saveOpnameRow(id) {
     const fisik = Number(inp.value || 0);
     const selisih = fisik - Number(prod.stock || 0);
     const now = new Date();
-
     await addDoc(colOpname, {
       productId: id,
       productName: prod.name,
@@ -938,7 +819,6 @@ async function saveOpnameRow(id) {
       createdAt: serverTimestamp(),
       createdBy: currentUser?.email || "-",
     });
-
     await updateDoc(doc(db, "products", id), { stock: fisik });
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
     await loadProducts();
@@ -948,34 +828,26 @@ async function saveOpnameRow(id) {
   }
 }
 
-// ========== AUTH STATE LISTENER ==========
+// ================= AUTH STATE =================
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
-
   if (user) {
-    // Sudah login
     if (authCard) authCard.classList.add("hidden");
     if (appShell) appShell.classList.remove("hidden");
 
-    const role = (await getUserRole(user.uid)) || "kasir";
+    const role = await getUserRole(user.uid);
     applyRoleUI(role);
-
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
-    // load data
     await loadProducts();
     await loadSales();
-
-    // default buka kasir
     showSection("sales");
   } else {
-    // Belum login
     currentRole = null;
     productsCache = [];
     salesCache = [];
     currentCart = [];
-
     if (authCard) authCard.classList.remove("hidden");
     if (appShell) appShell.classList.add("hidden");
     if (topbarEmail) topbarEmail.textContent = "–";
