@@ -1435,6 +1435,12 @@ function updatePrintAreaFromSale(saleDoc) {
     max-width: 150px;
   }
 }
+
+#printArea {
+  margin-top: 32px !important;
+}
+
+
 /* --------------------------------------------------
   ANIMATIONS
 -------------------------------------------------- */
