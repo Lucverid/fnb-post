@@ -585,6 +585,12 @@ td {
   padding: 14px 16px;
 }
 
+.chart-total {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
 /* --------------------------------------------------
    CART SCROLL BOX
 -------------------------------------------------- */
