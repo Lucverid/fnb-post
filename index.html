@@ -99,7 +99,7 @@
             <i class="lucide-box"></i> <span>Inventory</span>
           </button>
 
-          <!-- 🔥 BARU: menu Resep -->
+          <!-- 🔥 Resep -->
           <button class="side-item admin-only" data-section="recipe">
             <i class="lucide-utensils"></i> <span>Resep</span>
           </button>
@@ -110,6 +110,11 @@
 
           <button class="side-item admin-only" data-section="opname">
             <i class="lucide-clipboard-list"></i> <span>Opname</span>
+          </button>
+
+          <!-- 🧾 LAPORAN (BARU) -->
+          <button class="side-item admin-only" data-section="reports">
+            <i class="lucide-file-text"></i> <span>Laporan</span>
           </button>
         </div>
 
@@ -422,46 +427,46 @@
         </div>
       </section>
 
+      <!-- 🧾 LAPORAN -->
+      <section id="reportsSection" class="section hidden">
+        <h2 class="page-title">Laporan</h2>
 
-<section id="reportsSection" class="page-section hidden">
-  <h2 class="page-title">Laporan</h2>
+        <div class="card">
+          <div class="field">
+            <label for="reportType">Jenis Laporan</label>
+            <select id="reportType">
+              <option value="sales_day">Penjualan per Hari</option>
+              <option value="sales_week">Penjualan per Minggu</option>
+              <option value="sales_month">Penjualan per Bulan</option>
+              <option value="sales_year">Penjualan per Tahun</option>
+              <option value="opname_week">Stok Opname per Minggu</option>
+            </select>
+          </div>
 
-  <div class="card">
-    <div class="field">
-      <label for="reportType">Jenis Laporan</label>
-      <select id="reportType">
-        <option value="sales_day">Penjualan per Hari</option>
-        <option value="sales_week">Penjualan per Minggu</option>
-        <option value="sales_month">Penjualan per Bulan</option>
-        <option value="sales_year">Penjualan per Tahun</option>
-        <option value="opname_week">Stok Opname per Minggu</option>
-      </select>
-    </div>
+          <div class="field two-col">
+            <div>
+              <label for="reportStart">Tanggal Mulai</label>
+              <input type="date" id="reportStart">
+            </div>
+            <div>
+              <label for="reportEnd">Tanggal Sampai</label>
+              <input type="date" id="reportEnd">
+            </div>
+          </div>
 
-    <div class="field two-col">
-      <div>
-        <label for="reportStart">Tanggal Mulai</label>
-        <input type="date" id="reportStart">
-      </div>
-      <div>
-        <label for="reportEnd">Tanggal Sampai</label>
-        <input type="date" id="reportEnd">
-      </div>
-    </div>
+          <div class="field">
+            <button id="btnReportGenerate" class="btn-primary">Generate</button>
+            <button id="btnReportDownload" class="btn-outline">Download CSV</button>
+          </div>
+        </div>
 
-    <div class="field">
-      <button id="btnReportGenerate" class="btn-primary">Generate</button>
-      <button id="btnReportDownload" class="btn-outline">Download CSV</button>
-    </div>
-  </div>
-
-  <div class="card table-wrapper">
-    <table class="table" id="reportTable">
-      <thead id="reportTableHead"></thead>
-      <tbody id="reportTableBody"></tbody>
-    </table>
-  </div>
-</section>
+        <div class="card table-wrapper">
+          <table class="table" id="reportTable">
+            <thead id="reportTableHead"></thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+      </section>
 
     </main>
   </div>
