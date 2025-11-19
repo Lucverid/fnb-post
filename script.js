@@ -1,4 +1,4 @@
-// script.js (versi stabil)
+// script.js (versi stabil + filter dashboard + menu terlaris)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -128,6 +128,13 @@ const dailyChartCanvas = $("dailyChart");
 const monthlyChartCanvas = $("monthlyChart");
 let dailyChart = null;
 let monthlyChart = null;
+
+// 🔍 filter tanggal + menu terlaris
+const filterStart = $("filterStart");
+const filterEnd = $("filterEnd");
+const btnFilterApply = $("btnFilterApply");
+const btnFilterReset = $("btnFilterReset");
+const topMenuTable = $("topMenuTable");
 
 // Opname
 const opnameTable = $("opnameTable");
@@ -682,10 +689,28 @@ async function loadSales() {
       });
     });
     updateCharts();
+    updateTopMenu();
   } catch (err) {
     console.error("loadSales error:", err);
     showToast("Gagal mengambil data penjualan", "error");
   }
+}
+
+// 👉 ambil penjualan sesuai filter tanggal
+function getFilteredSales() {
+  if (!salesCache.length) return [];
+  let list = [...salesCache];
+
+  if (filterStart?.value) {
+    const sDate = new Date(filterStart.value + "T00:00:00");
+    list = list.filter((s) => s.createdAtDate >= sDate);
+  }
+  if (filterEnd?.value) {
+    const eDate = new Date(filterEnd.value + "T23:59:59");
+    list = list.filter((s) => s.createdAtDate <= eDate);
+  }
+
+  return list;
 }
 
 function updateCharts() {
@@ -694,12 +719,14 @@ function updateCharts() {
     !monthlyChartCanvas ||
     typeof Chart === "undefined"
   ) {
-    // kalau Chart.js belum ada, jangan bikin error
     console.warn("Chart.js belum siap, chart dilewati");
     return;
   }
 
+  const src = getFilteredSales(); // gunakan data terfilter
   const today = new Date();
+
+  // ---- Harian (7 hari) ----
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
@@ -707,12 +734,13 @@ function updateCharts() {
     d.setDate(d.getDate() - i);
     const key = todayKey(d);
     dayLabels.push(`${d.getDate()}/${d.getMonth() + 1}`);
-    const sum = salesCache
+    const sum = src
       .filter((s) => s.dateKey === key)
       .reduce((n, s) => n + Number(s.total || 0), 0);
     dayData.push(sum);
   }
 
+  // ---- Bulanan (6 bulan) ----
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
@@ -723,7 +751,7 @@ function updateCharts() {
         month: "short",
       })
     );
-    const sum = salesCache
+    const sum = src
       .filter((s) => (s.dateKey || "").startsWith(ym))
       .reduce((n, s) => n + Number(s.total || 0), 0);
     monthData.push(sum);
@@ -735,7 +763,11 @@ function updateCharts() {
   dailyChart = new Chart(dailyChartCanvas.getContext("2d"), {
     type: "line",
     data: { labels: dayLabels, datasets: [{ label: "Omzet", data: dayData }] },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+    },
   });
 
   monthlyChart = new Chart(monthlyChartCanvas.getContext("2d"), {
@@ -744,7 +776,79 @@ function updateCharts() {
       labels: monthLabels,
       datasets: [{ label: "Omzet", data: monthData }],
     },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+// 👉 Menu terlaris (berdasarkan filter)
+function updateTopMenu() {
+  if (!topMenuTable) return;
+
+  const src = getFilteredSales();
+  const agg = {};
+
+  src.forEach((s) => {
+    (s.items || []).forEach((it) => {
+      const key = it.name || "Tanpa Nama";
+      if (!agg[key]) agg[key] = { qty: 0, total: 0 };
+      agg[key].qty += Number(it.qty || 0);
+      agg[key].total += Number(it.subtotal || 0);
+    });
+  });
+
+  const rows = Object.entries(agg)
+    .sort((a, b) => b[1].qty - a[1].qty)
+    .slice(0, 10);
+
+  topMenuTable.innerHTML = "";
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td colspan="3">Belum ada data penjualan untuk periode ini.</td>';
+    topMenuTable.appendChild(tr);
+    return;
+  }
+
+  rows.forEach(([name, data]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${name}</td>
+      <td>${data.qty}</td>
+      <td>${formatCurrency(data.total)}</td>
+    `;
+    topMenuTable.appendChild(tr);
+  });
+}
+
+// event filter
+if (btnFilterApply) {
+  btnFilterApply.addEventListener("click", () => {
+    updateCharts();
+    updateTopMenu();
+  });
+}
+if (btnFilterReset) {
+  btnFilterReset.addEventListener("click", () => {
+    if (filterStart) filterStart.value = "";
+    if (filterEnd) filterEnd.value = "";
+    updateCharts();
+    updateTopMenu();
+  });
+}
+if (filterStart) {
+  filterStart.addEventListener("change", () => {
+    updateCharts();
+    updateTopMenu();
+  });
+}
+if (filterEnd) {
+  filterEnd.addEventListener("change", () => {
+    updateCharts();
+    updateTopMenu();
   });
 }
 
