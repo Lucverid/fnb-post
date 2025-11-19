@@ -190,14 +190,13 @@ async function getUserRole(uid) {
   }
 }
 
+/**
+ * Untuk sementara: jangan sembunyikan menu admin.
+ * Biar semua role tetap bisa klik Dashboard / Inventory / Opname,
+ * jadi nggak kejadian "nggak bisa buka dashboard".
+ */
 function applyRoleUI(role) {
   currentRole = role || "kasir";
-  const adminOnly = document.querySelectorAll(".admin-only");
-  adminOnly.forEach((el) =>
-    currentRole === "admin"
-      ? el.classList.remove("hidden")
-      : el.classList.add("hidden")
-  );
   if (bannerRole)
     bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
@@ -686,7 +685,6 @@ async function loadSales() {
         dateKey: data.dateKey || todayKey(createdDate),
       });
     });
-    // penting: semua pakai fungsi yang sama supaya sinkron
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
@@ -784,7 +782,7 @@ function updateCharts() {
   });
 }
 
-// 👉 Menu terlaris (5–10 besar) sesuai filter tanggal
+// 👉 Menu terlaris
 function updateTopMenu() {
   if (!topMenuTable) return;
 
@@ -824,7 +822,7 @@ function updateTopMenu() {
   });
 }
 
-// 👉 Riwayat penjualan (semua transaksi sesuai filter + search)
+// 👉 Riwayat penjualan
 function updateHistoryTable() {
   if (!historyTable) return;
 
@@ -833,7 +831,6 @@ function updateHistoryTable() {
 
   const keyword = (historySearch?.value || "").trim().toLowerCase();
 
-  // filter lagi pakai keyword (tanggal / item)
   let list = [...src];
   if (keyword) {
     list = list.filter((s) => {
@@ -843,7 +840,6 @@ function updateHistoryTable() {
         .map((it) => `${it.name} x${it.qty}`)
         .join(", ")
         .toLowerCase();
-
       return timeStr.includes(keyword) || itemsStr.includes(keyword);
     });
   }
@@ -875,7 +871,7 @@ function updateHistoryTable() {
     });
 }
 
-// event filter tanggal
+// event filter tanggal & search
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
@@ -906,8 +902,6 @@ if (filterEnd) {
     updateHistoryTable();
   });
 }
-
-// event search riwayat
 if (historySearch) {
   historySearch.addEventListener("input", () => {
     updateHistoryTable();
