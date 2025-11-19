@@ -386,21 +386,25 @@ if (burgerBtn && sidebar) {
   });
 }
 
-// ================= CLICK METRIC -> BUKA OPNAME =================
-[metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
-  if (!card) return;
-  card.style.cursor = "pointer";
-  card.addEventListener("click", () => {
-    // pindah ke halaman opname
-    showSection("opname");
+// ================= INIT KLIK METRIC (PINDAH KE OPNAME) =================
+let metricClickInited = false;
 
-    // kalau mau langsung scroll ke tabel opname
-    if (opnameSection) {
-      opnameSection.scrollIntoView({ behavior: "smooth" });
-    }
+function initMetricClickToOpname() {
+  if (metricClickInited) return;
+
+  [metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
+    if (!card) return;
+    card.style.cursor = "pointer";
+    card.addEventListener("click", () => {
+      showSection("opname");
+      if (opnameSection) {
+        opnameSection.scrollIntoView({ behavior: "smooth" });
+      }
+    });
   });
-});
 
+  metricClickInited = true;
+}
 
 // ================= NOTIF STOK =================
 function productStatus(prod) {
@@ -1980,10 +1984,12 @@ onAuthStateChanged(auth, async (user) => {
     applyRoleUI(role);
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
-
+    
     await loadProducts();
     await loadSales();
     await loadOpnameLogs();
+
+    initMetricClickToOpname(); // <-- TAMBAHKAN INI
 
     if (navigator.onLine) {
       syncOfflineSales();
