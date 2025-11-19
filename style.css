@@ -1448,10 +1448,9 @@ td {
     max-width: 150px;
   }
 }
-
-/* =========================
-   PRINT HANYA STRUK
-========================= */
+/* ==================================================
+   PRINT – HANYA CETAK STRUK
+================================================== */
 @media print {
   body {
     margin: 0;
@@ -1459,23 +1458,45 @@ td {
     background: #ffffff;
   }
 
-  /* Sembunyikan semua dulu */
-  body * {
-    visibility: hidden;
+  /* sembunyiin semua chrome UI */
+  .app-header,
+  .sidebar,
+  #toast-container {
+    display: none !important;
   }
 
-  /* Tampilkan hanya area struk */
-  #printArea,
-  #printArea * {
-    visibility: visible;
+  /* cuma tampilkan section Kasir */
+  .app-main {
+    margin: 0;
+    padding: 0;
   }
 
-  /* Posisi struk di pojok kiri atas halaman */
+  .app-main > *:not(#salesSection) {
+    display: none !important;
+  }
+
+  /* di Kasir: sembunyiin list menu & form ringkasan, sisakan struk saja */
+  #salesSection h2,
+  #salesSection .pos-left,
+  #salesSection .cart-summary,
+  #salesSection #strukTitle,
+  #salesSection #btnPrint {
+    display: none !important;
+  }
+
+  .cart-box {
+    box-shadow: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+
   #printArea {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    display: block !important;
+    padding: 8px;
+  }
+
+  .receipt {
     margin: 0;
     padding: 0;
     box-shadow: none;
@@ -1483,25 +1504,11 @@ td {
     border: none;
   }
 
-  .receipt {
-    box-shadow: none;
-    border-radius: 0;
-    border: none;
-  }
-
+  /* paksa font mono & format text pre */
   .receipt-pre {
-    font-family: "SF Mono","Roboto Mono",monospace;
-    font-size: 11px;   /* bisa dikecilin lagi kalau kepanjangan kertas */
+    font-family: "SF Mono", "Roboto Mono", monospace;
+    font-size: 12px;
     white-space: pre;
-  }
-
-  /* Optional: sembunyiin elemen lain biar pasti nggak ikut ke-print */
-  header,
-  .sidebar,
-  .welcome-banner,
-  .cart-summary,
-  .pos-left {
-    display: none !important;
   }
 }
 
