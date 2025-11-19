@@ -891,30 +891,102 @@ td {
   background: #fee2e2;
 }
 
-/* --------------------------------------------------
-  PRINT AREA
--------------------------------------------------- */
+/* ====== STRUK / RECEIPT ====== */
 
-#strukTitle {
-  margin-top: 26px;
+#printArea {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
 }
 
-.print-area {
-  border: 1px dashed var(--border);
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--bg-card);
-  font-size: 13px;
+/* kartu struk di dalam card ungu */
+.receipt {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* header toko */
+.receipt-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.receipt-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.receipt-subtitle {
+  font-size: 11px;
+  color: #666;
+}
+
+/* bagian informasi tanggal & kasir */
+.receipt-meta {
+  border-top: 1px dashed #ccc;
+  padding-top: 8px;
   margin-top: 8px;
 }
 
-@media print {
-  body * { visibility: hidden; }
-  #printArea, #printArea * { visibility: visible; }
-  #printArea {
-    margin: 0;
-    padding: 0;
-  }
+/* baris kiri–kanan (label : nilai) */
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.receipt-row span:first-child {
+  color: #555;
+}
+.receipt-row span:last-child {
+  font-weight: 500;
+}
+
+/* daftar item */
+.receipt-items {
+  border-top: 1px dashed #ccc;
+  border-bottom: 1px dashed #ccc;
+  padding: 8px 0;
+  margin: 8px 0;
+}
+.receipt-items-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+/* setiap item */
+.receipt-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.receipt-item-left {
+  max-width: 65%;
+}
+.receipt-item-name {
+  font-weight: 500;
+}
+.receipt-item-qty {
+  font-size: 11px;
+  color: #666;
+}
+
+/* bagian total, bayar, kembalian */
+.receipt-footer {
+  border-top: 1px dashed #ccc;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+/* tulisan terima kasih */
+.receipt-thankyou {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #666;
 }
 
 /* --------------------------------------------------
