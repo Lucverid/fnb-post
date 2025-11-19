@@ -85,44 +85,44 @@
       </div>
     </header>
 
-  <!-- 🧭 SIDEBAR -->
-<aside id="sidebar" class="sidebar">
-  <nav>
-    <div class="sidebar-group">
+    <!-- 🧭 SIDEBAR -->
+    <aside id="sidebar" class="sidebar">
+      <nav>
+        <div class="sidebar-group">
 
-      <button class="side-item admin-only active" data-section="dashboard">
-        <i class="lucide-bar-chart"></i> <span>Dashboard</span>
-      </button>
+          <button class="side-item admin-only active" data-section="dashboard">
+            <i class="lucide-bar-chart"></i> <span>Dashboard</span>
+          </button>
 
-      <button class="side-item" data-section="sales">
-        <i class="lucide-shopping-cart"></i> <span>Kasir</span>
-      </button>
+          <button class="side-item" data-section="sales">
+            <i class="lucide-shopping-cart"></i> <span>Kasir</span>
+          </button>
 
-      <button class="side-item admin-only" data-section="inventory">
-        <i class="lucide-box"></i> <span>Inventory</span>
-      </button>
+          <button class="side-item admin-only" data-section="inventory">
+            <i class="lucide-box"></i> <span>Inventory</span>
+          </button>
 
-      <button class="side-item admin-only" data-section="recipe">
-        <i class="lucide-utensils"></i> <span>Resep</span>
-      </button>
+          <button class="side-item admin-only" data-section="recipe">
+            <i class="lucide-utensils"></i> <span>Resep</span>
+          </button>
 
-      <button class="side-item admin-only" data-section="opname">
-        <i class="lucide-clipboard-list"></i> <span>Opname</span>
-      </button>
+          <button class="side-item admin-only" data-section="opname">
+            <i class="lucide-clipboard-list"></i> <span>Opname</span>
+          </button>
 
-      <button class="side-item admin-only" data-section="reports">
-        <i class="lucide-file-text"></i> <span>Laporan</span>
-      </button>
+          <button class="side-item admin-only" data-section="reports">
+            <i class="lucide-file-text"></i> <span>Laporan</span>
+          </button>
 
-    </div>
+        </div>
 
-    <div class="sidebar-footer">
-      <button id="btnLogout" class="logout-btn">
-        <i class="lucide-log-out"></i> Logout
-      </button>
-    </div>
-  </nav>
-</aside>
+        <div class="sidebar-footer">
+          <button id="btnLogout" class="logout-btn">
+            <i class="lucide-log-out"></i> Logout
+          </button>
+        </div>
+      </nav>
+    </aside>
 
     <!-- 📌 MAIN CONTENT -->
     <main class="app-main">
@@ -194,9 +194,12 @@
                 <button id="btnSaveSale" class="btn-primary">Simpan Transaksi</button>
               </div>
 
+              <!-- STRUK -->
               <h3 id="strukTitle">Struk</h3>
-              <div id="printArea" class="print-area">Belum ada transaksi</div>
-              <button onclick="window.print()" class="btn-secondary" type="button">Print</button>
+              <div id="printArea" class="print-area">
+                Belum ada transaksi
+              </div>
+              <button id="btnPrint" class="btn-secondary" type="button">Print</button>
             </div>
           </div>
         </div>
@@ -363,20 +366,20 @@
         </div>
 
         <div class="chart-card">
-  <h4>Omzet Harian</h4>
-  <div class="chart-total">Total hari ini: <span id="dailyTotalLabel">Rp 0</span></div>
-  <div class="chart-box">
-    <canvas id="dailyChart"></canvas>
-  </div>
-</div>
+          <h4>Omzet Harian</h4>
+          <div class="chart-total">Total hari ini: <span id="dailyTotalLabel">Rp 0</span></div>
+          <div class="chart-box">
+            <canvas id="dailyChart"></canvas>
+          </div>
+        </div>
 
-<div class="chart-card">
-  <h4>Omzet Bulanan</h4>
-  <div class="chart-total">Total bulan ini: <span id="monthlyTotalLabel">Rp 0</span></div>
-  <div class="chart-box">
-    <canvas id="monthlyChart"></canvas>
-  </div>
-</div>
+        <div class="chart-card">
+          <h4>Omzet Bulanan</h4>
+          <div class="chart-total">Total bulan ini: <span id="monthlyTotalLabel">Rp 0</span></div>
+          <div class="chart-box">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
 
         <h3>Menu Terlaris</h3>
         <div class="table-wrap">
@@ -490,5 +493,63 @@
 
   <!-- JS utama -->
   <script src="script.js" type="module"></script>
+
+  <!-- JS tambahan khusus PRINT STRUK -->
+  <script>
+    function handlePrint() {
+      const printDiv = document.getElementById("printArea");
+      if (!printDiv) return;
+
+      const printContents = printDiv.innerHTML;
+
+      const win = window.open("", "", "width=400,height=600");
+      win.document.write(`
+        <html>
+          <head>
+            <title>Print Struk</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 10px;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 12px;
+              }
+              .print-area {
+                font-family: "SF Mono","Roboto Mono",monospace;
+                font-size: 12px;
+                white-space: pre;
+              }
+              .receipt {
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border-radius: 0;
+                border: none;
+              }
+              .receipt-pre {
+                font-family: "SF Mono","Roboto Mono",monospace;
+                font-size: 12px;
+                white-space: pre;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+          </body>
+        </html>
+      `);
+      win.document.close();
+      win.focus();
+      win.print();
+      win.close();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const btnPrint = document.getElementById("btnPrint");
+      if (btnPrint) {
+        btnPrint.addEventListener("click", handlePrint);
+      }
+    });
+  </script>
 </body>
 </html>
