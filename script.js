@@ -1075,7 +1075,7 @@ function updateCartSummary() {
   if (el) el.addEventListener("input", updateCartSummary);
 });
 
-// ================= STRUK PRINT (HTML CARD) =================
+// ================= STRUK PRINT (HTML CARD RAPIH) =================
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
 
@@ -1086,12 +1086,12 @@ function updatePrintAreaFromSale(saleDoc) {
   const itemsHtml = (saleDoc.items || [])
     .map(
       (it) => `
-        <div class="receipt-item">
-          <div class="receipt-item-left">
-            <div class="receipt-item-name">${it.name}</div>
-            <div class="receipt-item-qty">x${it.qty} @ ${formatCurrency(it.price)}</div>
+        <div class="r-item">
+          <div class="r-left">
+            <div class="r-name">${it.name}</div>
+            <div class="r-qty">x${it.qty} @ ${formatCurrency(it.price)}</div>
           </div>
-          <div class="receipt-item-sub">${formatCurrency(it.subtotal)}</div>
+          <div class="r-sub">${formatCurrency(it.subtotal)}</div>
         </div>
       `
     )
@@ -1099,57 +1099,37 @@ function updatePrintAreaFromSale(saleDoc) {
 
   printArea.innerHTML = `
     <div class="receipt">
-      <div class="receipt-header">
-        <div class="receipt-store-name">F&amp;B Cafe</div>
-        <div class="receipt-store-address">Jl. Mawar No.123 - Bandung</div>
+
+      <div class="r-header">
+        <div class="r-title"><strong>F&B Cafe</strong></div>
+        <div class="r-address">Jl. Mawar No.123 - Bandung</div>
       </div>
 
-      <div class="receipt-meta">
-        <div class="receipt-row">
-          <span>Tanggal</span><span>${waktu}</span>
-        </div>
-        <div class="receipt-row">
-          <span>Kasir</span><span>${kasir}</span>
-        </div>
+      <div class="r-meta">
+        <div><span>Tanggal</span><span>${waktu}</span></div>
+        <div><span>Kasir</span><span>${kasir}</span></div>
       </div>
 
-      <div class="receipt-items">
-        <div class="receipt-items-header">
+      <div class="r-items">
+        <div class="r-items-head">
           <span>Item</span><span>Subtotal</span>
         </div>
-        ${itemsHtml || '<div class="receipt-empty">(Tidak ada item)</div>'}
+        ${itemsHtml || '<div class="r-empty">(Tidak ada item)</div>'}
       </div>
 
-      <div class="receipt-footer">
-        <div class="receipt-row">
-          <span>Subtotal</span>
-          <span>${formatCurrency(saleDoc.subtotal || 0)}</span>
-        </div>
-        <div class="receipt-row">
-          <span>Diskon</span>
-          <span>${saleDoc.discountPercent ? saleDoc.discountPercent + '%' : '-'}</span>
-        </div>
-        <div class="receipt-row">
-          <span>Voucher</span>
-          <span>${saleDoc.voucher ? formatCurrency(saleDoc.voucher) : '-'}</span>
-        </div>
-        <div class="receipt-row receipt-row-total">
-          <span>Total</span>
-          <span>${formatCurrency(saleDoc.total || 0)}</span>
-        </div>
-        <div class="receipt-row">
-          <span>Bayar</span>
-          <span>${formatCurrency(saleDoc.pay || 0)}</span>
-        </div>
-        <div class="receipt-row">
-          <span>Kembalian</span>
-          <span>${formatCurrency(saleDoc.change || 0)}</span>
-        </div>
+      <div class="r-summary">
+        <div><span>Subtotal</span><span>${formatCurrency(saleDoc.subtotal || 0)}</span></div>
+        <div><span>Diskon</span><span>${saleDoc.discountPercent ? saleDoc.discountPercent + '%' : '-'}</span></div>
+        <div><span>Voucher</span><span>${saleDoc.voucher ? formatCurrency(saleDoc.voucher) : '-'}</span></div>
+        <div class="r-total"><span>Total</span><span>${formatCurrency(saleDoc.total || 0)}</span></div>
+        <div><span>Bayar</span><span>${formatCurrency(saleDoc.pay || 0)}</span></div>
+        <div><span>Kembalian</span><span>${formatCurrency(saleDoc.change || 0)}</span></div>
       </div>
 
-      <div class="receipt-thankyou">
-        <strong>Terima kasih</strong> &nbsp;&bull;&nbsp; Follow IG @fnbcafe
+      <div class="r-footer">
+        Terima kasih • Follow IG @fnbcafe
       </div>
+
     </div>
   `;
 }
