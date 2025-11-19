@@ -1449,7 +1449,61 @@ td {
   }
 }
 
+/* =========================
+   PRINT HANYA STRUK
+========================= */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
 
+  /* Sembunyikan semua dulu */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Tampilkan hanya area struk */
+  #printArea,
+  #printArea * {
+    visibility: visible;
+  }
+
+  /* Posisi struk di pojok kiri atas halaman */
+  #printArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    border: none;
+  }
+
+  .receipt {
+    box-shadow: none;
+    border-radius: 0;
+    border: none;
+  }
+
+  .receipt-pre {
+    font-family: "SF Mono","Roboto Mono",monospace;
+    font-size: 11px;   /* bisa dikecilin lagi kalau kepanjangan kertas */
+    white-space: pre;
+  }
+
+  /* Optional: sembunyiin elemen lain biar pasti nggak ikut ke-print */
+  header,
+  .sidebar,
+  .welcome-banner,
+  .cart-summary,
+  .pos-left {
+    display: none !important;
+  }
+}
 
 /* --------------------------------------------------
   ANIMATIONS
