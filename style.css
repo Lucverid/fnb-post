@@ -1549,6 +1549,14 @@ td {
     display: block !important;
   }
 }
+
+
+@media (max-width: 600px) {
+  #printArea {
+    margin-top: 36px;
+  }
+}
+
 /* --------------------------------------------------
   ANIMATIONS
 -------------------------------------------------- */
