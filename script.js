@@ -1298,7 +1298,7 @@ if (btnPrint) {
           * { box-sizing: border-box; }
 
           @page {
-            size: 58mm auto;       /* 👈 lebar thermal */
+            size: 58mm auto;       /* lebar thermal */
             margin: 4mm;
           }
 
@@ -1321,7 +1321,7 @@ if (btnPrint) {
             font-family: "Courier New", monospace;
             font-size: 15px;
             margin: 0;
-            white-space: pre;        /* biar layout text struk rapi */
+            white-space: pre;  /* biar layout text struk rapi */
           }
         </style>
       </head>
@@ -1339,8 +1339,8 @@ if (btnPrint) {
     win.onload = function () {
       win.focus();
       win.print();
-      // JANGAN langsung win.close() di Android,
-      // biarkan user yang tutup setelah print supaya tidak error
+      // di Android, biarkan user yang tutup tab print-nya sendiri
+      // jangan langsung win.close()
     };
   });
 }
