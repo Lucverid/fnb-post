@@ -1,82 +1,80 @@
-// =============================
-// F&B POS — Service Worker PWA
-// =============================
-
+// service-worker.js
 const CACHE_NAME = "fnb-pos-cache-v1";
 
-const FILES_TO_CACHE = [
-  "/fnb-post/",
-  "/fnb-post/index.html",
-  "/fnb-post/script.js",
-  "/fnb-post/style.css",
-  "/fnb-post/manifest.json",
-  "/fnb-post/icon-192.png",
-  "/fnb-post/icon-512.png",
+// Daftar file yang *wajib* ada offline (app shell)
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./style.css",      // ganti kalau namanya beda, misal styles.css
+  "./script.js",
+  "./favicon.png"     // kalau belum ada, boleh dihapus baris ini
 ];
 
-// Firebase CDN (harus dicache agar app bisa load offline)
-const FIREBASE_SDK = [
-  "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js",
-  "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js",
-  "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js"
-];
-
-const CHART_JS = [
-  "https://cdn.jsdelivr.net/npm/chart.js"
-];
-
+// Install: pre-cache semua ASSETS
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([...FILES_TO_CACHE, ...FIREBASE_SDK, ...CHART_JS]);
+      return cache.addAll(ASSETS);
     })
   );
   self.skipWaiting();
 });
 
+// Activate: bersihin cache lama kalau ada versi baru
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keyList) =>
+    caches.keys().then((keys) =>
       Promise.all(
-        keyList.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
       )
     )
   );
   self.clients.claim();
 });
 
-// =============================
-// NETWORK FALLBACK
-// =============================
+// Fetch: strategi **cache-first** untuk file statis,
+// dan **network-first** dengan fallback cache untuk sisanya
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
-  // Avoid caching Firestore / Auth API calls
-  if (req.url.includes("firestore") || req.url.includes("googleapis")) {
+  // Hanya handle GET
+  if (req.method !== "GET") return;
+
+  const url = new URL(req.url);
+
+  // ====== SAME-ORIGIN (file web kamu sendiri) -> CACHE FIRST ======
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        if (cached) return cached;
+        return fetch(req).then((res) => {
+          // simpan ke cache untuk kunjungan berikutnya
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, res.clone());
+            return res;
+          });
+        });
+      })
+    );
     return;
   }
 
+  // ====== CROSS-ORIGIN (firebase, chart.js, dll) -> NETWORK FIRST ======
   event.respondWith(
-    caches.match(req).then((cached) => {
-      return (
-        cached ||
-        fetch(req)
-          .then((res) => {
-            // cache new files dynamically
-            return caches.open(CACHE_NAME).then((cache) => {
-              cache.put(req, res.clone());
-              return res;
-            });
-          })
-          .catch(() => {
-            // Offline fallback
-            if (req.mode === "navigate") {
-              return caches.match("/fnb-post/index.html");
-            }
-          })
-      );
-    })
+    fetch(req)
+      .then((res) => {
+        // simpan di cache juga supaya kalau offline masih bisa pakai
+        return caches.open(CACHE_NAME).then((cache) => {
+          cache.put(req, res.clone());
+          return res;
+        });
+      })
+      .catch(() =>
+        // kalau offline dan sudah pernah di-cache
+        caches.match(req)
+      )
   );
 });
