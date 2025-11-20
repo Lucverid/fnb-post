@@ -1508,56 +1508,42 @@ td {
 
 
 
-/* =========================================
-   PRINT – HANYA STRUK (#printArea) YANG CETAK
-========================================= */
+/* ===== PRINT THERMAL MODE 58mm ===== */
 @media print {
 
-  /* Sembunyikan semua elemen lain */
-  header,
-  aside,
-  nav,
-  .app-header,
-  .sidebar,
-  .section:not(#salesSection),
-  .app-main > *:not(#salesSection),
-  .cart-summary,
-  .cart-items-wrapper,
-  #saleMenuBody,
-  #saleSearch,
-  #btnSaveSale,
-  #strukTitle,
-  #btnPrint,
-  #toast-container {              /* toast juga disembunyiin */
-    display: none !important;
+  /* Hilangkan semua elemen kecuali #printArea */
+  body * {
+    visibility: hidden !important;
+    background: white !important;
   }
 
-  /* Biarkan layout kasir + kolom kanan hidup */
-  #salesSection,
-  .pos-layout,
-  .pos-right,
+  #printArea, #printArea * {
+    visibility: visible !important;
+  }
+
   #printArea {
-    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm;         /* 👈 ukuran thermal */
+    max-width: 58mm;
+    padding: 0;
+    margin: 0;
+    background: white !important;
   }
 
-  /* Di dalam .pos-layout, yang kelihatan cuma kolom kanan (struk) */
-  .pos-layout > *:not(.pos-right) {
+  /* Hilangkan shadow, border radius */
+  .print-area {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Hapus header, sidebar, tombol */
+  header, footer, nav, button {
     display: none !important;
-  }
-
-  /* Di dalam kolom kanan, yang kelihatan cuma printArea */
-  .pos-right > *:not(#printArea) {
-    display: none !important;
-  }
-
-  /* Atur area struk full lebar kertas */
-  #printArea {
-    position: static;
-    width: 100%;
-    padding: 8px;
-    background: #fff !important;
   }
 }
+
 
 /* STRUK AREA – RESPONSIVE MARGIN */
 .cart-box #strukTitle {
