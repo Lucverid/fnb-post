@@ -1188,98 +1188,60 @@ function updateCartSummary() {
   if (el) el.addEventListener("input", updateCartSummary);
 });
 
-// ================= STRUK PRINT (TEXT MODE) =================
-function updatePrintAreaFromSale(saleDoc) {
-  if (!printArea) return;
+// ================= PRINT STRUK – JENDELA TERPISAH =================
+if (btnPrint) {
+  btnPrint.addEventListener("click", () => {
+    if (!printArea) return;
 
-  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
-  const waktu = formatDateTime(d);
-  const items = saleDoc.items || [];
+    const receiptHtml = printArea.innerHTML.trim();
+    if (!receiptHtml) {
+      showToast("Belum ada struk untuk dicetak", "error");
+      return;
+    }
 
-  // helper angka tanpa "Rp "
-  function formatNumberPlain(num) {
-    const n = Number(num || 0);
-    return n.toLocaleString("id-ID");
-  }
+    const win = window.open("", "_blank");
 
-  const line = "-".repeat(39);   // ---------------------------------------
+    win.document.open();
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Print Struk</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 8px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #ffffff;
+          }
+          .receipt {
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          .receipt-pre {
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            margin: 0;
+            white-space: pre-wrap;
+          }
+          @page { margin: 4mm; }
+        </style>
+      </head>
+      <body>
+        ${receiptHtml}
+      </body>
+      </html>
+    `);
+    win.document.close();
 
-  // lebar kolom
-  const nameWidth = 18;
-  const qtyWidth = 6;
-  const subWidth = 11;
-
-  function makeItemLine(name, qty, subtotal) {
-    const nm = (name || "").substring(0, nameWidth);
-    const qtyStr = "x" + qty;
-    const subStr = formatNumberPlain(subtotal);
-    return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
-  }
-
-  let text = "";
-
-  // ===== HEADER TOKO =====
-  text += "F&B Cafe\n";
-  text += "Jl. Mawar No.123 - Bandung\n";
-  text += waktu + "\n";
-  text += line + "\n";
-
-  // ===== HEADER KOLOM =====
-  text +=
-    "Item".padEnd(nameWidth) +
-    "Qty".padEnd(qtyWidth) +
-    "Subtotal".padStart(subWidth) +
-    "\n";
-
-  // ===== ITEM =====
-  items.forEach((it) => {
-    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
+    win.focus();
+    win.print();
+    win.close();
   });
-
-  text += line + "\n";
-
-  // ===== RINGKASAN =====
-  const labelWidth = 18;
-  function row(label, value) {
-    return label.padEnd(labelWidth) + value + "\n";
-  }
-
-  const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
-  const diskonLabel = saleDoc.discountPercent
-    ? `Diskon (${saleDoc.discountPercent}%) :`
-    : "Diskon :";
-  const diskonStr =
-    saleDoc.discountAmount && saleDoc.discountAmount > 0
-      ? formatNumberPlain(saleDoc.discountAmount)
-      : "-";
-  const voucherStr =
-    saleDoc.voucher && saleDoc.voucher > 0
-      ? formatNumberPlain(saleDoc.voucher)
-      : "-";
-
-  const totalStr = formatNumberPlain(saleDoc.total || 0);
-  const bayarStr = formatNumberPlain(saleDoc.pay || 0);
-  const kembaliStr = formatNumberPlain(saleDoc.change || 0);
-
-  text += row("Subtotal :", subtotalStr);
-  text += row(diskonLabel, diskonStr);
-  text += row("Voucher :", voucherStr);
-  text += row("Total :", totalStr);
-  text += row("Bayar :", bayarStr);
-  text += row("Kembalian :", kembaliStr);
-
-  text += line + "\n";
-  text += "Terima kasih!\n";
-  text += "Follow IG @fnbcafe\n";
-
-  // tempel ke DOM
-  printArea.innerHTML = `
-    <div class="receipt">
-      <pre class="receipt-pre">${text}</pre>
-    </div>
-  `;
 }
-
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
   const shortage = [];
