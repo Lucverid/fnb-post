@@ -1,4 +1,4 @@
-// script.js (offline-ready + BOM / Resep + Opname offline) 
+// script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -196,7 +196,7 @@ const salePay = $("salePay");
 const saleChange = $("saleChange");
 const btnSaveSale = $("btnSaveSale");
 const printArea = $("printArea");
-const btnPrint = $("btnPrint"); // <- TAMBAHAN
+const btnPrint = $("btnPrint");
 
 // Inventory
 const productName = $("productName");
@@ -236,7 +236,7 @@ const metricEmptyCount = $("metricEmptyCount");
 const metricLowCount = $("metricLowCount");
 const metricOkCount = $("metricOkCount");
 
-// kartu metric (buat klik ke opname)
+// kartu metric (klik -> opname)
 const metricEmptyCard = $("metricEmpty");
 const metricLowCard = $("metricLow");
 const metricOkCard = $("metricOk");
@@ -372,7 +372,8 @@ function applyRoleUI(role) {
   });
 
   if (bannerRole)
-    bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
+    bannerRole.textContent =
+      currentRole === "admin" ? "Administrator" : "Kasir";
 }
 
 // ================= NAV =================
@@ -506,7 +507,9 @@ function updateStockNotif() {
   });
   lowItems.forEach((p) => {
     const li = document.createElement("li");
-    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""})`;
+    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${
+      p.unit || ""
+    })`;
     notifList.appendChild(li);
     count++;
   });
@@ -791,11 +794,10 @@ function addBomRow(selectedId = "", qty = 1) {
   bomList.appendChild(row);
 
   const searchInput = row.querySelector(".bom-search");
-  const suggestBox  = row.querySelector(".bom-suggest");
-  const hiddenId    = row.querySelector(".bom-material-id");
-  const removeBtn   = row.querySelector(".bom-remove");
+  const suggestBox = row.querySelector(".bom-suggest");
+  const hiddenId = row.querySelector(".bom-material-id");
+  const removeBtn = row.querySelector(".bom-remove");
 
-  // kalau lagi edit resep lama → isi nilai awal
   if (selectedBahan) {
     searchInput.value = `${selectedBahan.name} (${Number(
       selectedBahan.stock || 0
@@ -807,10 +809,11 @@ function addBomRow(selectedId = "", qty = 1) {
     let list = allBahan;
 
     if (q) {
-      list = allBahan.filter((b) =>
-        (b.name || "").toLowerCase().includes(q) ||
-        (b.category || "").toLowerCase().includes(q) ||
-        (b.unit || "").toLowerCase().includes(q)
+      list = allBahan.filter(
+        (b) =>
+          (b.name || "").toLowerCase().includes(q) ||
+          (b.category || "").toLowerCase().includes(q) ||
+          (b.unit || "").toLowerCase().includes(q)
       );
     }
 
@@ -825,14 +828,15 @@ function addBomRow(selectedId = "", qty = 1) {
       .map(
         (b) => `
         <div class="bom-suggest-item" data-id="${b.id}">
-          ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
+          ${b.name} (${Number(b.stock || 0).toLocaleString(
+            "id-ID"
+          )} ${b.unit || ""})
         </div>`
       )
       .join("");
 
     suggestBox.classList.remove("hidden");
 
-    // klik item → pilih bahan
     suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
       const id = item.getAttribute("data-id");
       if (!id) return;
@@ -846,29 +850,25 @@ function addBomRow(selectedId = "", qty = 1) {
       });
     });
 
-    // kalau hasil cuma 1 → auto pilih
     if (list.length === 1) {
       const b = list[0];
       hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(
-        b.stock || 0
-      ).toLocaleString("id-ID")} ${b.unit || ""})`;
+      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString(
+        "id-ID"
+      )} ${b.unit || ""})`;
       suggestBox.classList.add("hidden");
     }
   }
 
-  // ngetik → filter
   searchInput.addEventListener("input", () => {
     hiddenId.value = "";
     renderSuggest(searchInput.value);
   });
 
-  // fokus → buka suggestion
   searchInput.addEventListener("focus", () => {
     renderSuggest(searchInput.value);
   });
 
-  // klik di luar row → tutup suggestion
   document.addEventListener("click", (e) => {
     if (!row.contains(e.target)) {
       suggestBox.classList.add("hidden");
@@ -878,13 +878,9 @@ function addBomRow(selectedId = "", qty = 1) {
   removeBtn.addEventListener("click", () => row.remove());
 }
 
-// tombol tambah bahan tetap sama:
 if (btnAddBomRow) {
   btnAddBomRow.addEventListener("click", () => addBomRow());
 }
-
-
-
 
 function openBomModal(menuId) {
   if (!bomModal || !bomModalBody || !bomModalTitle) return;
@@ -896,10 +892,11 @@ function openBomModal(menuId) {
   const descHtml =
     m.desc && String(m.desc).trim()
       ? `
-      <div class="modal-section">
-        <div class="modal-sec-title">Deskripsi</div>
-        <p>${m.desc}</p>
-      </div>`
+        <div class="modal-section">
+          <div class="modal-sec-title">Deskripsi</div>
+          <p>${m.desc}</p>
+        </div>
+      `
       : "";
 
   let bomHtml = "";
@@ -915,7 +912,8 @@ function openBomModal(menuId) {
             )
             .join("")}
         </ul>
-      </div>`;
+      </div>
+    `;
   } else {
     bomHtml = `<p class="modal-empty">Belum ada BOM untuk menu ini.</p>`;
   }
@@ -1042,21 +1040,21 @@ if (btnSaveRecipe) {
 
       const bom = [];
       if (bomList) {
-  bomList.querySelectorAll(".bom-row").forEach((row) => {
-    const idInput = row.querySelector(".bom-material-id");
-    const inp = row.querySelector(".bom-qty");
-    const materialId = idInput?.value || "";
-    const qty = Number(inp?.value || 0);
-    if (!materialId || qty <= 0) return;
-    const bahan = productsCache.find((p) => p.id === materialId);
-    bom.push({
-      materialId,
-      materialName: bahan?.name || "",
-      qty,
-      unit: bahan?.unit || "",
-    });
-  });
-}
+        bomList.querySelectorAll(".bom-row").forEach((row) => {
+          const idInput = row.querySelector(".bom-material-id");
+          const inp = row.querySelector(".bom-qty");
+          const materialId = idInput?.value || "";
+          const qty = Number(inp?.value || 0);
+          if (!materialId || qty <= 0) return;
+          const bahan = productsCache.find((p) => p.id === materialId);
+          bom.push({
+            materialId,
+            materialName: bahan?.name || "",
+            qty,
+            unit: bahan?.unit || "",
+          });
+        });
+      }
       const payload = {
         name,
         type: "menu",
@@ -1188,6 +1186,93 @@ function updateCartSummary() {
   if (el) el.addEventListener("input", updateCartSummary);
 });
 
+// ================= STRUK PRINT (TEXT MODE) =================
+function updatePrintAreaFromSale(saleDoc) {
+  if (!printArea) return;
+
+  const d = saleDoc.createdAtLocal
+    ? new Date(saleDoc.createdAtLocal)
+    : new Date();
+  const waktu = formatDateTime(d);
+  const items = saleDoc.items || [];
+
+  function formatNumberPlain(num) {
+    const n = Number(num || 0);
+    return n.toLocaleString("id-ID");
+  }
+
+  const line = "-".repeat(39);
+
+  const nameWidth = 18;
+  const qtyWidth = 6;
+  const subWidth = 11;
+
+  function makeItemLine(name, qty, subtotal) {
+    const nm = (name || "").substring(0, nameWidth);
+    const qtyStr = "x" + qty;
+    const subStr = formatNumberPlain(subtotal);
+    return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
+  }
+
+  let text = "";
+
+  text += "F&B Cafe\n";
+  text += "Jl. Mawar No.123 - Bandung\n";
+  text += waktu + "\n";
+  text += line + "\n";
+
+  text +=
+    "Item".padEnd(nameWidth) +
+    "Qty".padEnd(qtyWidth) +
+    "Subtotal".padStart(subWidth) +
+    "\n";
+
+  items.forEach((it) => {
+    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
+  });
+
+  text += line + "\n";
+
+  const labelWidth = 18;
+  function row(label, value) {
+    return label.padEnd(labelWidth) + value + "\n";
+  }
+
+  const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
+  const diskonLabel = saleDoc.discountPercent
+    ? `Diskon (${saleDoc.discountPercent}%) :`
+    : "Diskon :";
+  const diskonStr =
+    saleDoc.discountAmount && saleDoc.discountAmount > 0
+      ? formatNumberPlain(saleDoc.discountAmount)
+      : "-";
+  const voucherStr =
+    saleDoc.voucher && saleDoc.voucher > 0
+      ? formatNumberPlain(saleDoc.voucher)
+      : "-";
+
+  const totalStr = formatNumberPlain(saleDoc.total || 0);
+  const bayarStr = formatNumberPlain(saleDoc.pay || 0);
+  const kembaliStr = formatNumberPlain(saleDoc.change || 0);
+
+  text += row("Subtotal :", subtotalStr);
+  text += row(diskonLabel, diskonStr);
+  text += row("Voucher :", voucherStr);
+  text += row("Total :", totalStr);
+  text += row("Bayar :", bayarStr);
+  text += row("Kembalian :", kembaliStr);
+
+  text += line + "\n";
+  text += "Terima kasih!\n";
+  text += "Follow IG @fnbcafe\n";
+
+  printArea.innerHTML = `
+    <div class="receipt">
+      <pre class="receipt-pre">${text}</pre>
+    </div>
+  `;
+}
+
 // ================= PRINT STRUK – JENDELA TERPISAH =================
 if (btnPrint) {
   btnPrint.addEventListener("click", () => {
@@ -1242,6 +1327,7 @@ if (btnPrint) {
     win.close();
   });
 }
+
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
   const shortage = [];
@@ -1372,7 +1458,6 @@ if (btnSaveSale) {
         createdByUid: currentUser?.uid || null,
       };
 
-      // OFFLINE
       if (!navigator.onLine) {
         queueOfflineSale(saleDoc);
         showToast(
@@ -1390,7 +1475,6 @@ if (btnSaveSale) {
         return;
       }
 
-      // ONLINE
       await addDoc(colSales, { ...saleDoc, createdAt: serverTimestamp() });
       await applyBomForSale(saleDoc);
 
@@ -1454,7 +1538,11 @@ async function syncOfflineOpname() {
     }
 
     saveOfflineOpnameQueue([]);
-    showToast(`${queue.length} data opname offline tersinkron`, "success", 4000);
+    showToast(
+      `${queue.length} data opname offline tersinkron`,
+      "success",
+      4000
+    );
 
     await loadProducts();
     await loadOpnameLogs();
@@ -1541,7 +1629,10 @@ function updateCharts() {
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}`;
     monthLabels.push(
       d.toLocaleString("id-ID", {
         month: "short",
@@ -1553,14 +1644,15 @@ function updateCharts() {
     monthData.push(sum);
   }
 
-  // total harian & bulanan (berdasarkan filterStart jika ada)
   let refDate = today;
   if (filterStart && filterStart.value) {
     refDate = new Date(filterStart.value + "T00:00:00");
   }
 
   const refKey = todayKey(refDate);
-  const ymRef = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}`;
+  const ymRef = `${refDate.getFullYear()}-${String(
+    refDate.getMonth() + 1
+  ).padStart(2, "0")}`;
 
   const todayTotal = src
     .filter((s) => s.dateKey === refKey)
@@ -1691,7 +1783,6 @@ function updateHistoryTable() {
     });
 }
 
-// filter + search event
 if (btnFilterApply) {
   btnFilterApply.addEventListener("click", () => {
     updateCharts();
@@ -1769,7 +1860,8 @@ function renderOpnameTable() {
 
   if (!bahan.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6">Belum ada data bahan baku untuk opname.</td>`;
+    tr.innerHTML =
+      '<td colspan="6">Belum ada data bahan baku untuk opname.</td>';
     opnameTable.appendChild(tr);
     return;
   }
@@ -1890,6 +1982,8 @@ async function loadOpnameLogs() {
       let createdDate = new Date();
       if (data.createdAt && typeof data.createdAt.toDate === "function") {
         createdDate = data.createdAt.toDate();
+      } else if (data.createdAtLocal) {
+        createdDate = new Date(data.createdAtLocal);
       }
       opnameLogsCache.push({
         id: d.id,
@@ -2029,12 +2123,12 @@ function renderReportTable() {
   if (!reportTableBody) return;
 
   reportTableBody.innerHTML = "";
-
   renderReportHeader();
 
   if (!currentReportRows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6">Tidak ada data untuk periode ini.</td>`;
+    tr.innerHTML =
+      '<td colspan="6">Tidak ada data untuk periode ini.</td>';
     reportTableBody.appendChild(tr);
     return;
   }
@@ -2116,7 +2210,16 @@ function downloadReportCSV() {
       csv += row.join(sep) + "\n";
     });
   } else if (currentReportKind === "opname_week") {
-    csv += ["Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Satuan", "User"].join(sep) + "\n";
+    csv +=
+      [
+        "Tanggal",
+        "Produk",
+        "Stok Sistem",
+        "Stok Fisik",
+        "Selisih",
+        "Satuan",
+        "User",
+      ].join(sep) + "\n";
     currentReportRows.forEach((r) => {
       const row = [
         `"${r.tanggal}"`,
