@@ -1550,9 +1550,22 @@ td {
   }
 }
 
+/* STRUK AREA – RESPONSIVE MARGIN */
+.cart-box #strukTitle {
+  margin-top: 24px !important;      /* Desktop normal */
+}
+
+/* Tablet (≤ 992px) */
+@media (max-width: 992px) {
+  .cart-box #strukTitle {
+    margin-top: 32px !important;
+  }
+}
+
+/* HP (≤ 600px) */
 @media (max-width: 600px) {
-  #strukTitle {
-    margin-top: clamp(2rem, 6vw, 3rem);
+  .cart-box #strukTitle {
+    margin-top: 44px !important;
   }
 }
 
