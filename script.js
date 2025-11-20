@@ -1298,8 +1298,8 @@ if (btnPrint) {
           * { box-sizing: border-box; }
 
           @page {
-            size: 58mm auto;       /* lebar thermal */
-            margin: 4mm;
+            size: 58mm auto;                 /* lebar kertas */
+            margin: 4mm 4mm 12mm 4mm;        /* margin bawah diperbesar */
           }
 
           body {
@@ -1311,22 +1311,35 @@ if (btnPrint) {
             background: #ffffff;
           }
 
+          .print-wrapper {
+            width: 100%;
+          }
+
           .receipt {
-            font-size: 20px;
-            line-height: 1.4;
+            font-size: 18px;                 /* > sebelumnya 12–15px */
+            line-height: 1.5;
             padding: 4px 0;
           }
 
           .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 15px;
+            font-size: 18px;                 /* perbesar font */
+            font-weight: 600;                /* semi-bold supaya lebih pekat */
             margin: 0;
-            white-space: pre;  /* biar layout text struk rapi */
+            white-space: pre;                /* layout struk tetap rapi */
+          }
+
+          /* ruang kosong ekstra di bawah supaya tidak ikut tersobek */
+          .bottom-gap {
+            height: 24px;
           }
         </style>
       </head>
       <body>
-        ${receiptHtml}
+        <div class="print-wrapper">
+          ${receiptHtml}
+          <div class="bottom-gap"></div>
+        </div>
       </body>
       </html>
     `;
@@ -1335,12 +1348,10 @@ if (btnPrint) {
     win.document.write(html);
     win.document.close();
 
-    // tunggu dokumen siap dulu baru print
     win.onload = function () {
       win.focus();
       win.print();
-      // di Android, biarkan user yang tutup tab print-nya sendiri
-      // jangan langsung win.close()
+      // biarkan user yang menutup tab print di Android
     };
   });
 }
