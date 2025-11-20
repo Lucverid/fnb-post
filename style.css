@@ -1550,10 +1550,10 @@ td {
   }
 }
 
-/* Jarak untuk judul Struk di HP */
 @media (max-width: 600px) {
-  .print-title,
-  #printTitle {
+  h3:contains("Struk"),
+  h2:contains("Struk"),
+  .print-title {
     margin-top: 32px !important;
   }
 }
