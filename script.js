@@ -196,6 +196,7 @@ const salePay = $("salePay");
 const saleChange = $("saleChange");
 const btnSaveSale = $("btnSaveSale");
 const printArea = $("printArea");
+const btnPrint = $("btnPrint"); // <- TAMBAHAN
 
 // Inventory
 const productName = $("productName");
