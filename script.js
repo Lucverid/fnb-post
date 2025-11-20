@@ -768,7 +768,6 @@ if (btnSaveProduct) {
 function addBomRow(selectedId = "", qty = 1) {
   if (!bomList) return;
 
-  // ambil semua bahan baku sekali saja
   const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
   if (!allBahan.length) {
     showToast("Belum ada bahan baku di Inventory", "error");
@@ -793,7 +792,6 @@ function addBomRow(selectedId = "", qty = 1) {
   const selectEl   = row.querySelector(".bom-material");
   const removeBtn  = row.querySelector(".bom-remove");
 
-  // fungsi untuk isi ulang option sesuai keyword
   function refreshOptions(keyword = "") {
     let list = allBahan;
     const q = keyword.trim().toLowerCase();
@@ -806,7 +804,8 @@ function addBomRow(selectedId = "", qty = 1) {
       );
     }
 
-    selectEl.innerHTML = '<option value="">Pilih bahan...</option>' +
+    selectEl.innerHTML =
+      '<option value="">Pilih bahan...</option>' +
       list
         .map(
           (b) => `
@@ -817,16 +816,18 @@ function addBomRow(selectedId = "", qty = 1) {
         .join("");
   }
 
-  // pertama kali isi semua bahan
   refreshOptions("");
 
-  // saat ngetik di search → filter opsi
   searchInput.addEventListener("input", () => {
     refreshOptions(searchInput.value);
   });
 
-  // tombol hapus baris
   removeBtn.addEventListener("click", () => row.remove());
+}
+
+// 🔴 INI YANG HARUS DITAMBAHKAN LAGI
+if (btnAddBomRow) {
+  btnAddBomRow.addEventListener("click", () => addBomRow());
 }
 
 function openBomModal(menuId) {
