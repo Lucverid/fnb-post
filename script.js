@@ -2296,4 +2296,4 @@ onAuthStateChanged(auth, async (user) => {
     if (appShell) appShell.classList.add("hidden");
     if (topbarEmail) topbarEmail.textContent = "–";
   }
-});
+}); 
