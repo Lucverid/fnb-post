@@ -1,4 +1,3 @@
-
 // script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -196,6 +195,7 @@ const salePay = $("salePay");
 const saleChange = $("saleChange");
 const btnSaveSale = $("btnSaveSale");
 const printArea = $("printArea");
+const btnPrint = $("btnPrint"); // <-- tombol Print
 
 // Inventory
 const productName = $("productName");
@@ -371,7 +371,8 @@ else el.classList.add("hidden");
 });
 
 if (bannerRole)
-bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
+bannerRole.textContent =
+currentRole === "admin" ? "Administrator" : "Kasir";
 }
 
 // ================= NAV =================
@@ -507,7 +508,7 @@ count++;
 });
 lowItems.forEach((p) => {
 const li = document.createElement("li");
-li.textContent = Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""});
+li.textContent = Hampir habis: ${p.name} (sisa ${p.stock} ${   p.unit || ""   });
 notifList.appendChild(li);
 count++;
 });
@@ -787,9 +788,9 @@ row.innerHTML =   <div class="bom-row-material">   <input type="text" class="bom
 bomList.appendChild(row);
 
 const searchInput = row.querySelector(".bom-search");
-const suggestBox  = row.querySelector(".bom-suggest");
-const hiddenId    = row.querySelector(".bom-material-id");
-const removeBtn   = row.querySelector(".bom-remove");
+const suggestBox = row.querySelector(".bom-suggest");
+const hiddenId = row.querySelector(".bom-material-id");
+const removeBtn = row.querySelector(".bom-remove");
 
 // kalau lagi edit resep lama → isi nilai awal
 if (selectedBahan) {
@@ -801,10 +802,11 @@ const q = (keyword || "").trim().toLowerCase();
 let list = allBahan;
 
 if (q) {  
-  list = allBahan.filter((b) =>  
-    (b.name || "").toLowerCase().includes(q) ||  
-    (b.category || "").toLowerCase().includes(q) ||  
-    (b.unit || "").toLowerCase().includes(q)  
+  list = allBahan.filter(  
+    (b) =>  
+      (b.name || "").toLowerCase().includes(q) ||  
+      (b.category || "").toLowerCase().includes(q) ||  
+      (b.unit || "").toLowerCase().includes(q)  
   );  
 }  
 
@@ -819,7 +821,9 @@ suggestBox.innerHTML = list
   .map(  
     (b) => `  
     <div class="bom-suggest-item" data-id="${b.id}">  
-      ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})  
+      ${b.name} (${Number(b.stock || 0).toLocaleString(  
+        "id-ID"  
+      )} ${b.unit || ""})  
     </div>`  
   )  
   .join("");  
@@ -844,9 +848,9 @@ suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
 if (list.length === 1) {  
   const b = list[0];  
   hiddenId.value = b.id;  
-  searchInput.value = `${b.name} (${Number(  
-    b.stock || 0  
-  ).toLocaleString("id-ID")} ${b.unit || ""})`;  
+  searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString(  
+    "id-ID"  
+  )} ${b.unit || ""})`;  
   suggestBox.classList.add("hidden");  
 }
 
@@ -887,12 +891,12 @@ bomModalTitle.textContent = BOM: ${m.name || "-"};
 
 const descHtml =
 m.desc && String(m.desc).trim()
-?    <div class="modal-section">   <div class="modal-sec-title">Deskripsi</div>   <p>${m.desc}</p>   </div>
+?   <div class="modal-section">   <div class="modal-sec-title">Deskripsi</div>   <p>${m.desc}</p>   </div>  
 : "";
 
 let bomHtml = "";
 if (Array.isArray(m.bom) && m.bom.length) {
-bomHtml =   <div class="modal-section">   <div class="modal-sec-title">Bahan per 1 porsi</div>   <ul class="modal-bom-list">   ${m.bom   .map(   (b) =>  <li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>   )   .join("")}   </ul>   </div>;
+bomHtml =   <div class="modal-section">   <div class="modal-sec-title">Bahan per 1 porsi</div>   <ul class="modal-bom-list">   ${m.bom   .map(   (b) =>  <li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>  )   .join("")}   </ul>   </div>  ;
 } else {
 bomHtml = <p class="modal-empty">Belum ada BOM untuk menu ini.</p>;
 }
@@ -1005,36 +1009,35 @@ if (!name) {
   }  
 
   const bom = [];  
-  if (bomList) {
+  if (bomList) {  
+    bomList.querySelectorAll(".bom-row").forEach((row) => {  
+      const idInput = row.querySelector(".bom-material-id");  
+      const inp = row.querySelector(".bom-qty");  
+      const materialId = idInput?.value || "";  
+      const qty = Number(inp?.value || 0);  
+      if (!materialId || qty <= 0) return;  
+      const bahan = productsCache.find((p) => p.id === materialId);  
+      bom.push({  
+        materialId,  
+        materialName: bahan?.name || "",  
+        qty,  
+        unit: bahan?.unit || "",  
+      });  
+    });  
+  }  
+  const payload = {  
+    name,  
+    type: "menu",  
+    category,  
+    price,  
+    desc,  
+    bom,  
+    stock: 0,  
+    minStock: 0,  
+    updatedAt: serverTimestamp(),  
+  };  
 
-bomList.querySelectorAll(".bom-row").forEach((row) => {
-const idInput = row.querySelector(".bom-material-id");
-const inp = row.querySelector(".bom-qty");
-const materialId = idInput?.value || "";
-const qty = Number(inp?.value || 0);
-if (!materialId || qty <= 0) return;
-const bahan = productsCache.find((p) => p.id === materialId);
-bom.push({
-materialId,
-materialName: bahan?.name || "",
-qty,
-unit: bahan?.unit || "",
-});
-});
-}
-const payload = {
-name,
-type: "menu",
-category,
-price,
-desc,
-bom,
-stock: 0,
-minStock: 0,
-updatedAt: serverTimestamp(),
-};
-
-if (editingRecipeId) {  
+  if (editingRecipeId) {  
     await updateDoc(doc(db, "products", editingRecipeId), payload);  
     showToast("Resep diupdate", "success");  
   } else {  
@@ -1149,7 +1152,9 @@ if (el) el.addEventListener("input", updateCartSummary);
 function updatePrintAreaFromSale(saleDoc) {
 if (!printArea) return;
 
-const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
+const d = saleDoc.createdAtLocal
+? new Date(saleDoc.createdAtLocal)
+: new Date();
 const waktu = formatDateTime(d);
 const items = saleDoc.items || [];
 
@@ -1159,7 +1164,7 @@ const n = Number(num || 0);
 return n.toLocaleString("id-ID");
 }
 
-const line = "-".repeat(39);   // ---------------------------------------
+const line = "-".repeat(39); // ---------------------------------------
 
 // lebar kolom
 const nameWidth = 18;
@@ -1231,6 +1236,62 @@ text += "Follow IG @fnbcafe\n";
 
 // tempel ke DOM
 printArea.innerHTML =   <div class="receipt">   <pre class="receipt-pre">${text}</pre>   </div>  ;
+}
+
+// ================= PRINT STRUK – JENDELA TERPISAH =================
+if (btnPrint) {
+btnPrint.addEventListener("click", () => {
+if (!printArea) return;
+
+const receiptHtml = printArea.innerHTML.trim();  
+if (!receiptHtml) {  
+  showToast("Belum ada struk untuk dicetak", "error");  
+  return;  
+}  
+
+const win = window.open("", "_blank");  
+
+win.document.open();  
+win.document.write(`  
+  <!DOCTYPE html>  
+  <html>  
+  <head>  
+    <meta charset="utf-8">  
+    <title>Print Struk</title>  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <style>  
+      * { box-sizing: border-box; }  
+      body {  
+        margin: 0;  
+        padding: 8px;  
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;  
+        background: #ffffff;  
+      }  
+      .receipt {  
+        font-size: 12px;  
+        line-height: 1.4;  
+      }  
+      .receipt-pre {  
+        font-family: "Courier New", monospace;  
+        font-size: 12px;  
+        margin: 0;  
+        white-space: pre-wrap;  
+      }  
+      @page { margin: 4mm; }  
+    </style>  
+  </head>  
+  <body>  
+    ${receiptHtml}  
+  </body>  
+  </html>  
+`);  
+win.document.close();  
+
+win.focus();  
+win.print();  
+win.close();
+
+});
 }
 
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
@@ -1449,7 +1510,11 @@ if (op.productId && typeof op.physicalStock === "number") {
 }  
 
 saveOfflineOpnameQueue([]);  
-showToast(`${queue.length} data opname offline tersinkron`, "success", 4000);  
+showToast(  
+  `${queue.length} data opname offline tersinkron`,  
+  "success",  
+  4000  
+);  
 
 await loadProducts();  
 await loadOpnameLogs();
@@ -1537,7 +1602,7 @@ const monthLabels = [];
 const monthData = [];
 for (let i = 5; i >= 0; i--) {
 const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-const ym = ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")};
+const ym = ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(   2,   "0"   )};
 monthLabels.push(
 d.toLocaleString("id-ID", {
 month: "short",
@@ -1556,7 +1621,7 @@ refDate = new Date(filterStart.value + "T00:00:00");
 }
 
 const refKey = todayKey(refDate);
-const ymRef = ${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")};
+const ymRef = ${refDate.getFullYear()}-${String(   refDate.getMonth() + 1   ).padStart(2, "0")};
 
 const todayTotal = src
 .filter((s) => s.dateKey === refKey)
@@ -1762,7 +1827,8 @@ bahan = bahan.filter(
 
 if (!bahan.length) {
 const tr = document.createElement("tr");
-tr.innerHTML = <td colspan="6">Belum ada data bahan baku untuk opname.</td>;
+tr.innerHTML =
+'<td colspan="6">Belum ada data bahan baku untuk opname.</td>';
 opnameTable.appendChild(tr);
 return;
 }
@@ -1877,326 +1943,357 @@ showToast("Gagal menyimpan opname", "error");
 
 // ================= LOAD OPNAME LOGS =================
 async function loadOpnameLogs() {
-try {
-const snap = await getDocs(query(colOpname, orderBy("createdAt", "desc")));
-opnameLogsCache = [];
-snap.forEach((d) => {
-const data = d.data();
-let createdDate = new Date();
-if (data.createdAt && typeof data.createdAt.toDate === "function") {
-createdDate = data.createdAt.toDate();
-}
-opnameLogsCache.push({
-id: d.id,
-...data,
-createdAtDate: createdDate,
-dateKey: data.dateKey || todayKey(createdDate),
-});
-});
-} catch (err) {
-console.error("loadOpnameLogs error:", err);
-}
+  try {
+    const snap = await getDocs(query(colOpname, orderBy("createdAt", "desc")));
+    opnameLogsCache = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      let createdDate = new Date();
+      if (data.createdAt && typeof data.createdAt.toDate === "function") {
+        createdDate = data.createdAt.toDate();
+      } else if (data.createdAtLocal) {
+        createdDate = new Date(data.createdAtLocal);
+      }
+      opnameLogsCache.push({
+        id: d.id,
+        ...data,
+        createdAtDate: createdDate,
+        dateKey: data.dateKey || todayKey(createdDate),
+      });
+    });
+  } catch (err) {
+    console.error("loadOpnameLogs error:", err);
+  }
 }
 
 // ================= REPORT (LAPORAN) =================
 function ensureReportDateDefaults() {
-if (!reportStart || !reportEnd || !reportType) return;
-const today = new Date();
-const pad = (n) => String(n).padStart(2, "0");
+  if (!reportStart || !reportEnd || !reportType) return;
+  const today = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
 
-function setInputDate(el, d) {
-if (!el) return;
-const v = ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())};
-el.value = v;
-}
+  function setInputDate(el, d) {
+    if (!el) return;
+    const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    el.value = v;
+  }
 
-const type = reportType.value || "sales_day";
+  const type = reportType.value || "sales_day";
 
-if (!reportStart.value && !reportEnd.value) {
-if (type === "sales_day") {
-setInputDate(reportStart, today);
-setInputDate(reportEnd, today);
-} else if (type === "sales_week" || type === "opname_week") {
-const start = new Date(today);
-const day = start.getDay();
-const diff = day === 0 ? 6 : day - 1;
-start.setDate(start.getDate() - diff);
-const end = new Date(start);
-end.setDate(start.getDate() + 6);
-setInputDate(reportStart, start);
-setInputDate(reportEnd, end);
-} else if (type === "sales_month") {
-const start = new Date(today.getFullYear(), today.getMonth(), 1);
-const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-setInputDate(reportStart, start);
-setInputDate(reportEnd, end);
-} else if (type === "sales_year") {
-const start = new Date(today.getFullYear(), 0, 1);
-const end = new Date(today.getFullYear(), 11, 31);
-setInputDate(reportStart, start);
-setInputDate(reportEnd, end);
-}
-}
+  if (!reportStart.value && !reportEnd.value) {
+    if (type === "sales_day") {
+      setInputDate(reportStart, today);
+      setInputDate(reportEnd, today);
+    } else if (type === "sales_week" || type === "opname_week") {
+      const start = new Date(today);
+      const day = start.getDay();
+      const diff = day === 0 ? 6 : day - 1; // Senin awal minggu
+      start.setDate(start.getDate() - diff);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    } else if (type === "sales_month") {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    } else if (type === "sales_year") {
+      const start = new Date(today.getFullYear(), 0, 1);
+      const end = new Date(today.getFullYear(), 11, 31);
+      setInputDate(reportStart, start);
+      setInputDate(reportEnd, end);
+    }
+  }
 }
 
 function parseDateInput(value, isEnd = false) {
-if (!value) return null;
-if (isEnd) {
-return new Date(value + "T23:59:59");
-}
-return new Date(value + "T00:00:00");
+  if (!value) return null;
+  if (isEnd) {
+    return new Date(value + "T23:59:59");
+  }
+  return new Date(value + "T00:00:00");
 }
 
 function buildSalesReportRows(startDate, endDate) {
-const rows = [];
+  const rows = [];
 
-salesCache.forEach((s) => {
-const d = s.createdAtDate || new Date();
-if (d < startDate || d > endDate) return;
-const timeStr = formatDateTime(d);
-const itemsStr = (s.items || [])
-.map((it) => ${it.name} x${it.qty})
-.join(", ");
+  salesCache.forEach((s) => {
+    const d = s.createdAtDate || new Date();
+    if (d < startDate || d > endDate) return;
+    const timeStr = formatDateTime(d);
+    const itemsStr = (s.items || [])
+      .map((it) => `${it.name} x${it.qty}`)
+      .join(", ");
 
-rows.push({  
-  tanggal: timeStr,  
-  items: itemsStr,  
-  total: Number(s.total || 0),  
-  kasir: s.createdBy || "-",  
-});
+    rows.push({
+      tanggal: timeStr,
+      items: itemsStr,
+      total: Number(s.total || 0),
+      kasir: s.createdBy || "-",
+    });
+  });
 
-});
-
-return rows;
+  return rows;
 }
 
 function buildOpnameWeeklyRows(startDate, endDate) {
-const rows = [];
+  const rows = [];
 
-opnameLogsCache.forEach((o) => {
-const d = o.createdAtDate || new Date();
-if (d < startDate || d > endDate) return;
+  opnameLogsCache.forEach((o) => {
+    const d = o.createdAtDate || new Date();
+    if (d < startDate || d > endDate) return;
 
-const timeStr = formatDateTime(d);  
-rows.push({  
-  tanggal: timeStr,  
-  produk: o.productName || "-",  
-  systemStock: Number(o.systemStock ?? 0),  
-  physicalStock: Number(o.physicalStock ?? 0),  
-  diff: Number(o.diff ?? 0),  
-  unit: o.unit || "",  
-  user: o.createdBy || "-",  
-});
+    const timeStr = formatDateTime(d);
+    rows.push({
+      tanggal: timeStr,
+      produk: o.productName || "-",
+      systemStock: Number(o.systemStock ?? 0),
+      physicalStock: Number(o.physicalStock ?? 0),
+      diff: Number(o.diff ?? 0),
+      unit: o.unit || "",
+      user: o.createdBy || "-",
+    });
+  });
 
-});
-
-return rows;
+  return rows;
 }
 
 function renderReportHeader() {
-if (!reportTableHead) return;
-reportTableHead.innerHTML = "";
+  if (!reportTableHead) return;
+  reportTableHead.innerHTML = "";
 
-const tr = document.createElement("tr");
+  const tr = document.createElement("tr");
 
-if (currentReportKind.startsWith("sales_")) {
-tr.innerHTML =   <th>Tanggal & Waktu</th>   <th>Detail Item</th>   <th>Total</th>   <th>Kasir</th>  ;
-} else if (currentReportKind === "opname_week") {
-tr.innerHTML =   <th>Tanggal & Waktu</th>   <th>Produk</th>   <th>Stok Sistem</th>   <th>Stok Fisik</th>   <th>Selisih</th>   <th>User</th>  ;
-} else {
-tr.innerHTML = <th>Tanggal</th><th>Detail</th><th>Nilai</th>;
-}
+  if (currentReportKind.startsWith("sales_")) {
+    tr.innerHTML = `
+      <th>Tanggal & Waktu</th>
+      <th>Detail Item</th>
+      <th>Total</th>
+      <th>Kasir</th>
+    `;
+  } else if (currentReportKind === "opname_week") {
+    tr.innerHTML = `
+      <th>Tanggal & Waktu</th>
+      <th>Produk</th>
+      <th>Stok Sistem</th>
+      <th>Stok Fisik</th>
+      <th>Selisih</th>
+      <th>User</th>
+    `;
+  } else {
+    tr.innerHTML = `<th>Tanggal</th><th>Detail</th><th>Nilai</th>`;
+  }
 
-reportTableHead.appendChild(tr);
+  reportTableHead.appendChild(tr);
 }
 
 function renderReportTable() {
-if (!reportTableBody) return;
+  if (!reportTableBody) return;
 
-reportTableBody.innerHTML = "";
+  reportTableBody.innerHTML = "";
+  renderReportHeader();
 
-renderReportHeader();
+  if (!currentReportRows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td colspan="6">Tidak ada data untuk periode ini.</td>';
+    reportTableBody.appendChild(tr);
+    return;
+  }
 
-if (!currentReportRows.length) {
-const tr = document.createElement("tr");
-tr.innerHTML = <td colspan="6">Tidak ada data untuk periode ini.</td>;
-reportTableBody.appendChild(tr);
-return;
-}
-
-if (currentReportKind.startsWith("sales_")) {
-currentReportRows.forEach((r) => {
-const tr = document.createElement("tr");
-tr.innerHTML =   <td>${r.tanggal}</td>   <td>${r.items}</td>   <td>${formatCurrency(r.total)}</td>   <td>${r.kasir}</td>  ;
-reportTableBody.appendChild(tr);
-});
-} else if (currentReportKind === "opname_week") {
-currentReportRows.forEach((r) => {
-const tr = document.createElement("tr");
-tr.innerHTML =   <td>${r.tanggal}</td>   <td>${r.produk}</td>   <td>${Number(r.systemStock).toLocaleString("id-ID")} ${r.unit || ""}</td>   <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${r.unit || ""}</td>   <td>${r.diff}</td>   <td>${r.user}</td>  ;
-reportTableBody.appendChild(tr);
-});
-}
+  if (currentReportKind.startsWith("sales_")) {
+    currentReportRows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.tanggal}</td>
+        <td>${r.items}</td>
+        <td>${formatCurrency(r.total)}</td>
+        <td>${r.kasir}</td>
+      `;
+      reportTableBody.appendChild(tr);
+    });
+  } else if (currentReportKind === "opname_week") {
+    currentReportRows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.tanggal}</td>
+        <td>${r.produk}</td>
+        <td>${Number(r.systemStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
+        <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
+        <td>${r.diff}</td>
+        <td>${r.user}</td>
+      `;
+      reportTableBody.appendChild(tr);
+    });
+  }
 }
 
 function generateReport() {
-if (!reportType || !reportStart || !reportEnd) return;
+  if (!reportType || !reportStart || !reportEnd) return;
 
-const type = reportType.value || "sales_day";
-const startDate = parseDateInput(reportStart.value, false);
-const endDate = parseDateInput(reportEnd.value, true);
+  const type = reportType.value || "sales_day";
+  const startDate = parseDateInput(reportStart.value, false);
+  const endDate = parseDateInput(reportEnd.value, true);
 
-if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate)) {
-showToast("Tanggal awal & akhir laporan wajib diisi", "error");
-return;
-}
+  if (!startDate || !endDate || isNaN(startDate) || isNaN(endDate)) {
+    showToast("Tanggal awal & akhir laporan wajib diisi", "error");
+    return;
+  }
 
-if (endDate < startDate) {
-showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
-return;
-}
+  if (endDate < startDate) {
+    showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
+    return;
+  }
 
-if (type === "opname_week") {
-currentReportKind = "opname_week";
-currentReportRows = buildOpnameWeeklyRows(startDate, endDate);
-} else {
-currentReportKind = type;
-currentReportRows = buildSalesReportRows(startDate, endDate);
-}
+  if (type === "opname_week") {
+    currentReportKind = "opname_week";
+    currentReportRows = buildOpnameWeeklyRows(startDate, endDate);
+  } else {
+    currentReportKind = type;
+    currentReportRows = buildSalesReportRows(startDate, endDate);
+  }
 
-renderReportTable();
-showToast("Laporan diperbarui", "success");
+  renderReportTable();
+  showToast("Laporan diperbarui", "success");
 }
 
 function downloadReportCSV() {
-if (!currentReportRows.length) {
-showToast("Tidak ada data laporan untuk diunduh", "error");
-return;
-}
+  if (!currentReportRows.length) {
+    showToast("Tidak ada data laporan untuk diunduh", "error");
+    return;
+  }
 
-let csv = "";
-const sep = ",";
+  let csv = "";
+  const sep = ",";
 
-if (currentReportKind.startsWith("sales_")) {
-csv += ["Tanggal", "Items", "Total", "Kasir"].join(sep) + "\n";
-currentReportRows.forEach((r) => {
-const row = [
-"${r.tanggal}",
-"${(r.items || "").replace(/"/g, '""')}",
-r.total,
-"${(r.kasir || "").replace(/"/g, '""')}",
-];
-csv += row.join(sep) + "\n";
-});
-} else if (currentReportKind === "opname_week") {
-csv += ["Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Satuan", "User"].join(sep) + "\n";
-currentReportRows.forEach((r) => {
-const row = [
-"${r.tanggal}",
-"${(r.produk || "").replace(/"/g, '""')}",
-r.systemStock,
-r.physicalStock,
-r.diff,
-"${(r.unit || "").replace(/"/g, '""')}",
-"${(r.user || "").replace(/"/g, '""')}",
-];
-csv += row.join(sep) + "\n";
-});
-}
+  if (currentReportKind.startsWith("sales_")) {
+    csv += ["Tanggal", "Items", "Total", "Kasir"].join(sep) + "\n";
+    currentReportRows.forEach((r) => {
+      const row = [
+        `"${r.tanggal}"`,
+        `"${(r.items || "").replace(/"/g, '""')}"`,
+        r.total,
+        `"${(r.kasir || "").replace(/"/g, '""')}"`,
+      ];
+      csv += row.join(sep) + "\n";
+    });
+  } else if (currentReportKind === "opname_week") {
+    csv +=
+      [
+        "Tanggal",
+        "Produk",
+        "Stok Sistem",
+        "Stok Fisik",
+        "Selisih",
+        "Satuan",
+        "User",
+      ].join(sep) + "\n";
+    currentReportRows.forEach((r) => {
+      const row = [
+        `"${r.tanggal}"`,
+        `"${(r.produk || "").replace(/"/g, '""')}"`,
+        r.systemStock,
+        r.physicalStock,
+        r.diff,
+        `"${(r.unit || "").replace(/"/g, '""')}"`,
+        `"${(r.user || "").replace(/"/g, '""')}"`,
+      ];
+      csv += row.join(sep) + "\n";
+    });
+  }
 
-const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-const url = URL.createObjectURL(blob);
-const a = document.createElement("a");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
 
-const startLabel = reportStart?.value || "";
-const endLabel = reportEnd?.value || "";
-const baseName = currentReportKind.replace(/[^a-z0-9_-]/gi, "-");
+  const startLabel = reportStart?.value || "";
+  const endLabel = reportEnd?.value || "";
+  const baseName = currentReportKind.replace(/[^a-z0-9_-]/gi, "-");
 
-a.href = url;
-a.download = laporan-${baseName}-${startLabel}_sd_${endLabel}.csv;
-document.body.appendChild(a);
-a.click();
-document.body.removeChild(a);
-URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = `laporan-${baseName}-${startLabel}_sd_${endLabel}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 
-showToast("Laporan CSV diunduh", "success");
+  showToast("Laporan CSV diunduh", "success");
 }
 
 if (reportType) {
-reportType.addEventListener("change", () => {
-if (reportStart) reportStart.value = "";
-if (reportEnd) reportEnd.value = "";
-ensureReportDateDefaults();
-});
+  reportType.addEventListener("change", () => {
+    if (reportStart) reportStart.value = "";
+    if (reportEnd) reportEnd.value = "";
+    ensureReportDateDefaults();
+  });
 }
 
 if (btnReportGenerate) {
-btnReportGenerate.addEventListener("click", () => {
-generateReport();
-});
+  btnReportGenerate.addEventListener("click", () => {
+    generateReport();
+  });
 }
 
 if (btnReportDownload) {
-btnReportDownload.addEventListener("click", () => {
-downloadReportCSV();
-});
+  btnReportDownload.addEventListener("click", () => {
+    downloadReportCSV();
+  });
 }
 
 // ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
 attachRupiahFormatter([
-"saleVoucher",
-"salePay",
-"saleTotal",
-"saleChange",
-"productPrice",
-"productStock",
-"productMinStock",
-"recipePrice",
+  "saleVoucher",
+  "salePay",
+  "saleTotal",
+  "saleChange",
+  "productPrice",
+  "productStock",
+  "productMinStock",
+  "recipePrice",
 ]);
 
 // ================= AUTH STATE =================
 onAuthStateChanged(auth, async (user) => {
-currentUser = user || null;
+  currentUser = user || null;
 
-if (user) {
-if (authCard) authCard.classList.add("hidden");
-if (appShell) appShell.classList.remove("hidden");
+  if (user) {
+    if (authCard) authCard.classList.add("hidden");
+    if (appShell) appShell.classList.remove("hidden");
 
-const role = await getUserRole(user.uid);  
-applyRoleUI(role);  
+    const role = await getUserRole(user.uid);
+    applyRoleUI(role);
 
-if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;  
-if (welcomeBanner) welcomeBanner.classList.remove("hidden");  
+    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
+    if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
-await loadProducts();  
-await loadSales();  
-await loadOpnameLogs();  
+    await loadProducts();
+    await loadSales();
+    await loadOpnameLogs();
 
-initMetricClickToOpname();  
+    initMetricClickToOpname();
 
-if (navigator.onLine) {  
-  syncOfflineSales();  
-  syncOfflineOpname();  
-}  
+    if (navigator.onLine) {
+      syncOfflineSales();
+      syncOfflineOpname();
+    }
 
-ensureReportDateDefaults();  
+    ensureReportDateDefaults();
 
-if (role === "admin") {  
-  showSection("dashboard");  
-} else {  
-  showSection("sales");  
-}
+    if (role === "admin") {
+      showSection("dashboard");
+    } else {
+      showSection("sales");
+    }
+  } else {
+    currentRole = null;
+    productsCache = [];
+    salesCache = [];
+    opnameLogsCache = [];
+    currentCart = [];
 
-} else {
-currentRole = null;
-productsCache = [];
-salesCache = [];
-opnameLogsCache = [];
-currentCart = [];
-
-if (authCard) authCard.classList.remove("hidden");  
-if (appShell) appShell.classList.add("hidden");  
-if (topbarEmail) topbarEmail.textContent = "–";
-
-}
+    if (authCard) authCard.classList.remove("hidden");
+    if (appShell) appShell.classList.add("hidden");
+    if (topbarEmail) topbarEmail.textContent = "–";
+  }
 });
