@@ -1298,8 +1298,8 @@ if (btnPrint) {
           * { box-sizing: border-box; }
 
           @page {
-            size: 58mm auto;                 /* lebar kertas */
-            margin: 4mm 4mm 12mm 4mm;        /* margin bawah diperbesar */
+            size: 58mm auto;
+            margin: 4mm 4mm 26mm 4mm;   /* 🔥 margin bawah jadi 26mm */
           }
 
           body {
@@ -1316,22 +1316,24 @@ if (btnPrint) {
           }
 
           .receipt {
-            font-size: 18px;                 /* > sebelumnya 12–15px */
-            line-height: 1.5;
+            font-size: 19px;               /* lebih besar dari sebelumnya */
+            line-height: 1.55;
             padding: 4px 0;
+            font-weight: 700;              /* benar-benar bold */
           }
 
           .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 18px;                 /* perbesar font */
-            font-weight: 600;                /* semi-bold supaya lebih pekat */
+            font-size: 19px;               /* besar */
+            font-weight: 700;              /* 🔥 lebih tebal */
+            -webkit-text-stroke: 0.3px black; /* TRIK menebalkan */
             margin: 0;
-            white-space: pre;                /* layout struk tetap rapi */
+            white-space: pre;
           }
 
-          /* ruang kosong ekstra di bawah supaya tidak ikut tersobek */
+          /* Ruang kosong ekstra bawah */
           .bottom-gap {
-            height: 24px;
+            height: 30px;                 /* 🔥 lebih besar */
           }
         </style>
       </head>
@@ -1351,7 +1353,6 @@ if (btnPrint) {
     win.onload = function () {
       win.focus();
       win.print();
-      // biarkan user yang menutup tab print di Android
     };
   });
 }
