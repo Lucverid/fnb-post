@@ -1284,7 +1284,6 @@ if (btnPrint) {
       return;
     }
 
-    // buka jendela baru khusus untuk print
     const win = window.open("", "_blank");
 
     const html = `
@@ -1299,42 +1298,43 @@ if (btnPrint) {
 
           @page {
             size: 58mm auto;
-            /* top kecil, bottom besar supaya tidak kena sobek */
             margin: 2mm 3mm 30mm 3mm;
           }
 
-          html, body {
+          body {
             margin: 0;
             padding: 0;
             width: 58mm;
             max-width: 58mm;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #ffffff;
-          }
-
-          .print-wrapper {
-            width: 100%;
-          }
-
-          .receipt {
-            font-size: 21px;          /* ✅ font lebih besar */
-            line-height: 1.6;
-            padding: 2px 0;           /* jangan terlalu jauh dari atas */
-            font-weight: 700;
-          }
-
-          .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 21px;          /* ✅ 21px */
-            font-weight: 700;
-            -webkit-text-stroke: 0.35px black;  /* ✅ lebih tebal/kontras */
-            margin: 0;
-            white-space: pre;
+            background: #fff;
           }
 
-          /* Ruang kosong ekstra di bawah supaya teks aman saat disobek */
+          /* ================= SUPER BOLD MODE ================ */
+          .receipt-pre {
+            font-size: 19px;
+            line-height: 1.55;
+            font-weight: 900;
+
+            /* TEBALKAN SAMPAAI HITAM */
+            -webkit-text-stroke: 0.45px #000;
+
+            /* TEX SHADOW 8 ARAH (full bold) */
+            text-shadow:
+              0.3px 0   #000,
+             -0.3px 0   #000,
+              0   0.3px #000,
+              0  -0.3px #000,
+              0.3px 0.3px #000,
+             -0.3px 0.3px #000,
+              0.3px -0.3px #000,
+             -0.3px -0.3px #000;
+            white-space: pre;
+            margin: 0;
+          }
+
           .bottom-gap {
-            height: 40px;             /* ✅ lebih panjang dari sebelumnya */
+            height: 42px;
           }
         </style>
       </head>
@@ -1354,7 +1354,6 @@ if (btnPrint) {
     win.onload = function () {
       win.focus();
       win.print();
-      // biar user sendiri yang tutup tab print
     };
   });
 }
