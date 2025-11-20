@@ -1284,6 +1284,7 @@ if (btnPrint) {
       return;
     }
 
+    // buka jendela baru khusus untuk print
     const win = window.open("", "_blank");
 
     const html = `
@@ -1297,7 +1298,7 @@ if (btnPrint) {
           * { box-sizing: border-box; }
 
           @page {
-            size: 58mm auto;
+            size: 58mm auto;       /* 👈 lebar thermal */
             margin: 4mm;
           }
 
@@ -1308,26 +1309,19 @@ if (btnPrint) {
             max-width: 58mm;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: #ffffff;
-            font-size: 13px;          /* 👈 font dasar agak gede */
           }
 
           .receipt {
-            font-size: 13px;          /* 👈 gedein teks */
-            line-height: 1.5;
+            font-size: 15px;
+            line-height: 1.4;
             padding: 4px 0;
           }
 
           .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 13px;          /* 👈 ini yang paling berpengaruh */
+            font-size: 15px;
             margin: 0;
-            white-space: pre;
-          }
-
-          @media print {
-            body {
-              font-size: 13px;
-            }
+            white-space: pre;        /* biar layout text struk rapi */
           }
         </style>
       </head>
@@ -1341,10 +1335,12 @@ if (btnPrint) {
     win.document.write(html);
     win.document.close();
 
+    // tunggu dokumen siap dulu baru print
     win.onload = function () {
       win.focus();
       win.print();
-      // biarkan user yang nutup manual
+      // JANGAN langsung win.close() di Android,
+      // biarkan user yang tutup setelah print supaya tidak error
     };
   });
 }
