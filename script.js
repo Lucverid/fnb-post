@@ -1312,7 +1312,7 @@ if (btnPrint) {
           }
 
           .receipt {
-            font-size: 15px;
+            font-size: 20px;
             line-height: 1.4;
             padding: 4px 0;
           }
