@@ -1551,10 +1551,8 @@ td {
 }
 
 @media (max-width: 600px) {
-  h3:contains("Struk"),
-  h2:contains("Struk"),
-  .print-title {
-    margin-top: 32px !important;
+  #strukTitle {
+    margin-top: clamp(2rem, 6vw, 3rem);
   }
 }
 
