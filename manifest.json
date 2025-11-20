@@ -1,11 +1,12 @@
 {
-  "name": "F&B POS System",
+  "name": "F&B POS",
   "short_name": "FNB POS",
-  "start_url": "/fnb-post/index.html",
+  "start_url": "/fnb-post/",
   "scope": "/fnb-post/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#6a00ff",
   "icons": [
     {
       "src": "icon-192.png",
