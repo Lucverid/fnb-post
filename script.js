@@ -774,14 +774,15 @@ function addBomRow(selectedId = "", qty = 1) {
     return;
   }
 
+  const selectedBahan = allBahan.find((b) => b.id === selectedId) || null;
+
   const row = document.createElement("div");
   row.className = "bom-row";
   row.innerHTML = `
     <div class="bom-row-material">
-      <input type="text" class="bom-search" placeholder="Cari bahan..." />
-      <select class="bom-material">
-        <option value="">Pilih bahan...</option>
-      </select>
+      <input type="text" class="bom-search" placeholder="Cari bahan..." autocomplete="off" />
+      <div class="bom-suggest hidden"></div>
+      <input type="hidden" class="bom-material-id" value="${selectedId || ""}">
     </div>
     <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">
     <button type="button" class="btn-table small bom-remove">x</button>
@@ -789,14 +790,20 @@ function addBomRow(selectedId = "", qty = 1) {
   bomList.appendChild(row);
 
   const searchInput = row.querySelector(".bom-search");
-  const selectEl   = row.querySelector(".bom-material");
-  const removeBtn  = row.querySelector(".bom-remove");
+  const suggestBox  = row.querySelector(".bom-suggest");
+  const hiddenId    = row.querySelector(".bom-material-id");
+  const removeBtn   = row.querySelector(".bom-remove");
 
-  let firstPopulate = true;
+  // kalau lagi edit resep lama → isi nilai awal
+  if (selectedBahan) {
+    searchInput.value = `${selectedBahan.name} (${Number(
+      selectedBahan.stock || 0
+    ).toLocaleString("id-ID")} ${selectedBahan.unit || ""})`;
+  }
 
-  function refreshOptions(keyword = "") {
+  function renderSuggest(keyword) {
+    const q = (keyword || "").trim().toLowerCase();
     let list = allBahan;
-    const q = keyword.trim().toLowerCase();
 
     if (q) {
       list = allBahan.filter((b) =>
@@ -806,42 +813,78 @@ function addBomRow(selectedId = "", qty = 1) {
       );
     }
 
-    selectEl.innerHTML =
-      '<option value="">Pilih bahan...</option>' +
-      list
-        .map(
-          (b) => `
-          <option value="${b.id}">
-            ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
-          </option>`
-        )
-        .join("");
-
-    // kalau lagi edit resep lama → pilih yg lama dulu
-    if (firstPopulate && selectedId) {
-      selectEl.value = selectedId;
-    } else if (list.length === 1) {
-      // kalau hasil filter cuma 1 → auto select
-      selectEl.value = list[0].id;
+    if (!list.length) {
+      suggestBox.innerHTML =
+        '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
+      suggestBox.classList.remove("hidden");
+      return;
     }
 
-    firstPopulate = false;
+    suggestBox.innerHTML = list
+      .map(
+        (b) => `
+        <div class="bom-suggest-item" data-id="${b.id}">
+          ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
+        </div>`
+      )
+      .join("");
+
+    suggestBox.classList.remove("hidden");
+
+    // klik item → pilih bahan
+    suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
+      const id = item.getAttribute("data-id");
+      if (!id) return;
+      item.addEventListener("click", () => {
+        const bahan = allBahan.find((b) => b.id === id);
+        hiddenId.value = id;
+        searchInput.value = `${bahan.name} (${Number(
+          bahan.stock || 0
+        ).toLocaleString("id-ID")} ${bahan.unit || ""})`;
+        suggestBox.classList.add("hidden");
+      });
+    });
+
+    // kalau hasil cuma 1 → auto pilih
+    if (list.length === 1) {
+      const b = list[0];
+      hiddenId.value = b.id;
+      searchInput.value = `${b.name} (${Number(
+        b.stock || 0
+      ).toLocaleString("id-ID")} ${b.unit || ""})`;
+      suggestBox.classList.add("hidden");
+    }
   }
 
-  // isi awal
-  refreshOptions("");
-
+  // ngetik → filter
   searchInput.addEventListener("input", () => {
-    refreshOptions(searchInput.value);
+    hiddenId.value = "";
+    renderSuggest(searchInput.value);
+  });
+
+  // fokus → buka suggestion
+  searchInput.addEventListener("focus", () => {
+    renderSuggest(searchInput.value);
+  });
+
+  // klik di luar row → tutup suggestion
+  document.addEventListener("click", (e) => {
+    if (!row.contains(e.target)) {
+      suggestBox.classList.add("hidden");
+    }
   });
 
   removeBtn.addEventListener("click", () => row.remove());
 }
 
-// pastikan ini tetap ada:
+// tombol tambah bahan tetap sama:
 if (btnAddBomRow) {
   btnAddBomRow.addEventListener("click", () => addBomRow());
 }
+
+
+
+
 function openBomModal(menuId) {
   if (!bomModal || !bomModalBody || !bomModalTitle) return;
   const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
