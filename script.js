@@ -1299,10 +1299,11 @@ if (btnPrint) {
 
           @page {
             size: 58mm auto;
-            margin: 4mm 4mm 26mm 4mm;   /* 🔥 margin bawah jadi 26mm */
+            /* top kecil, bottom besar supaya tidak kena sobek */
+            margin: 2mm 3mm 30mm 3mm;
           }
 
-          body {
+          html, body {
             margin: 0;
             padding: 0;
             width: 58mm;
@@ -1316,24 +1317,24 @@ if (btnPrint) {
           }
 
           .receipt {
-            font-size: 19px;               /* lebih besar dari sebelumnya */
-            line-height: 1.55;
-            padding: 4px 0;
-            font-weight: 700;              /* benar-benar bold */
+            font-size: 21px;          /* ✅ font lebih besar */
+            line-height: 1.6;
+            padding: 2px 0;           /* jangan terlalu jauh dari atas */
+            font-weight: 700;
           }
 
           .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 19px;               /* besar */
-            font-weight: 700;              /* 🔥 lebih tebal */
-            -webkit-text-stroke: 0.3px black; /* TRIK menebalkan */
+            font-size: 21px;          /* ✅ 21px */
+            font-weight: 700;
+            -webkit-text-stroke: 0.35px black;  /* ✅ lebih tebal/kontras */
             margin: 0;
             white-space: pre;
           }
 
-          /* Ruang kosong ekstra bawah */
+          /* Ruang kosong ekstra di bawah supaya teks aman saat disobek */
           .bottom-gap {
-            height: 30px;                 /* 🔥 lebih besar */
+            height: 40px;             /* ✅ lebih panjang dari sebelumnya */
           }
         </style>
       </head>
@@ -1353,6 +1354,7 @@ if (btnPrint) {
     win.onload = function () {
       win.focus();
       win.print();
+      // biar user sendiri yang tutup tab print
     };
   });
 }
