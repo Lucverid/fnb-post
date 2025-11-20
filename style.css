@@ -1448,6 +1448,40 @@ td {
     max-width: 150px;
   }
 }
+
+
+.bom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.bom-row-material {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bom-search {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #ddd);
+  font-size: 14px;
+}
+
+.bom-material {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #ddd);
+  font-size: 14px;
+}
+
+
+
+
+
+
 /* =========================================
    PRINT – HANYA STRUK (#printArea) YANG CETAK
 ========================================= */
