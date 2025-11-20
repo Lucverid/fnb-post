@@ -1041,22 +1041,21 @@ if (btnSaveRecipe) {
 
       const bom = [];
       if (bomList) {
-        bomList.querySelectorAll(".bom-row").forEach((row) => {
-          const sel = row.querySelector(".bom-material");
-          const inp = row.querySelector(".bom-qty");
-          const materialId = sel?.value || "";
-          const qty = Number(inp?.value || 0);
-          if (!materialId || qty <= 0) return;
-          const bahan = productsCache.find((p) => p.id === materialId);
-          bom.push({
-            materialId,
-            materialName: bahan?.name || "",
-            qty,
-            unit: bahan?.unit || "",
-          });
-        });
-      }
-
+  bomList.querySelectorAll(".bom-row").forEach((row) => {
+    const idInput = row.querySelector(".bom-material-id");
+    const inp = row.querySelector(".bom-qty");
+    const materialId = idInput?.value || "";
+    const qty = Number(inp?.value || 0);
+    if (!materialId || qty <= 0) return;
+    const bahan = productsCache.find((p) => p.id === materialId);
+    bom.push({
+      materialId,
+      materialName: bahan?.name || "",
+      qty,
+      unit: bahan?.unit || "",
+    });
+  });
+}
       const payload = {
         name,
         type: "menu",
