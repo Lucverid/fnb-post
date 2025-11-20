@@ -768,8 +768,9 @@ if (btnSaveProduct) {
 function addBomRow(selectedId = "", qty = 1) {
   if (!bomList) return;
 
-  const bahanList = productsCache.filter((p) => p.type === "bahan_baku");
-  if (!bahanList.length) {
+  // ambil semua bahan baku sekali saja
+  const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
+  if (!allBahan.length) {
     showToast("Belum ada bahan baku di Inventory", "error");
     return;
   }
@@ -777,27 +778,55 @@ function addBomRow(selectedId = "", qty = 1) {
   const row = document.createElement("div");
   row.className = "bom-row";
   row.innerHTML = `
-    <select class="bom-material">
-      <option value="">Pilih bahan...</option>
-      ${bahanList
-        .map(
-          (b) => `
-        <option value="${b.id}" ${b.id === selectedId ? "selected" : ""}>
-          ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
-        </option>`
-        )
-        .join("")}
-    </select>
+    <div class="bom-row-material">
+      <input type="text" class="bom-search" placeholder="Cari bahan..." />
+      <select class="bom-material">
+        <option value="">Pilih bahan...</option>
+      </select>
+    </div>
     <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">
     <button type="button" class="btn-table small bom-remove">x</button>
   `;
   bomList.appendChild(row);
 
-  row.querySelector(".bom-remove").addEventListener("click", () => row.remove());
-}
+  const searchInput = row.querySelector(".bom-search");
+  const selectEl   = row.querySelector(".bom-material");
+  const removeBtn  = row.querySelector(".bom-remove");
 
-if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => addBomRow());
+  // fungsi untuk isi ulang option sesuai keyword
+  function refreshOptions(keyword = "") {
+    let list = allBahan;
+    const q = keyword.trim().toLowerCase();
+
+    if (q) {
+      list = allBahan.filter((b) =>
+        (b.name || "").toLowerCase().includes(q) ||
+        (b.category || "").toLowerCase().includes(q) ||
+        (b.unit || "").toLowerCase().includes(q)
+      );
+    }
+
+    selectEl.innerHTML = '<option value="">Pilih bahan...</option>' +
+      list
+        .map(
+          (b) => `
+          <option value="${b.id}" ${b.id === selectedId ? "selected" : ""}>
+            ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
+          </option>`
+        )
+        .join("");
+  }
+
+  // pertama kali isi semua bahan
+  refreshOptions("");
+
+  // saat ngetik di search → filter opsi
+  searchInput.addEventListener("input", () => {
+    refreshOptions(searchInput.value);
+  });
+
+  // tombol hapus baris
+  removeBtn.addEventListener("click", () => row.remove());
 }
 
 function openBomModal(menuId) {
