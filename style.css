@@ -1513,7 +1513,7 @@ td {
 ========================================= */
 @media print {
 
-  /* Sembunyikan seluruh layout utama */
+  /* Sembunyikan layout lain, TAPI biarkan #salesSection hidup */
   header,
   aside,
   nav,
@@ -1521,7 +1521,7 @@ td {
   .sidebar,
   .pos-left,
   .pos-right > *:not(#printArea),
-  .section,
+  .section:not(#salesSection),
   .app-main > *:not(#salesSection),
   #salesSection > *:not(.pos-right),
   .cart-summary,
@@ -1534,19 +1534,19 @@ td {
     display: none !important;
   }
 
+  /* Pastikan container struk tetap tampil */
+  #salesSection,
+  .pos-right {
+    display: block !important;
+  }
+
   /* TAMPILKAN hanya struk */
   #printArea {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static;
     width: 100%;
     padding: 8px;
     background: #fff !important;
-  }
-
-  #printArea * {
-    display: block !important;
   }
 }
 
