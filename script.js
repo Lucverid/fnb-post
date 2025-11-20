@@ -792,6 +792,8 @@ function addBomRow(selectedId = "", qty = 1) {
   const selectEl   = row.querySelector(".bom-material");
   const removeBtn  = row.querySelector(".bom-remove");
 
+  let firstPopulate = true;
+
   function refreshOptions(keyword = "") {
     let list = allBahan;
     const q = keyword.trim().toLowerCase();
@@ -809,13 +811,24 @@ function addBomRow(selectedId = "", qty = 1) {
       list
         .map(
           (b) => `
-          <option value="${b.id}" ${b.id === selectedId ? "selected" : ""}>
+          <option value="${b.id}">
             ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
           </option>`
         )
         .join("");
+
+    // kalau lagi edit resep lama → pilih yg lama dulu
+    if (firstPopulate && selectedId) {
+      selectEl.value = selectedId;
+    } else if (list.length === 1) {
+      // kalau hasil filter cuma 1 → auto select
+      selectEl.value = list[0].id;
+    }
+
+    firstPopulate = false;
   }
 
+  // isi awal
   refreshOptions("");
 
   searchInput.addEventListener("input", () => {
@@ -825,11 +838,10 @@ function addBomRow(selectedId = "", qty = 1) {
   removeBtn.addEventListener("click", () => row.remove());
 }
 
-// 🔴 INI YANG HARUS DITAMBAHKAN LAGI
+// pastikan ini tetap ada:
 if (btnAddBomRow) {
   btnAddBomRow.addEventListener("click", () => addBomRow());
 }
-
 function openBomModal(menuId) {
   if (!bomModal || !bomModalBody || !bomModalTitle) return;
   const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
