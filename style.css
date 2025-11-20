@@ -1513,36 +1513,45 @@ td {
 ========================================= */
 @media print {
 
-  /* Sembunyikan layout lain, TAPI biarkan #salesSection hidup */
+  /* Sembunyikan semua elemen lain */
   header,
   aside,
   nav,
   .app-header,
   .sidebar,
-  .pos-left,
-  .pos-right > *:not(#printArea),
   .section:not(#salesSection),
   .app-main > *:not(#salesSection),
-  #salesSection > *:not(.pos-right),
   .cart-summary,
   .cart-items-wrapper,
   #saleMenuBody,
   #saleSearch,
   #btnSaveSale,
   #strukTitle,
-  #btnPrint {
+  #btnPrint,
+  #toast-container {              /* toast juga disembunyiin */
     display: none !important;
   }
 
-  /* Pastikan container struk tetap tampil */
+  /* Biarkan layout kasir + kolom kanan hidup */
   #salesSection,
-  .pos-right {
+  .pos-layout,
+  .pos-right,
+  #printArea {
     display: block !important;
   }
 
-  /* TAMPILKAN hanya struk */
+  /* Di dalam .pos-layout, yang kelihatan cuma kolom kanan (struk) */
+  .pos-layout > *:not(.pos-right) {
+    display: none !important;
+  }
+
+  /* Di dalam kolom kanan, yang kelihatan cuma printArea */
+  .pos-right > *:not(#printArea) {
+    display: none !important;
+  }
+
+  /* Atur area struk full lebar kertas */
   #printArea {
-    display: block !important;
     position: static;
     width: 100%;
     padding: 8px;
