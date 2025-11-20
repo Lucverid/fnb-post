@@ -1550,9 +1550,11 @@ td {
   }
 }
 
+/* Jarak untuk judul Struk di HP */
 @media (max-width: 600px) {
-  #strukTitle {
-    margin-top: 36px;
+  .print-title,
+  #printTitle {
+    margin-top: 32px !important;
   }
 }
 
