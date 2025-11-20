@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>F&B POS — Modern v3</title>
 
+<!-- manifest.js->
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -13,6 +19,17 @@
 
   <!-- CSS utama -->
   <link rel="stylesheet" href="style.css">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/fnb-post/service-worker.js')
+        .then(reg => console.log("SW registered:", reg))
+        .catch(err => console.log("SW failed:", err));
+    });
+  }
+</script>
+
 </head>
 
 <body>
