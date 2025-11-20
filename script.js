@@ -1273,21 +1273,21 @@ function updatePrintAreaFromSale(saleDoc) {
   `;
 }
 
-// ================= PRINT STRUK – JENDELA TERPISAH =================
+// ================= PRINT STRUK – JENDELA TERPISAH (THERMAL 58mm) =================
 if (btnPrint) {
   btnPrint.addEventListener("click", () => {
     if (!printArea) return;
 
     const receiptHtml = printArea.innerHTML.trim();
-    if (!receiptHtml) {
+    if (!receiptHtml || receiptHtml === "Belum ada transaksi") {
       showToast("Belum ada struk untuk dicetak", "error");
       return;
     }
 
+    // buka jendela baru khusus untuk print
     const win = window.open("", "_blank");
 
-    win.document.open();
-    win.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -1296,35 +1296,52 @@ if (btnPrint) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { box-sizing: border-box; }
+
+          @page {
+            size: 58mm auto;       /* 👈 lebar thermal */
+            margin: 4mm;
+          }
+
           body {
             margin: 0;
-            padding: 8px;
+            padding: 0;
+            width: 58mm;
+            max-width: 58mm;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: #ffffff;
           }
+
           .receipt {
-            font-size: 12px;
+            font-size: 11px;
             line-height: 1.4;
+            padding: 4px 0;
           }
+
           .receipt-pre {
             font-family: "Courier New", monospace;
-            font-size: 12px;
+            font-size: 11px;
             margin: 0;
-            white-space: pre-wrap;
+            white-space: pre;        /* biar layout text struk rapi */
           }
-          @page { margin: 4mm; }
         </style>
       </head>
       <body>
         ${receiptHtml}
       </body>
       </html>
-    `);
+    `;
+
+    win.document.open();
+    win.document.write(html);
     win.document.close();
 
-    win.focus();
-    win.print();
-    win.close();
+    // tunggu dokumen siap dulu baru print
+    win.onload = function () {
+      win.focus();
+      win.print();
+      // JANGAN langsung win.close() di Android,
+      // biarkan user yang tutup setelah print supaya tidak error
+    };
   });
 }
 
