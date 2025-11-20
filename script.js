@@ -1296,45 +1296,71 @@ if (btnPrint) {
         <style>
           * { box-sizing: border-box; }
 
+          /* Lebar kertas 58mm, margin kiri/kanan diperkecil biar teks muat */
           @page {
             size: 58mm auto;
-            margin: 2mm 3mm 30mm 3mm;
+            margin: 2mm 0.5mm 26mm 0.5mm;  /* atas | kanan | bawah | kiri */
           }
 
           body {
             margin: 0;
             padding: 0;
-            width: 58mm;
-            max-width: 58mm;
+            width: 100%;
+            max-width: 100%;
             font-family: "Courier New", monospace;
             background: #fff;
           }
 
-         /* ================= SUPER BOLD MODE FIX WRAP ================ */
-.receipt-pre {
-  font-size: 20px;
-  line-height: 1.55;
-  font-weight: 900;
+          .print-wrapper {
+            width: 100%;
+          }
 
-  -webkit-text-stroke: 0.45px #000;
+          /* =============== SUPER BOLD + ANTI KEpotong =============== */
+          .receipt-pre {
+            font-size: 20px;          /* tetap besar */
+            line-height: 1.5;
+            font-weight: 900;
 
-  text-shadow:
-    0.3px 0   #000,
-   -0.3px 0   #000,
-    0   0.3px #000,
-    0  -0.3px #000,
-    0.3px 0.3px #000,
-   -0.3px 0.3px #000,
-    0.3px -0.3px #000,
-   -0.3px -0.3px #000;
+            /* bold tapi tidak terlalu melebar ke samping */
+            -webkit-text-stroke: 0.35px #000;
 
-  white-space: pre-wrap;     /* 🔥 dari pre → pre-wrap supaya text bisa turun */
-  word-break: break-word;    /* 🔥 cegah overflow kanan */
-  overflow-wrap: break-word; /* 🔥 aman ketika angka panjang */
+            text-shadow:
+              0.25px 0   #000,
+             -0.25px 0   #000,
+              0   0.25px #000,
+              0  -0.25px #000,
+              0.25px 0.25px #000,
+             -0.25px 0.25px #000,
+              0.25px -0.25px #000,
+             -0.25px -0.25px #000;
 
-  padding-right: 6px;        /* 🔥 beri jarak supaya angka tidak nabrak kertas */
+            white-space: pre;       /* layout struk tetap rapi */
+            margin: 0;
+          }
 
-  margin: 0;
+          .bottom-gap {
+            height: 43px;           /* ruang ekstra di bawah buat sobekan */
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-wrapper">
+          ${receiptHtml}
+          <div class="bottom-gap"></div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+
+    win.onload = function () {
+      win.focus();
+      win.print();
+    };
+  });
 }
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
