@@ -1310,52 +1310,31 @@ if (btnPrint) {
             background: #fff;
           }
 
-          /* ================= SUPER BOLD MODE ================ */
-          .receipt-pre {
-            font-size: 19px;
-            line-height: 1.55;
-            font-weight: 900;
+         /* ================= SUPER BOLD MODE FIX WRAP ================ */
+.receipt-pre {
+  font-size: 20px;
+  line-height: 1.55;
+  font-weight: 900;
 
-            /* TEBALKAN SAMPAAI HITAM */
-            -webkit-text-stroke: 0.45px #000;
+  -webkit-text-stroke: 0.45px #000;
 
-            /* TEX SHADOW 8 ARAH (full bold) */
-            text-shadow:
-              0.3px 0   #000,
-             -0.3px 0   #000,
-              0   0.3px #000,
-              0  -0.3px #000,
-              0.3px 0.3px #000,
-             -0.3px 0.3px #000,
-              0.3px -0.3px #000,
-             -0.3px -0.3px #000;
-            white-space: pre;
-            margin: 0;
-          }
+  text-shadow:
+    0.3px 0   #000,
+   -0.3px 0   #000,
+    0   0.3px #000,
+    0  -0.3px #000,
+    0.3px 0.3px #000,
+   -0.3px 0.3px #000,
+    0.3px -0.3px #000,
+   -0.3px -0.3px #000;
 
-          .bottom-gap {
-            height: 42px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="print-wrapper">
-          ${receiptHtml}
-          <div class="bottom-gap"></div>
-        </div>
-      </body>
-      </html>
-    `;
+  white-space: pre-wrap;     /* 🔥 dari pre → pre-wrap supaya text bisa turun */
+  word-break: break-word;    /* 🔥 cegah overflow kanan */
+  overflow-wrap: break-word; /* 🔥 aman ketika angka panjang */
 
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+  padding-right: 6px;        /* 🔥 beri jarak supaya angka tidak nabrak kertas */
 
-    win.onload = function () {
-      win.focus();
-      win.print();
-    };
-  });
+  margin: 0;
 }
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
