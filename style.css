@@ -1552,7 +1552,7 @@ td {
 
 /* STRUK AREA – RESPONSIVE MARGIN */
 .cart-box #strukTitle {
-  margin-top: 24px !important;      /* Desktop normal */
+  margin-top: 30px !important;      /* Desktop normal */
 }
 
 /* Tablet (≤ 992px) */
