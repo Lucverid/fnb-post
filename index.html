@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>F&B POS — Modern v3</title>
 
-<!-- manifest.js->
-
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#6a00ff" />
-
+  <!-- manifest.json -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6a00ff" />
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -20,17 +18,21 @@
   <!-- CSS utama -->
   <link rel="stylesheet" href="style.css">
 
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker
-        .register("./service-worker.js")
-        .catch((err) => {
-          console.error("SW registration failed", err);
-        });
-    });
-  }
-</script>
+  <script>
+    // Registrasi Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker
+          .register('./service-worker.js')
+          .then(reg => {
+            console.log('SW registered', reg.scope);
+          })
+          .catch(err => {
+            console.error('SW registration failed', err);
+          });
+      });
+    }
+  </script>
 
 </head>
 
