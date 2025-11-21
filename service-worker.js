@@ -1,33 +1,40 @@
 // service-worker.js
-const CACHE_NAME = "fnb-pos-cache-v1";
+const CACHE_VERSION = 'v3';
+const CACHE_NAME = `fnb-pos-${CACHE_VERSION}`;
 
-// Daftar file yang *wajib* ada offline (app shell)
-const ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./style.css",      // ganti kalau namanya beda, misal styles.css
-  "./script.js",
-  "./favicon.png"     // kalau belum ada, boleh dihapus baris ini
+const OFFLINE_ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './manifest.json',
+
+  // eksternal (akan dicache saat pertama kali berhasil di-fetch)
+  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css'
 ];
 
-// Install: pre-cache semua ASSETS
-self.addEventListener("install", (event) => {
+// Install: pre-cache file utama
+self.addEventListener('install', (event) => {
+  console.log('[SW] Install');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      return cache.addAll(OFFLINE_ASSETS).catch((err) => {
+        console.warn('[SW] Gagal pre-cache sebagian asset', err);
+      });
     })
   );
   self.skipWaiting();
 });
 
-// Activate: bersihin cache lama kalau ada versi baru
-self.addEventListener("activate", (event) => {
+// Activate: hapus cache lama
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activate');
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key.startsWith('fnb-pos-') && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       )
     )
@@ -35,46 +42,54 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: strategi **cache-first** untuk file statis,
-// dan **network-first** dengan fallback cache untuk sisanya
-self.addEventListener("fetch", (event) => {
+// Fetch: network first untuk navigasi, cache fallback; cache first untuk asset
+self.addEventListener('fetch', (event) => {
   const req = event.request;
 
-  // Hanya handle GET
-  if (req.method !== "GET") return;
+  // hanya GET yang kita handle
+  if (req.method !== 'GET') {
+    return;
+  }
 
-  const url = new URL(req.url);
-
-  // ====== SAME-ORIGIN (file web kamu sendiri) -> CACHE FIRST ======
-  if (url.origin === self.location.origin) {
+  // Permintaan navigasi (buka / reload halaman)
+  if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
-          // simpan ke cache untuk kunjungan berikutnya
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, res.clone());
-            return res;
+      fetch(req)
+        .then((res) => {
+          // simpan copy ke cache
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, resClone);
           });
-        });
-      })
+          return res;
+        })
+        .catch(() => {
+          // kalau offline / gagal, pakai index.html dari cache
+          return caches.match('./index.html');
+        })
     );
     return;
   }
 
-  // ====== CROSS-ORIGIN (firebase, chart.js, dll) -> NETWORK FIRST ======
+  // Untuk asset js/css/font: cache-first, lalu network fallback
   event.respondWith(
-    fetch(req)
-      .then((res) => {
-        // simpan di cache juga supaya kalau offline masih bisa pakai
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(req, res.clone());
+    caches.match(req).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(req)
+        .then((res) => {
+          // simpan asset yang berhasil di-fetch ke cache
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, resClone);
+          });
           return res;
+        })
+        .catch(() => {
+          // kalau gagal dan nggak ada di cache, yaudah pass (browser yang handle)
+          return cached;
         });
-      })
-      .catch(() =>
-        // kalau offline dan sudah pernah di-cache
-        caches.match(req)
-      )
+    })
   );
 });
