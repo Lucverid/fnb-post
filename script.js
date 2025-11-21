@@ -1,35 +1,36 @@
-// script.js (offline-ready + BOM / Resep + Opname offline)
+
+​// script.js (offline-ready + BOM / Resep + Opname offline)
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
-  getAuth,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
+getAuth,
+onAuthStateChanged,
+createUserWithEmailAndPassword,
+signInWithEmailAndPassword,
+signOut,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
+getFirestore,
+collection,
+addDoc,
+getDocs,
+query,
+where,
+orderBy,
+updateDoc,
+deleteDoc,
+doc,
+serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
-  authDomain: "app-387dc.firebaseapp.com",
-  projectId: "app-387dc",
-  storageBucket: "app-387dc.firebasestorage.app",
-  messagingSenderId: "227151496412",
-  appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
-  measurementId: "G-9E282TKXSJ",
+apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
+authDomain: "app-387dc.firebaseapp.com",
+projectId: "app-387dc",
+storageBucket: "app-387dc.firebasestorage.app",
+messagingSenderId: "227151496412",
+appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
+measurementId: "G-9E282TKXSJ",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -41,64 +42,63 @@ const $ = (id) => document.getElementById(id);
 
 const toastContainer = $("toast-container");
 function showToast(msg, type = "info", time = 3000) {
-  if (!toastContainer) return;
-  const div = document.createElement("div");
-  div.className = `toast toast-${type}`;
-  div.textContent = msg;
-  toastContainer.appendChild(div);
-  setTimeout(() => div.remove(), time);
+if (!toastContainer) return;
+const div = document.createElement("div");
+div.className = toast toast-${type};
+div.textContent = msg;
+toastContainer.appendChild(div);
+setTimeout(() => div.remove(), time);
 }
 
 function formatCurrency(num) {
-  const n = Number(num || 0);
-  return "Rp " + n.toLocaleString("id-ID");
+const n = Number(num || 0);
+return "Rp " + n.toLocaleString("id-ID");
 }
 
 // ===== HELPER ANGKA UNTUK INPUT (titik ribuan) =====
 function cleanNumber(val) {
-  if (val == null) return 0;
-  const num = parseInt(val.toString().replace(/\D/g, ""), 10);
-  return isNaN(num) ? 0 : num;
+if (val == null) return 0;
+const num = parseInt(val.toString().replace(/\D/g, ""), 10);
+return isNaN(num) ? 0 : num;
 }
 
 function formatRupiahInput(val) {
-  const n = cleanNumber(val);
-  if (!n) return "";
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const n = cleanNumber(val);
+if (!n) return "";
+return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
 function attachRupiahFormatter(ids) {
-  ids.forEach((id) => {
-    const el = $(id);
-    if (!el) return;
-    el.addEventListener("input", () => {
-      const pos = el.selectionStart;
-      const prevLen = el.value.length;
+ids.forEach((id) => {
+const el = $(id);
+if (!el) return;
+el.addEventListener("input", () => {
+const pos = el.selectionStart;
+const prevLen = el.value.length;
 
-      const formatted = formatRupiahInput(el.value);
-      el.value = formatted;
+const formatted = formatRupiahInput(el.value);  
+  el.value = formatted;  
 
-      const newLen = formatted.length;
-      if (typeof pos === "number") {
-        const diff = newLen - prevLen;
-        const newPos = Math.max(pos + diff, 0);
-        el.selectionStart = el.selectionEnd = newPos;
-      }
-    });
-  });
+  const newLen = formatted.length;  
+  if (typeof pos === "number") {  
+    const diff = newLen - prevLen;  
+    const newPos = Math.max(pos + diff, 0);  
+    el.selectionStart = el.selectionEnd = newPos;  
+  }  
+});
+
+});
 }
 
 function todayKey(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+const y = d.getFullYear();
+const m = String(d.getMonth() + 1).padStart(2, "0");
+const day = String(d.getDate()).padStart(2, "0");
+return ${y}-${m}-${day};
 }
 function formatDateTime(d) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+const pad = (n) => String(n).padStart(2, "0");
+return ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(   d.getHours()   )}:${pad(d.getMinutes())};
 }
 
 // ================= OFFLINE QUEUE =================
@@ -111,71 +111,71 @@ const SNAP_SALES_KEY = "fnb_sales_snapshot_v1";
 const SNAP_OPNAME_KEY = "fnb_opname_snapshot_v1";
 
 function saveSnapshot(key, data) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data || []));
-  } catch (e) {
-    console.warn("Gagal simpan snapshot", key, e);
-  }
+try {
+localStorage.setItem(key, JSON.stringify(data || []));
+} catch (e) {
+console.warn("Gagal simpan snapshot", key, e);
+}
 }
 
 function loadSnapshot(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    return parsed;
-  } catch (e) {
-    console.warn("Gagal baca snapshot", key, e);
-    return null;
-  }
+try {
+const raw = localStorage.getItem(key);
+if (!raw) return null;
+const parsed = JSON.parse(raw);
+if (!Array.isArray(parsed)) return null;
+return parsed;
+} catch (e) {
+console.warn("Gagal baca snapshot", key, e);
+return null;
+}
 }
 
 function loadOfflineQueue() {
-  try {
-    const raw = localStorage.getItem(OFFLINE_SALES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+try {
+const raw = localStorage.getItem(OFFLINE_SALES_KEY);
+if (!raw) return [];
+const parsed = JSON.parse(raw);
+return Array.isArray(parsed) ? parsed : [];
+} catch {
+return [];
+}
 }
 function saveOfflineQueue(list) {
-  try {
-    localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
-  } catch {
-    // abaikan
-  }
+try {
+localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
+} catch {
+// abaikan
+}
 }
 function queueOfflineSale(saleDoc) {
-  const list = loadOfflineQueue();
-  list.push(saleDoc);
-  saveOfflineQueue(list);
+const list = loadOfflineQueue();
+list.push(saleDoc);
+saveOfflineQueue(list);
 }
 
 // ==== OFFLINE OPNAME ====
 function loadOfflineOpnameQueue() {
-  try {
-    const raw = localStorage.getItem(OFFLINE_OPNAME_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+try {
+const raw = localStorage.getItem(OFFLINE_OPNAME_KEY);
+if (!raw) return [];
+const parsed = JSON.parse(raw);
+return Array.isArray(parsed) ? parsed : [];
+} catch {
+return [];
+}
 }
 function saveOfflineOpnameQueue(list) {
-  try {
-    localStorage.setItem(OFFLINE_OPNAME_KEY, JSON.stringify(list || []));
-  } catch {
-    // abaikan
-  }
+try {
+localStorage.setItem(OFFLINE_OPNAME_KEY, JSON.stringify(list || []));
+} catch {
+// abaikan
+}
 }
 function queueOfflineOpname(opDoc) {
-  const list = loadOfflineOpnameQueue();
-  list.push(opDoc);
-  saveOfflineOpnameQueue(list);
+const list = loadOfflineOpnameQueue();
+list.push(opDoc);
+saveOfflineOpnameQueue(list);
 }
 
 // ================= ELEMENTS =================
@@ -325,45 +325,106 @@ let opnameStatusFilter = null;
 // flag supaya listener metric tidak dobel
 let metricClickInited = false;
 
+// ================ INIT DARI SNAPSHOT (STARTUP OFFLINE) ================
+function initFromSnapshotsIfOffline() {
+if (navigator.onLine) return;
+
+let hasAny = false;
+
+// Produk / menu
+const cachedProducts = loadSnapshot(SNAP_PRODUCTS_KEY);
+if (cachedProducts && cachedProducts.length) {
+productsCache = cachedProducts;
+renderProductTable();
+renderRecipeTable();
+renderSaleMenu();
+updateStockMetrics();
+updateStockNotif();
+renderOpnameTable();
+hasAny = true;
+}
+
+// Sales (dashboard + history)
+const cachedSales = loadSnapshot(SNAP_SALES_KEY);
+if (cachedSales && cachedSales.length) {
+salesCache = cachedSales.map((s) => ({
+...s,
+createdAtDate: new Date(
+s.createdAtDate || s.createdAtLocal || Date.now()
+),
+}));
+updateCharts();
+updateTopMenu();
+updateHistoryTable();
+hasAny = true;
+}
+
+// Opname logs (laporan)
+const cachedOpname = loadSnapshot(SNAP_OPNAME_KEY);
+if (cachedOpname && cachedOpname.length) {
+opnameLogsCache = cachedOpname.map((o) => ({
+...o,
+createdAtDate: new Date(
+o.createdAtDate || o.createdAtLocal || Date.now()
+),
+}));
+hasAny = true;
+}
+
+if (hasAny) {
+showToast(
+"Mode offline: data dimuat dari cache perangkat",
+"info",
+3500
+);
+}
+}
+// panggil segera saat load
+initFromSnapshotsIfOffline();
+
 // ================= CONNECTION LABEL + NOTIF =================
 let lastOnlineState = navigator.onLine;
 
 function updateConnectionStatus(showNotif = false) {
-  if (!connectionStatus) return;
+if (!connectionStatus) return;
 
-  const isOnline = navigator.onLine;
+const isOnline = navigator.onLine;
 
-  if (isOnline) {
-    connectionStatus.textContent = "Online";
-    connectionStatus.classList.remove("offline");
-    connectionStatus.classList.add("online");
-  } else {
-    connectionStatus.textContent = "Offline";
-    connectionStatus.classList.remove("online");
-    connectionStatus.classList.add("offline");
-  }
+if (isOnline) {
+connectionStatus.textContent = "Online";
+connectionStatus.classList.remove("offline");
+connectionStatus.classList.add("online");
+} else {
+connectionStatus.textContent = "Offline";
+connectionStatus.classList.remove("online");
+connectionStatus.classList.add("offline");
+}
 
-  if (showNotif && isOnline !== lastOnlineState) {
-    if (!isOnline) {
-      showToast(
-        "Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
-        "error",
-        4000
-      );
-    } else {
-      showToast(
-        "Koneksi kembali online. Menyinkronkan data offline...",
-        "info",
-        4000
-      );
-      if (currentUser) {
-        syncOfflineSales();
-        syncOfflineOpname();
-      }
-    }
-  }
+if (showNotif && isOnline !== lastOnlineState) {
+if (!isOnline) {
+showToast(
+"Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
+"error",
+4000
+);
+} else {
+showToast(
+"Koneksi kembali online. Menyinkronkan data offline...",
+"info",
+4000
+);
+if (currentUser) {
+syncOfflineSales();
+syncOfflineOpname();
+// refresh data fresh dari server
+loadProducts();
+loadSales();
+loadOpnameLogs();
+}
+}
+}
 
-  lastOnlineState = isOnline;
+lastOnlineState = isOnline;
 }
 updateConnectionStatus(false);
 
@@ -372,906 +433,863 @@ window.addEventListener("offline", () => updateConnectionStatus(true));
 
 // ================= ROLE =================
 async function getUserRole(uid) {
-  try {
-    const qRole = query(colUsers, where("uid", "==", uid));
-    const snap = await getDocs(qRole);
-    if (snap.empty) return null;
-    let role;
-    snap.forEach((d) => {
-      const data = d.data();
-      if (data.role) role = data.role;
-    });
-    return role || "kasir";
-  } catch (e) {
-    console.error("getUserRole", e);
-    return "kasir";
-  }
+try {
+const qRole = query(colUsers, where("uid", "==", uid));
+const snap = await getDocs(qRole);
+if (snap.empty) return null;
+let role;
+snap.forEach((d) => {
+const data = d.data();
+if (data.role) role = data.role;
+});
+return role || "kasir";
+} catch (e) {
+console.error("getUserRole", e);
+return "kasir";
+}
 }
 
 function applyRoleUI(role) {
-  currentRole = role || "kasir";
+currentRole = role || "kasir";
 
-  const adminEls = document.querySelectorAll(".admin-only");
-  adminEls.forEach((el) => {
-    if (currentRole === "admin") el.classList.remove("hidden");
-    else el.classList.add("hidden");
-  });
+const adminEls = document.querySelectorAll(".admin-only");
+adminEls.forEach((el) => {
+if (currentRole === "admin") el.classList.remove("hidden");
+else el.classList.add("hidden");
+});
 
-  if (bannerRole)
-    bannerRole.textContent =
-      currentRole === "admin" ? "Administrator" : "Kasir";
+if (bannerRole)
+bannerRole.textContent =
+currentRole === "admin" ? "Administrator" : "Kasir";
 }
 
 // ================= NAV =================
 function showSection(name) {
-  [
-    salesSection,
-    inventorySection,
-    recipeSection,
-    dashboardSection,
-    opnameSection,
-    reportsSection,
-  ].forEach((sec) => sec && sec.classList.add("hidden"));
+[
+salesSection,
+inventorySection,
+recipeSection,
+dashboardSection,
+opnameSection,
+reportsSection,
+].forEach((sec) => sec && sec.classList.add("hidden"));
 
-  if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
-  if (name === "inventory" && inventorySection)
-    inventorySection.classList.remove("hidden");
-  if (name === "recipe" && recipeSection)
-    recipeSection.classList.remove("hidden");
-  if (name === "dashboard" && dashboardSection)
-    dashboardSection.classList.remove("hidden");
-  if (name === "opname" && opnameSection)
-    opnameSection.classList.remove("hidden");
-  if (name === "reports" && reportsSection)
-    reportsSection.classList.remove("hidden");
+if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
+if (name === "inventory" && inventorySection)
+inventorySection.classList.remove("hidden");
+if (name === "recipe" && recipeSection)
+recipeSection.classList.remove("hidden");
+if (name === "dashboard" && dashboardSection)
+dashboardSection.classList.remove("hidden");
+if (name === "opname" && opnameSection)
+opnameSection.classList.remove("hidden");
+if (name === "reports" && reportsSection)
+reportsSection.classList.remove("hidden");
 }
 
 // klik menu sidebar
 document.querySelectorAll(".side-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const section = btn.dataset.section;
-    if (!section) return;
+btn.addEventListener("click", () => {
+const section = btn.dataset.section;
+if (!section) return;
 
-    document.querySelectorAll(".side-item").forEach((b) => {
-      b.classList.remove("active");
-    });
-    btn.classList.add("active");
+document.querySelectorAll(".side-item").forEach((b) => {  
+  b.classList.remove("active");  
+});  
+btn.classList.add("active");  
 
-    if (section === "opname") {
-      opnameStatusFilter = null;
-      if (opnameSearch) opnameSearch.value = "";
-      renderOpnameTable();
-    }
+if (section === "opname") {  
+  opnameStatusFilter = null;  
+  if (opnameSearch) opnameSearch.value = "";  
+  renderOpnameTable();  
+}  
 
-    showSection(section);
+showSection(section);  
 
-    if (window.innerWidth <= 900 && sidebar) {
-      sidebar.classList.remove("open");
-    }
-  });
+if (window.innerWidth <= 900 && sidebar) {  
+  sidebar.classList.remove("open");  
+}
+
+});
 });
 
 // burger
 if (burgerBtn && sidebar) {
-  burgerBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    sidebar.classList.toggle("open");
-  });
+burgerBtn.addEventListener("click", (e) => {
+e.stopPropagation();
+sidebar.classList.toggle("open");
+});
 
-  document.addEventListener("click", (e) => {
-    if (
-      window.innerWidth <= 900 &&
-      sidebar.classList.contains("open") &&
-      !sidebar.contains(e.target) &&
-      !burgerBtn.contains(e.target)
-    ) {
-      sidebar.classList.remove("open");
-    }
-  });
+document.addEventListener("click", (e) => {
+if (
+window.innerWidth <= 900 &&
+sidebar.classList.contains("open") &&
+!sidebar.contains(e.target) &&
+!burgerBtn.contains(e.target)
+) {
+sidebar.classList.remove("open");
+}
+});
 }
 
 // ================= CLICK METRIC -> BUKA OPNAME + FILTER =================
 function initMetricClickToOpname() {
-  if (metricClickInited) return;
+if (metricClickInited) return;
 
-  [metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
-    if (!card) return;
-    card.style.cursor = "pointer";
-    card.addEventListener("click", () => {
-      if (card === metricEmptyCard) {
-        opnameStatusFilter = "Habis";
-      } else if (card === metricLowCard) {
-        opnameStatusFilter = "Hampir habis";
-      } else if (card === metricOkCard) {
-        opnameStatusFilter = "Aman";
-      } else {
-        opnameStatusFilter = null;
-      }
+[metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
+if (!card) return;
+card.style.cursor = "pointer";
+card.addEventListener("click", () => {
+if (card === metricEmptyCard) {
+opnameStatusFilter = "Habis";
+} else if (card === metricLowCard) {
+opnameStatusFilter = "Hampir habis";
+} else if (card === metricOkCard) {
+opnameStatusFilter = "Aman";
+} else {
+opnameStatusFilter = null;
+}
 
-      if (opnameSearch) opnameSearch.value = "";
+if (opnameSearch) opnameSearch.value = "";  
 
-      showSection("opname");
-      renderOpnameTable();
+  showSection("opname");  
+  renderOpnameTable();  
 
-      if (opnameSection) {
-        opnameSection.scrollIntoView({ behavior: "smooth" });
-      }
-    });
-  });
+  if (opnameSection) {  
+    opnameSection.scrollIntoView({ behavior: "smooth" });  
+  }  
+});
 
-  metricClickInited = true;
+});
+
+metricClickInited = true;
 }
 
 // ================= NOTIF STOK =================
 function productStatus(prod) {
-  if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
-  const stock = Number(prod.stock || 0);
-  const min = Number(prod.minStock || 0);
-  if (stock <= 0) return { label: "Habis", cls: "red" };
-  if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
-  return { label: "Aman", cls: "green" };
+if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
+const stock = Number(prod.stock || 0);
+const min = Number(prod.minStock || 0);
+if (stock <= 0) return { label: "Habis", cls: "red" };
+if (min > 0 && stock <= min) return { label: "Hampir habis", cls: "yellow" };
+return { label: "Aman", cls: "green" };
 }
 
 function updateStockNotif() {
-  if (!notifList || !notifBadge) return;
+if (!notifList || !notifBadge) return;
 
-  notifList.innerHTML = "";
-  let count = 0;
+notifList.innerHTML = "";
+let count = 0;
 
-  const emptyItems = productsCache.filter(
-    (p) => productStatus(p).label === "Habis"
-  );
-  const lowItems = productsCache.filter(
-    (p) => productStatus(p).label === "Hampir habis"
-  );
+const emptyItems = productsCache.filter(
+(p) => productStatus(p).label === "Habis"
+);
+const lowItems = productsCache.filter(
+(p) => productStatus(p).label === "Hampir habis"
+);
 
-  emptyItems.forEach((p) => {
-    const li = document.createElement("li");
-    li.textContent = `Stok habis: ${p.name}`;
-    notifList.appendChild(li);
-    count++;
-  });
-  lowItems.forEach((p) => {
-    const li = document.createElement("li");
-    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${
-      p.unit || ""
-    })`;
-    notifList.appendChild(li);
-    count++;
-  });
+emptyItems.forEach((p) => {
+const li = document.createElement("li");
+li.textContent = Stok habis: ${p.name};
+notifList.appendChild(li);
+count++;
+});
+lowItems.forEach((p) => {
+const li = document.createElement("li");
+li.textContent = Hampir habis: ${p.name} (sisa ${p.stock} ${   p.unit || ""   });
+notifList.appendChild(li);
+count++;
+});
 
-  if (count === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Tidak ada notifikasi stok.";
-    notifList.appendChild(li);
-  }
-  notifBadge.textContent = String(count);
+if (count === 0) {
+const li = document.createElement("li");
+li.textContent = "Tidak ada notifikasi stok.";
+notifList.appendChild(li);
+}
+notifBadge.textContent = String(count);
 }
 
 if (notifBtn && notifPanel) {
-  notifBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    notifPanel.classList.toggle("hidden");
-  });
-  document.addEventListener("click", (e) => {
-    if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
-      notifPanel.classList.add("hidden");
-    }
-  });
+notifBtn.addEventListener("click", (e) => {
+e.stopPropagation();
+notifPanel.classList.toggle("hidden");
+});
+document.addEventListener("click", (e) => {
+if (!notifPanel.contains(e.target) && !notifBtn.contains(e.target)) {
+notifPanel.classList.add("hidden");
+}
+});
 }
 
 // ================= INVENTORY FORM VISIBILITY =================
 function updateInventoryFormVisibility() {
-  const type = productType?.value || "bahan_baku";
-  if (!groupPrice || !groupStock || !groupMinStock) return;
+const type = productType?.value || "bahan_baku";
+if (!groupPrice || !groupStock || !groupMinStock) return;
 
-  if (type === "bahan_baku") {
-    groupPrice.classList.add("hidden");
-    groupStock.classList.remove("hidden");
-    groupMinStock.classList.remove("hidden");
-    if (productPrice) productPrice.value = "";
-  } else {
-    groupPrice.classList.remove("hidden");
-    groupStock.classList.add("hidden");
-    groupMinStock.classList.add("hidden");
-    if (productStock) productStock.value = "";
-    if (productMinStock) productMinStock.value = "";
-  }
+if (type === "bahan_baku") {
+groupPrice.classList.add("hidden");
+groupStock.classList.remove("hidden");
+groupMinStock.classList.remove("hidden");
+if (productPrice) productPrice.value = "";
+} else {
+groupPrice.classList.remove("hidden");
+groupStock.classList.add("hidden");
+groupMinStock.classList.add("hidden");
+if (productStock) productStock.value = "";
+if (productMinStock) productMinStock.value = "";
+}
 }
 
 if (productType) {
-  productType.addEventListener("change", updateInventoryFormVisibility);
-  updateInventoryFormVisibility();
+productType.addEventListener("change", updateInventoryFormVisibility);
+updateInventoryFormVisibility();
 }
 
 // ================= AUTH BTN =================
 if (btnLogin) {
-  btnLogin.addEventListener("click", async () => {
-    try {
-      const email = (loginEmail?.value || "").trim();
-      const pass = (loginPassword?.value || "").trim();
-      if (!email || !pass) {
-        showToast("Email & password wajib diisi", "error");
-        return;
-      }
-      await signInWithEmailAndPassword(auth, email, pass);
-      showToast("Login berhasil", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("Login gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnLogin.addEventListener("click", async () => {
+try {
+const email = (loginEmail?.value || "").trim();
+const pass = (loginPassword?.value || "").trim();
+if (!email || !pass) {
+showToast("Email & password wajib diisi", "error");
+return;
+}
+await signInWithEmailAndPassword(auth, email, pass);
+showToast("Login berhasil", "success");
+} catch (err) {
+console.error(err);
+showToast("Login gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 if (btnRegister) {
-  btnRegister.addEventListener("click", async () => {
-    try {
-      const email = (registerEmail?.value || "").trim();
-      const pass = (registerPassword?.value || "").trim();
-      const role = registerRole?.value || "kasir";
-      if (!email || !pass) {
-        showToast("Email & password wajib diisi", "error");
-        return;
-      }
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await addDoc(colUsers, {
-        uid: cred.user.uid,
-        email,
-        role,
-        createdAt: serverTimestamp(),
-      });
-      showToast("User berhasil dibuat", "success");
-      if (registerEmail) registerEmail.value = "";
-      if (registerPassword) registerPassword.value = "";
-    } catch (err) {
-      console.error(err);
-      showToast("Register gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnRegister.addEventListener("click", async () => {
+try {
+const email = (registerEmail?.value || "").trim();
+const pass = (registerPassword?.value || "").trim();
+const role = registerRole?.value || "kasir";
+if (!email || !pass) {
+showToast("Email & password wajib diisi", "error");
+return;
+}
+const cred = await createUserWithEmailAndPassword(auth, email, pass);
+await addDoc(colUsers, {
+uid: cred.user.uid,
+email,
+role,
+createdAt: serverTimestamp(),
+});
+showToast("User berhasil dibuat", "success");
+if (registerEmail) registerEmail.value = "";
+if (registerPassword) registerPassword.value = "";
+} catch (err) {
+console.error(err);
+showToast("Register gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error(err);
-      showToast("Logout gagal: " + (err.message || err.code), "error");
-    }
-  });
+btnLogout.addEventListener("click", async () => {
+try {
+await signOut(auth);
+} catch (err) {
+console.error(err);
+showToast("Logout gagal: " + (err.message || err.code), "error");
+}
+});
 }
 
 // ================= LOAD PRODUCTS =================
 async function loadProducts() {
-  try {
-    const snap = await getDocs(query(colProducts, orderBy("name", "asc")));
-    productsCache = [];
-    snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
+try {
+const snap = await getDocs(query(colProducts, orderBy("name", "asc")));
+productsCache = [];
+snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
 
-    // simpan snapshot untuk offline
-    saveSnapshot(SNAP_PRODUCTS_KEY, productsCache);
+// simpan snapshot untuk offline  
+saveSnapshot(SNAP_PRODUCTS_KEY, productsCache);  
 
-    renderProductTable();
-    renderRecipeTable();
-    renderSaleMenu();
-    updateStockMetrics();
-    updateStockNotif();
-    renderOpnameTable();
-  } catch (err) {
-    console.error("loadProducts error:", err);
+renderProductTable();  
+renderRecipeTable();  
+renderSaleMenu();  
+updateStockMetrics();  
+updateStockNotif();  
+renderOpnameTable();
 
-    // fallback ke snapshot kalau ada
-    const cached = loadSnapshot(SNAP_PRODUCTS_KEY);
-    if (cached) {
-      productsCache = cached;
-      renderProductTable();
-      renderRecipeTable();
-      renderSaleMenu();
-      updateStockMetrics();
-      updateStockNotif();
-      renderOpnameTable();
-      showToast("Memuat data produk dari cache offline", "info");
-      return;
-    }
+} catch (err) {
+console.error("loadProducts error:", err);
 
-    showToast("Gagal mengambil data produk & tidak ada cache offline", "error");
-  }
+// fallback ke snapshot kalau ada  
+const cached = loadSnapshot(SNAP_PRODUCTS_KEY);  
+if (cached) {  
+  productsCache = cached;  
+  renderProductTable();  
+  renderRecipeTable();  
+  renderSaleMenu();  
+  updateStockMetrics();  
+  updateStockNotif();  
+  renderOpnameTable();  
+  showToast("Memuat data produk dari cache offline", "info");  
+  return;  
+}  
+
+showToast("Gagal mengambil data produk & tidak ada cache offline", "error");
+
+}
 }
 
 // ================= INVENTORY (BAHAN BAKU) =================
 function renderProductTable() {
-  if (!productTable) return;
-  productTable.innerHTML = "";
+if (!productTable) return;
+productTable.innerHTML = "";
 
-  let bahanList = productsCache.filter((p) => p.type === "bahan_baku");
+let bahanList = productsCache.filter((p) => p.type === "bahan_baku");
 
-  const q = (inventorySearch?.value || "").trim().toLowerCase();
-  if (q) {
-    bahanList = bahanList.filter(
-      (p) =>
-        (p.name || "").toLowerCase().includes(q) ||
-        (p.category || "").toLowerCase().includes(q)
-    );
-  }
+const q = (inventorySearch?.value || "").trim().toLowerCase();
+if (q) {
+bahanList = bahanList.filter(
+(p) =>
+(p.name || "").toLowerCase().includes(q) ||
+(p.category || "").toLowerCase().includes(q)
+);
+}
 
-  if (!bahanList.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="7">Belum ada bahan baku yang cocok.</td>';
-    productTable.appendChild(tr);
-    return;
-  }
+if (!bahanList.length) {
+const tr = document.createElement("tr");
+tr.innerHTML =
+'<td colspan="7">Belum ada bahan baku yang cocok.</td>';
+productTable.appendChild(tr);
+return;
+}
 
-  bahanList.forEach((p) => {
-    const st = productStatus(p);
+bahanList.forEach((p) => {
+const st = productStatus(p);
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${p.name || "-"}</td>
-      <td>Bahan Baku</td>
-      <td>${p.category || "-"}</td>
-      <td>-</td>
-      <td>${Number(p.stock || 0).toLocaleString("id-ID")}</td>
-      <td><span class="status-badge ${st.cls}">${st.label}</span></td>
-      <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>
-        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>
-      </td>
-    `;
-    productTable.appendChild(tr);
-  });
+const tr = document.createElement("tr");  
+tr.innerHTML = `  
+  <td>${p.name || "-"}</td>  
+  <td>Bahan Baku</td>  
+  <td>${p.category || "-"}</td>  
+  <td>-</td>  
+  <td>${Number(p.stock || 0).toLocaleString("id-ID")}</td>  
+  <td><span class="status-badge ${st.cls}">${st.label}</span></td>  
+  <td class="table-actions">  
+    <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>  
+    <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>  
+  </td>  
+`;  
+productTable.appendChild(tr);
 
-  productTable.querySelectorAll("button").forEach((btn) => {
-    const id = btn.getAttribute("data-id");
-    const act = btn.getAttribute("data-act");
-    if (act === "edit") btn.addEventListener("click", () => fillProductForm(id));
-    if (act === "del") btn.addEventListener("click", () => deleteProduct(id));
-  });
+});
+
+productTable.querySelectorAll("button").forEach((btn) => {
+const id = btn.getAttribute("data-id");
+const act = btn.getAttribute("data-act");
+if (act === "edit") btn.addEventListener("click", () => fillProductForm(id));
+if (act === "del") btn.addEventListener("click", () => deleteProduct(id));
+});
 }
 
 if (inventorySearch) {
-  inventorySearch.addEventListener("input", renderProductTable);
+inventorySearch.addEventListener("input", renderProductTable);
 }
 
 function fillProductForm(id) {
-  const p = productsCache.find((x) => x.id === id);
-  if (!p) return;
-  editingProductId = id;
-  if (productName) productName.value = p.name || "";
-  if (productType) productType.value = p.type || "bahan_baku";
-  if (productCategory) productCategory.value = p.category || "makanan";
-  if (productPrice) productPrice.value = formatRupiahInput(p.price || 0);
-  if (productStock) productStock.value = formatRupiahInput(p.stock || 0);
-  if (productMinStock) productMinStock.value = formatRupiahInput(p.minStock || 0);
-  if (productUnit) productUnit.value = p.unit || "";
-  updateInventoryFormVisibility();
+const p = productsCache.find((x) => x.id === id);
+if (!p) return;
+editingProductId = id;
+if (productName) productName.value = p.name || "";
+if (productType) productType.value = p.type || "bahan_baku";
+if (productCategory) productCategory.value = p.category || "makanan";
+if (productPrice) productPrice.value = formatRupiahInput(p.price || 0);
+if (productStock) productStock.value = formatRupiahInput(p.stock || 0);
+if (productMinStock) productMinStock.value = formatRupiahInput(p.minStock || 0);
+if (productUnit) productUnit.value = p.unit || "";
+updateInventoryFormVisibility();
 }
 
 async function deleteProduct(id) {
-  const p = productsCache.find((x) => x.id === id);
-  if (!p) return;
-  if (!confirm(`Hapus "${p.name}"?`)) return;
-  try {
-    await deleteDoc(doc(db, "products", id));
-    showToast("Produk dihapus", "success");
-    await loadProducts();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menghapus produk", "error");
-  }
+const p = productsCache.find((x) => x.id === id);
+if (!p) return;
+if (!confirm(Hapus "${p.name}"?)) return;
+try {
+await deleteDoc(doc(db, "products", id));
+showToast("Produk dihapus", "success");
+await loadProducts();
+} catch (e) {
+console.error(e);
+showToast("Gagal menghapus produk", "error");
+}
 }
 
 if (btnSaveProduct) {
-  btnSaveProduct.addEventListener("click", async () => {
-    try {
-      const name = (productName?.value || "").trim();
-      const type = "bahan_baku";
-      const category = productCategory?.value || "lainnya";
-      const price = 0;
-      const stock = cleanNumber(productStock?.value || 0);
-      const minStock = cleanNumber(productMinStock?.value || 0);
-      const unit = (productUnit?.value || "").trim();
+btnSaveProduct.addEventListener("click", async () => {
+try {
+const name = (productName?.value || "").trim();
+const type = "bahan_baku";
+const category = productCategory?.value || "lainnya";
+const price = 0;
+const stock = cleanNumber(productStock?.value || 0);
+const minStock = cleanNumber(productMinStock?.value || 0);
+const unit = (productUnit?.value || "").trim();
 
-      if (!name) {
-        showToast("Nama produk wajib diisi", "error");
-        return;
-      }
+if (!name) {  
+    showToast("Nama produk wajib diisi", "error");  
+    return;  
+  }  
 
-      const payload = {
-        name,
-        type,
-        category,
-        price,
-        stock,
-        minStock,
-        unit,
-        updatedAt: serverTimestamp(),
-      };
+  const payload = {  
+    name,  
+    type,  
+    category,  
+    price,  
+    stock,  
+    minStock,  
+    unit,  
+    updatedAt: serverTimestamp(),  
+  };  
 
-      if (editingProductId) {
-        await updateDoc(doc(db, "products", editingProductId), payload);
-        showToast("Produk diupdate", "success");
-      } else {
-        await addDoc(colProducts, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
-        showToast("Produk ditambahkan", "success");
-      }
+  if (editingProductId) {  
+    await updateDoc(doc(db, "products", editingProductId), payload);  
+    showToast("Produk diupdate", "success");  
+  } else {  
+    await addDoc(colProducts, {  
+      ...payload,  
+      createdAt: serverTimestamp(),  
+    });  
+    showToast("Produk ditambahkan", "success");  
+  }  
 
-      editingProductId = null;
-      if (productName) productName.value = "";
-      if (productStock) productStock.value = "";
-      if (productMinStock) productMinStock.value = "";
-      if (productUnit) productUnit.value = "";
-      await loadProducts();
-    } catch (err) {
-      console.error(err);
-      showToast("Gagal menyimpan produk", "error");
-    }
-  });
+  editingProductId = null;  
+  if (productName) productName.value = "";  
+  if (productStock) productStock.value = "";  
+  if (productMinStock) productMinStock.value = "";  
+  if (productUnit) productUnit.value = "";  
+  await loadProducts();  
+} catch (err) {  
+  console.error(err);  
+  showToast("Gagal menyimpan produk", "error");  
+}
+
+});
 }
 
 // ================= RESEP / BOM (MENU) =================
 function addBomRow(selectedId = "", qty = 1) {
-  if (!bomList) return;
+if (!bomList) return;
 
-  const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
-  if (!allBahan.length) {
-    showToast("Belum ada bahan baku di Inventory", "error");
-    return;
-  }
+const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
+if (!allBahan.length) {
+showToast("Belum ada bahan baku di Inventory", "error");
+return;
+}
 
-  const selectedBahan = allBahan.find((b) => b.id === selectedId) || null;
+const selectedBahan = allBahan.find((b) => b.id === selectedId) || null;
 
-  const row = document.createElement("div");
-  row.className = "bom-row";
-  row.innerHTML = `
-    <div class="bom-row-material">
-      <input type="text" class="bom-search" placeholder="Cari bahan..." autocomplete="off" />
-      <div class="bom-suggest hidden"></div>
-      <input type="hidden" class="bom-material-id" value="${selectedId || ""}">
-    </div>
-    <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">
-    <button type="button" class="btn-table small bom-remove">x</button>
-  `;
-  bomList.appendChild(row);
+const row = document.createElement("div");
+row.className = "bom-row";
+row.innerHTML =   <div class="bom-row-material">   <input type="text" class="bom-search" placeholder="Cari bahan..." autocomplete="off" />   <div class="bom-suggest hidden"></div>   <input type="hidden" class="bom-material-id" value="${selectedId || ""}">   </div>   <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">   <button type="button" class="btn-table small bom-remove">x</button>  ;
+bomList.appendChild(row);
 
-  const searchInput = row.querySelector(".bom-search");
-  const suggestBox = row.querySelector(".bom-suggest");
-  const hiddenId = row.querySelector(".bom-material-id");
-  const removeBtn = row.querySelector(".bom-remove");
+const searchInput = row.querySelector(".bom-search");
+const suggestBox = row.querySelector(".bom-suggest");
+const hiddenId = row.querySelector(".bom-material-id");
+const removeBtn = row.querySelector(".bom-remove");
 
-  if (selectedBahan) {
-    searchInput.value = `${selectedBahan.name} (${Number(
-      selectedBahan.stock || 0
-    ).toLocaleString("id-ID")} ${selectedBahan.unit || ""})`;
-  }
+if (selectedBahan) {
+searchInput.value = ${selectedBahan.name} (${Number(   selectedBahan.stock || 0   ).toLocaleString("id-ID")} ${selectedBahan.unit || ""});
+}
 
-  function renderSuggest(keyword) {
-    const q = (keyword || "").trim().toLowerCase();
-    let list = allBahan;
+function renderSuggest(keyword) {
+const q = (keyword || "").trim().toLowerCase();
+let list = allBahan;
 
-    if (q) {
-      list = allBahan.filter(
-        (b) =>
-          (b.name || "").toLowerCase().includes(q) ||
-          (b.category || "").toLowerCase().includes(q) ||
-          (b.unit || "").toLowerCase().includes(q)
-      );
-    }
+if (q) {  
+  list = allBahan.filter(  
+    (b) =>  
+      (b.name || "").toLowerCase().includes(q) ||  
+      (b.category || "").toLowerCase().includes(q) ||  
+      (b.unit || "").toLowerCase().includes(q)  
+  );  
+}  
 
-    if (!list.length) {
-      suggestBox.innerHTML =
-        '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
-      suggestBox.classList.remove("hidden");
-      return;
-    }
+if (!list.length) {  
+  suggestBox.innerHTML =  
+    '<div class="bom-suggest-item empty">Tidak ada bahan</div>';  
+  suggestBox.classList.remove("hidden");  
+  return;  
+}  
 
-    suggestBox.innerHTML = list
-      .map(
-        (b) => `
-        <div class="bom-suggest-item" data-id="${b.id}">
-          ${b.name} (${Number(b.stock || 0).toLocaleString(
-            "id-ID"
-          )} ${b.unit || ""})
-        </div>`
-      )
-      .join("");
+suggestBox.innerHTML = list  
+  .map(  
+    (b) => `  
+    <div class="bom-suggest-item" data-id="${b.id}">  
+      ${b.name} (${Number(b.stock || 0).toLocaleString(  
+        "id-ID"  
+      )} ${b.unit || ""})  
+    </div>`  
+  )  
+  .join("");  
 
-    suggestBox.classList.remove("hidden");
+suggestBox.classList.remove("hidden");  
 
-    suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
-      const id = item.getAttribute("data-id");
-      if (!id) return;
-      item.addEventListener("click", () => {
-        const bahan = allBahan.find((b) => b.id === id);
-        hiddenId.value = id;
-        searchInput.value = `${bahan.name} (${Number(
-          bahan.stock || 0
-        ).toLocaleString("id-ID")} ${bahan.unit || ""})`;
-        suggestBox.classList.add("hidden");
-      });
-    });
+suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {  
+  const id = item.getAttribute("data-id");  
+  if (!id) return;  
+  item.addEventListener("click", () => {  
+    const bahan = allBahan.find((b) => b.id === id);  
+    hiddenId.value = id;  
+    searchInput.value = `${bahan.name} (${Number(  
+      bahan.stock || 0  
+    ).toLocaleString("id-ID")} ${bahan.unit || ""})`;  
+    suggestBox.classList.add("hidden");  
+  });  
+});  
 
-    if (list.length === 1) {
-      const b = list[0];
-      hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString(
-        "id-ID"
-      )} ${b.unit || ""})`;
-      suggestBox.classList.add("hidden");
-    }
-  }
+if (list.length === 1) {  
+  const b = list[0];  
+  hiddenId.value = b.id;  
+  searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString(  
+    "id-ID"  
+  )} ${b.unit || ""})`;  
+  suggestBox.classList.add("hidden");  
+}
 
-  searchInput.addEventListener("input", () => {
-    hiddenId.value = "";
-    renderSuggest(searchInput.value);
-  });
+}
 
-  searchInput.addEventListener("focus", () => {
-    renderSuggest(searchInput.value);
-  });
+searchInput.addEventListener("input", () => {
+hiddenId.value = "";
+renderSuggest(searchInput.value);
+});
 
-  document.addEventListener("click", (e) => {
-    if (!row.contains(e.target)) {
-      suggestBox.classList.add("hidden");
-    }
-  });
+searchInput.addEventListener("focus", () => {
+renderSuggest(searchInput.value);
+});
 
-  removeBtn.addEventListener("click", () => row.remove());
+document.addEventListener("click", (e) => {
+if (!row.contains(e.target)) {
+suggestBox.classList.add("hidden");
+}
+});
+
+removeBtn.addEventListener("click", () => row.remove());
 }
 
 if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => addBomRow());
+btnAddBomRow.addEventListener("click", () => addBomRow());
 }
 
 function openBomModal(menuId) {
-  if (!bomModal || !bomModalBody || !bomModalTitle) return;
-  const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
-  if (!m) return;
+if (!bomModal || !bomModalBody || !bomModalTitle) return;
+const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
+if (!m) return;
 
-  bomModalTitle.textContent = `BOM: ${m.name || "-"}`;
+bomModalTitle.textContent = BOM: ${m.name || "-"};
 
-  const descHtml =
-    m.desc && String(m.desc).trim()
-      ? `
-        <div class="modal-section">
-          <div class="modal-sec-title">Deskripsi</div>
-          <p>${m.desc}</p>
-        </div>
-      `
-      : "";
+const descHtml =
+m.desc && String(m.desc).trim()
+?   <div class="modal-section">   <div class="modal-sec-title">Deskripsi</div>   <p>${m.desc}</p>   </div>  
+: "";
 
-  let bomHtml = "";
-  if (Array.isArray(m.bom) && m.bom.length) {
-    bomHtml = `
-      <div class="modal-section">
-        <div class="modal-sec-title">Bahan per 1 porsi</div>
-        <ul class="modal-bom-list">
-          ${m.bom
-            .map(
-              (b) =>
-                `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`
-            )
-            .join("")}
-        </ul>
-      </div>
-    `;
-  } else {
-    bomHtml = `<p class="modal-empty">Belum ada BOM untuk menu ini.</p>`;
-  }
+let bomHtml = "";
+if (Array.isArray(m.bom) && m.bom.length) {
+bomHtml =   <div class="modal-section">   <div class="modal-sec-title">Bahan per 1 porsi</div>   <ul class="modal-bom-list">   ${m.bom   .map(   (b) =>  <li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>  )   .join("")}   </ul>   </div>  ;
+} else {
+bomHtml = <p class="modal-empty">Belum ada BOM untuk menu ini.</p>;
+}
 
-  bomModalBody.innerHTML = descHtml + bomHtml;
-  bomModal.classList.remove("hidden");
+bomModalBody.innerHTML = descHtml + bomHtml;
+bomModal.classList.remove("hidden");
 }
 
 // close modal
 if (bomModalClose && bomModal) {
-  bomModalClose.addEventListener("click", () => {
-    bomModal.classList.add("hidden");
-  });
-  const backdrop = bomModal.querySelector(".modal-backdrop");
-  if (backdrop) {
-    backdrop.addEventListener("click", () => {
-      bomModal.classList.add("hidden");
-    });
-  }
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") bomModal.classList.add("hidden");
-  });
+bomModalClose.addEventListener("click", () => {
+bomModal.classList.add("hidden");
+});
+const backdrop = bomModal.querySelector(".modal-backdrop");
+if (backdrop) {
+backdrop.addEventListener("click", () => {
+bomModal.classList.add("hidden");
+});
+}
+window.addEventListener("keydown", (e) => {
+if (e.key === "Escape") bomModal.classList.add("hidden");
+});
 }
 
 function renderRecipeTable() {
-  if (!recipeTable) return;
-  recipeTable.innerHTML = "";
+if (!recipeTable) return;
+recipeTable.innerHTML = "";
 
-  let menus = productsCache.filter((p) => p.type === "menu");
+let menus = productsCache.filter((p) => p.type === "menu");
 
-  const q = (recipeSearch?.value || "").trim().toLowerCase();
-  if (q) {
-    menus = menus.filter(
-      (m) =>
-        (m.name || "").toLowerCase().includes(q) ||
-        (m.category || "").toLowerCase().includes(q)
-    );
-  }
+const q = (recipeSearch?.value || "").trim().toLowerCase();
+if (q) {
+menus = menus.filter(
+(m) =>
+(m.name || "").toLowerCase().includes(q) ||
+(m.category || "").toLowerCase().includes(q)
+);
+}
 
-  if (!menus.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="5">Belum ada menu / resep.</td>';
-    recipeTable.appendChild(tr);
-    return;
-  }
+if (!menus.length) {
+const tr = document.createElement("tr");
+tr.innerHTML = '<td colspan="5">Belum ada menu / resep.</td>';
+recipeTable.appendChild(tr);
+return;
+}
 
-  menus.forEach((m) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.name || "-"}</td>
-      <td>${m.category || "-"}</td>
-      <td>${formatCurrency(m.price || 0)}</td>
-      <td class="bom-eye-cell">
-        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
-          <i class="lucide-eye"></i>
-        </button>
-      </td>
-      <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
-        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
-      </td>
-    `;
-    recipeTable.appendChild(tr);
-  });
+menus.forEach((m) => {
+const tr = document.createElement("tr");
+tr.innerHTML =   <td>${m.name || "-"}</td>   <td>${m.category || "-"}</td>   <td>${formatCurrency(m.price || 0)}</td>   <td class="bom-eye-cell">   <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">   <i class="lucide-eye"></i>   </button>   </td>   <td class="table-actions">   <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>   <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>   </td>  ;
+recipeTable.appendChild(tr);
+});
 
-  recipeTable.querySelectorAll("button").forEach((btn) => {
-    const id = btn.getAttribute("data-id");
-    const act = btn.getAttribute("data-act");
-    if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
-    if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
-    if (act === "view-bom") btn.addEventListener("click", () => openBomModal(id));
-  });
+recipeTable.querySelectorAll("button").forEach((btn) => {
+const id = btn.getAttribute("data-id");
+const act = btn.getAttribute("data-act");
+if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
+if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
+if (act === "view-bom") btn.addEventListener("click", () => openBomModal(id));
+});
 }
 
 if (recipeSearch) {
-  recipeSearch.addEventListener("input", renderRecipeTable);
+recipeSearch.addEventListener("input", renderRecipeTable);
 }
 
 function fillRecipeForm(id) {
-  const m = productsCache.find((x) => x.id === id && x.type === "menu");
-  if (!m) return;
-  editingRecipeId = id;
-  if (recipeName) recipeName.value = m.name || "";
-  if (recipeCategory) recipeCategory.value = m.category || "makanan";
-  if (recipePrice) recipePrice.value = formatRupiahInput(m.price || 0);
-  if (recipeDesc) recipeDesc.value = m.desc || "";
+const m = productsCache.find((x) => x.id === id && x.type === "menu");
+if (!m) return;
+editingRecipeId = id;
+if (recipeName) recipeName.value = m.name || "";
+if (recipeCategory) recipeCategory.value = m.category || "makanan";
+if (recipePrice) recipePrice.value = formatRupiahInput(m.price || 0);
+if (recipeDesc) recipeDesc.value = m.desc || "";
 
-  if (bomList) {
-    bomList.innerHTML = "";
-    (m.bom || []).forEach((b) => addBomRow(b.materialId, b.qty));
-  }
+if (bomList) {
+bomList.innerHTML = "";
+(m.bom || []).forEach((b) => addBomRow(b.materialId, b.qty));
+}
 }
 
 async function deleteRecipe(id) {
-  const m = productsCache.find((x) => x.id === id && x.type === "menu");
-  if (!m) return;
-  if (!confirm(`Hapus resep/menu "${m.name}"?`)) return;
-  try {
-    await deleteDoc(doc(db, "products", id));
-    showToast("Resep dihapus", "success");
-    await loadProducts();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menghapus resep", "error");
-  }
+const m = productsCache.find((x) => x.id === id && x.type === "menu");
+if (!m) return;
+if (!confirm(Hapus resep/menu "${m.name}"?)) return;
+try {
+await deleteDoc(doc(db, "products", id));
+showToast("Resep dihapus", "success");
+await loadProducts();
+} catch (e) {
+console.error(e);
+showToast("Gagal menghapus resep", "error");
+}
 }
 
 if (btnSaveRecipe) {
-  btnSaveRecipe.addEventListener("click", async () => {
-    try {
-      const name = (recipeName?.value || "").trim();
-      const category = recipeCategory?.value || "lainnya";
-      const price = cleanNumber(recipePrice?.value || 0);
-      const desc = (recipeDesc?.value || "").trim();
+btnSaveRecipe.addEventListener("click", async () => {
+try {
+const name = (recipeName?.value || "").trim();
+const category = recipeCategory?.value || "lainnya";
+const price = cleanNumber(recipePrice?.value || 0);
+const desc = (recipeDesc?.value || "").trim();
 
-      if (!name) {
-        showToast("Nama menu wajib diisi", "error");
-        return;
-      }
-      if (!price || price <= 0) {
-        showToast("Harga jual wajib diisi", "error");
-        return;
-      }
+if (!name) {  
+    showToast("Nama menu wajib diisi", "error");  
+    return;  
+  }  
+  if (!price || price <= 0) {  
+    showToast("Harga jual wajib diisi", "error");  
+    return;  
+  }  
 
-      const bom = [];
-      if (bomList) {
-        bomList.querySelectorAll(".bom-row").forEach((row) => {
-          const idInput = row.querySelector(".bom-material-id");
-          const inp = row.querySelector(".bom-qty");
-          const materialId = idInput?.value || "";
-          const qty = Number(inp?.value || 0);
-          if (!materialId || qty <= 0) return;
-          const bahan = productsCache.find((p) => p.id === materialId);
-          bom.push({
-            materialId,
-            materialName: bahan?.name || "",
-            qty,
-            unit: bahan?.unit || "",
-          });
-        });
-      }
-      const payload = {
-        name,
-        type: "menu",
-        category,
-        price,
-        desc,
-        bom,
-        stock: 0,
-        minStock: 0,
-        updatedAt: serverTimestamp(),
-      };
+  const bom = [];  
+  if (bomList) {  
+    bomList.querySelectorAll(".bom-row").forEach((row) => {  
+      const idInput = row.querySelector(".bom-material-id");  
+      const inp = row.querySelector(".bom-qty");  
+      const materialId = idInput?.value || "";  
+      const qty = Number(inp?.value || 0);  
+      if (!materialId || qty <= 0) return;  
+      const bahan = productsCache.find((p) => p.id === materialId);  
+      bom.push({  
+        materialId,  
+        materialName: bahan?.name || "",  
+        qty,  
+        unit: bahan?.unit || "",  
+      });  
+    });  
+  }  
+  const payload = {  
+    name,  
+    type: "menu",  
+    category,  
+    price,  
+    desc,  
+    bom,  
+    stock: 0,  
+    minStock: 0,  
+    updatedAt: serverTimestamp(),  
+  };  
 
-      if (editingRecipeId) {
-        await updateDoc(doc(db, "products", editingRecipeId), payload);
-        showToast("Resep diupdate", "success");
-      } else {
-        await addDoc(colProducts, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
-        showToast("Resep ditambahkan", "success");
-      }
+  if (editingRecipeId) {  
+    await updateDoc(doc(db, "products", editingRecipeId), payload);  
+    showToast("Resep diupdate", "success");  
+  } else {  
+    await addDoc(colProducts, {  
+      ...payload,  
+      createdAt: serverTimestamp(),  
+    });  
+    showToast("Resep ditambahkan", "success");  
+  }  
 
-      editingRecipeId = null;
-      if (recipeName) recipeName.value = "";
-      if (recipePrice) recipePrice.value = "";
-      if (recipeDesc) recipeDesc.value = "";
-      if (bomList) bomList.innerHTML = "";
+  editingRecipeId = null;  
+  if (recipeName) recipeName.value = "";  
+  if (recipePrice) recipePrice.value = "";  
+  if (recipeDesc) recipeDesc.value = "";  
+  if (bomList) bomList.innerHTML = "";  
 
-      await loadProducts();
-    } catch (err) {
-      console.error(err);
-      showToast("Gagal menyimpan resep", "error");
-    }
-  });
+  await loadProducts();  
+} catch (err) {  
+  console.error(err);  
+  showToast("Gagal menyimpan resep", "error");  
+}
+
+});
 }
 
 // ================= POS =================
 function renderSaleMenu() {
-  if (!saleMenuBody) return;
-  saleMenuBody.innerHTML = "";
-  let list = productsCache.filter((p) => p.type === "menu");
-  const q = (saleSearch?.value || "").trim().toLowerCase();
-  if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
+if (!saleMenuBody) return;
+saleMenuBody.innerHTML = "";
+let list = productsCache.filter((p) => p.type === "menu");
+const q = (saleSearch?.value || "").trim().toLowerCase();
+if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
 
-  list.forEach((m) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.name || "-"}</td>
-      <td>${formatCurrency(m.price || 0)}</td>
-      <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>
-    `;
-    saleMenuBody.appendChild(tr);
-  });
+list.forEach((m) => {
+const tr = document.createElement("tr");
+tr.innerHTML =   <td>${m.name || "-"}</td>   <td>${formatCurrency(m.price || 0)}</td>   <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>  ;
+saleMenuBody.appendChild(tr);
+});
 
-  saleMenuBody.querySelectorAll("button").forEach((b) => {
-    const id = b.getAttribute("data-id");
-    b.addEventListener("click", () => addToCart(id));
-  });
+saleMenuBody.querySelectorAll("button").forEach((b) => {
+const id = b.getAttribute("data-id");
+b.addEventListener("click", () => addToCart(id));
+});
 }
 if (saleSearch) saleSearch.addEventListener("input", renderSaleMenu);
 
 function addToCart(productId) {
-  const menu = productsCache.find((p) => p.id === productId);
-  if (!menu) return;
-  const existing = currentCart.find((i) => i.productId === productId);
-  if (existing) {
-    existing.qty += 1;
-    existing.subtotal += menu.price || 0;
-  } else {
-    currentCart.push({
-      productId,
-      name: menu.name || "-",
-      qty: 1,
-      price: menu.price || 0,
-      subtotal: menu.price || 0,
-    });
-  }
-  renderCart();
+const menu = productsCache.find((p) => p.id === productId);
+if (!menu) return;
+const existing = currentCart.find((i) => i.productId === productId);
+if (existing) {
+existing.qty += 1;
+existing.subtotal += menu.price || 0;
+} else {
+currentCart.push({
+productId,
+name: menu.name || "-",
+qty: 1,
+price: menu.price || 0,
+subtotal: menu.price || 0,
+});
+}
+renderCart();
 }
 function renderCart() {
-  if (!cartBody) return;
-  cartBody.innerHTML = "";
-  currentCart.forEach((it, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${it.name}</td>
-      <td>${it.qty}</td>
-      <td>${formatCurrency(it.subtotal)}</td>
-      <td><button class="btn-table small" data-idx="${idx}">x</button></td>
-    `;
-    cartBody.appendChild(tr);
-  });
-  cartBody.querySelectorAll("button").forEach((btn) => {
-    const idx = Number(btn.getAttribute("data-idx"));
-    btn.addEventListener("click", () => {
-      currentCart.splice(idx, 1);
-      renderCart();
-    });
-  });
-  updateCartSummary();
+if (!cartBody) return;
+cartBody.innerHTML = "";
+currentCart.forEach((it, idx) => {
+const tr = document.createElement("tr");
+tr.innerHTML =   <td>${it.name}</td>   <td>${it.qty}</td>   <td>${formatCurrency(it.subtotal)}</td>   <td><button class="btn-table small" data-idx="${idx}">x</button></td>  ;
+cartBody.appendChild(tr);
+});
+cartBody.querySelectorAll("button").forEach((btn) => {
+const idx = Number(btn.getAttribute("data-idx"));
+btn.addEventListener("click", () => {
+currentCart.splice(idx, 1);
+renderCart();
+});
+});
+updateCartSummary();
 }
 
 function updateCartSummary() {
-  const subtotal = currentCart.reduce(
-    (sum, it) => sum + Number(it.subtotal || 0),
-    0
-  );
+const subtotal = currentCart.reduce(
+(sum, it) => sum + Number(it.subtotal || 0),
+0
+);
 
-  if (cartSubtotalLabel) {
-    cartSubtotalLabel.textContent = formatCurrency(subtotal);
-  }
+if (cartSubtotalLabel) {
+cartSubtotalLabel.textContent = formatCurrency(subtotal);
+}
 
-  const discPct = Number(saleDiscount?.value || 0);
-  const voucher = cleanNumber(saleVoucher?.value || 0);
+const discPct = Number(saleDiscount?.value || 0);
+const voucher = cleanNumber(saleVoucher?.value || 0);
 
-  let discAmount = discPct > 0 ? subtotal * (discPct / 100) : 0;
-  let total = subtotal - discAmount - voucher;
-  if (total < 0) total = 0;
+let discAmount = discPct > 0 ? subtotal * (discPct / 100) : 0;
+let total = subtotal - discAmount - voucher;
+if (total < 0) total = 0;
 
-  const pay = cleanNumber(salePay?.value || 0);
-  const change = pay > total ? pay - total : 0;
+const pay = cleanNumber(salePay?.value || 0);
+const change = pay > total ? pay - total : 0;
 
-  if (saleTotal) saleTotal.value = formatRupiahInput(total);
-  if (saleChange) saleChange.value = formatRupiahInput(change);
+if (saleTotal) saleTotal.value = formatRupiahInput(total);
+if (saleChange) saleChange.value = formatRupiahInput(change);
 }
 
 [saleDiscount, saleVoucher, salePay].forEach((el) => {
-  if (el) el.addEventListener("input", updateCartSummary);
+if (el) el.addEventListener("input", updateCartSummary);
 });
 
 // ================= STRUK PRINT (TEXT MODE) =================
 function updatePrintAreaFromSale(saleDoc) {
-  if (!printArea) return;
+if (!printArea) return;
 
-  const d = saleDoc.createdAtLocal
-    ? new Date(saleDoc.createdAtLocal)
-    : new Date();
-  const waktu = formatDateTime(d);
-  const items = saleDoc.items || [];
+const d = saleDoc.createdAtLocal
+? new Date(saleDoc.createdAtLocal)
+: new Date();
+const waktu = formatDateTime(d);
+const items = saleDoc.items || [];
 
-  function formatNumberPlain(num) {
-    const n = Number(num || 0);
-    return n.toLocaleString("id-ID");
-  }
+function formatNumberPlain(num) {
+const n = Number(num || 0);
+return n.toLocaleString("id-ID");
+}
 
-  const line = "-".repeat(39);
+const line = "-".repeat(39);
 
-  const nameWidth = 18;
-  const qtyWidth = 6;
-  const subWidth = 11;
+const nameWidth = 18;
+const qtyWidth = 6;
+const subWidth = 11;
 
-  function makeItemLine(name, qty, subtotal) {
-    const nm = (name || "").substring(0, nameWidth);
-    const qtyStr = "x" + qty;
-    const subStr = formatNumberPlain(subtotal);
-    return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
-  }
+function makeItemLine(name, qty, subtotal) {
+const nm = (name || "").substring(0, nameWidth);
+const qtyStr = "x" + qty;
+const subStr = formatNumberPlain(subtotal);
+return nm.padEnd(nameWidth) + qtyStr.padEnd(qtyWidth) + subStr.padStart(subWidth);
+}
 
-  let text = "";
+let text = "";
 
-  text += "F&B Cafe\n";
-  text += "Jl. Mawar No.123 - Bandung\n";
-  text += waktu + "\n";
-  text += line + "\n";
+text += "F&B Cafe\n";
+text += "Jl. Mawar No.123 - Bandung\n";
+text += waktu + "\n";
+text += line + "\n";
 
-  text +=
-    "Item".padEnd(nameWidth) +
-    "Qty".padEnd(qtyWidth) +
-    "Subtotal".padStart(subWidth) +
-    "\n";
+text +=
+"Item".padEnd(nameWidth) +
+"Qty".padEnd(qtyWidth) +
+"Subtotal".padStart(subWidth) +
+"\n";
 
-  items.forEach((it) => {
+items.forEach((it) => {
     text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
   });
 
@@ -1339,13 +1357,10 @@ if (btnPrint) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { box-sizing: border-box; }
-
-          /* Lebar kertas 58mm, margin kiri/kanan diperkecil biar teks muat */
           @page {
             size: 58mm auto;
-            margin: 2mm 0.5mm 26mm 0.5mm;  /* atas | kanan | bawah | kiri */
+            margin: 2mm 0.5mm 26mm 0.5mm;
           }
-
           body {
             margin: 0;
             padding: 0;
@@ -1354,20 +1369,12 @@ if (btnPrint) {
             font-family: "Courier New", monospace;
             background: #fff;
           }
-
-          .print-wrapper {
-            width: 100%;
-          }
-
-          /* =============== SUPER BOLD + ANTI KEpotong =============== */
+          .print-wrapper { width: 100%; }
           .receipt-pre {
-            font-size: 20px;          /* tetap besar */
+            font-size: 20px;
             line-height: 1.5;
             font-weight: 900;
-
-            /* bold tapi tidak terlalu melebar ke samping */
             -webkit-text-stroke: 0.35px #000;
-
             text-shadow:
               0.25px 0   #000,
              -0.25px 0   #000,
@@ -1377,13 +1384,11 @@ if (btnPrint) {
              -0.25px 0.25px #000,
               0.25px -0.25px #000,
              -0.25px -0.25px #000;
-
-            white-space: pre;       /* layout struk tetap rapi */
+            white-space: pre;
             margin: 0;
           }
-
           .bottom-gap {
-            height: 43px;           /* ruang ekstra di bawah buat sobekan */
+            height: 43px;
           }
         </style>
       </head>
@@ -1406,6 +1411,7 @@ if (btnPrint) {
     };
   });
 }
+
 // ================= CEK STOK BAHAN UNTUK CURRENT CART =================
 function checkStockForCurrentCart() {
   const shortage = [];
@@ -1665,7 +1671,9 @@ async function loadSales() {
     if (cached) {
       salesCache = cached.map((s) => ({
         ...s,
-        createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
+        createdAtDate: new Date(
+          s.createdAtDate || s.createdAtLocal || Date.now()
+        ),
       }));
       updateCharts();
       updateTopMenu();
@@ -1674,7 +1682,10 @@ async function loadSales() {
       return;
     }
 
-    showToast("Gagal mengambil data penjualan & tidak ada cache offline", "error");
+    showToast(
+      "Gagal mengambil data penjualan & tidak ada cache offline",
+      "error"
+    );
   }
 }
 
@@ -2099,7 +2110,9 @@ async function loadOpnameLogs() {
     if (cached) {
       opnameLogsCache = cached.map((o) => ({
         ...o,
-        createdAtDate: new Date(o.createdAtDate || o.createdAtLocal || Date.now()),
+        createdAtDate: new Date(
+          o.createdAtDate || o.createdAtLocal || Date.now()
+        ),
       }));
       showToast("Memuat data opname dari cache offline", "info");
       return;
@@ -2115,7 +2128,9 @@ function ensureReportDateDefaults() {
 
   function setInputDate(el, d) {
     if (!el) return;
-    const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+      d.getDate()
+    )}`;
     el.value = v;
   }
 
@@ -2260,8 +2275,12 @@ function renderReportTable() {
       tr.innerHTML = `
         <td>${r.tanggal}</td>
         <td>${r.produk}</td>
-        <td>${Number(r.systemStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
-        <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
+        <td>${Number(r.systemStock).toLocaleString("id-ID")} ${
+        r.unit || ""
+      }</td>
+        <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${
+        r.unit || ""
+      }</td>
         <td>${r.diff}</td>
         <td>${r.user}</td>
       `;
@@ -2408,18 +2427,30 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
-    // kalau online → tarik dari Firestore, kalau error akan fallback ke snapshot
-    await loadProducts();
-    await loadSales();
-    await loadOpnameLogs();
-
-    initMetricClickToOpname();
-
     if (navigator.onLine) {
+      // online: tarik data fresh dari Firestore (fallback ke snapshot sudah di-handle di masing2 fungsi)
+      await loadProducts();
+      await loadSales();
+      await loadOpnameLogs();
+
+      // sync antrian offline kalau ada
       syncOfflineSales();
       syncOfflineOpname();
+    } else {
+      // offline: jangan call Firestore (biar nggak delay/error), pakai cache yang sudah di-init
+      renderProductTable();
+      renderRecipeTable();
+      renderSaleMenu();
+      updateStockMetrics();
+      updateStockNotif();
+      renderOpnameTable();
+      updateCharts();
+      updateTopMenu();
+      updateHistoryTable();
+      showToast("Anda login dalam mode offline (pakai data cache).", "info");
     }
 
+    initMetricClickToOpname();
     ensureReportDateDefaults();
 
     if (role === "admin") {
