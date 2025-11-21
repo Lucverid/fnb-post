@@ -105,6 +105,32 @@ function formatDateTime(d) {
 const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
 const OFFLINE_OPNAME_KEY = "fnb_offline_opname_v1";
 
+// snapshot data Firestore (untuk reload offline)
+const SNAP_PRODUCTS_KEY = "fnb_products_snapshot_v1";
+const SNAP_SALES_KEY = "fnb_sales_snapshot_v1";
+const SNAP_OPNAME_KEY = "fnb_opname_snapshot_v1";
+
+function saveSnapshot(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data || []));
+  } catch (e) {
+    console.warn("Gagal simpan snapshot", key, e);
+  }
+}
+
+function loadSnapshot(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed;
+  } catch (e) {
+    console.warn("Gagal baca snapshot", key, e);
+    return null;
+  }
+}
+
 function loadOfflineQueue() {
   try {
     const raw = localStorage.getItem(OFFLINE_SALES_KEY);
@@ -622,6 +648,9 @@ async function loadProducts() {
     productsCache = [];
     snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
 
+    // simpan snapshot untuk offline
+    saveSnapshot(SNAP_PRODUCTS_KEY, productsCache);
+
     renderProductTable();
     renderRecipeTable();
     renderSaleMenu();
@@ -630,7 +659,22 @@ async function loadProducts() {
     renderOpnameTable();
   } catch (err) {
     console.error("loadProducts error:", err);
-    showToast("Gagal mengambil data produk", "error");
+
+    // fallback ke snapshot kalau ada
+    const cached = loadSnapshot(SNAP_PRODUCTS_KEY);
+    if (cached) {
+      productsCache = cached;
+      renderProductTable();
+      renderRecipeTable();
+      renderSaleMenu();
+      updateStockMetrics();
+      updateStockNotif();
+      renderOpnameTable();
+      showToast("Memuat data produk dari cache offline", "info");
+      return;
+    }
+
+    showToast("Gagal mengambil data produk & tidak ada cache offline", "error");
   }
 }
 
@@ -1420,6 +1464,7 @@ async function applyBomForSale(saleDoc) {
 
     menu.bom.forEach((b) => {
       if (!b.materialId || !b.qty) return;
+
       const totalUse = Number(b.qty) * Number(it.qty || 0);
       if (!bahanDelta[b.materialId]) bahanDelta[b.materialId] = 0;
       bahanDelta[b.materialId] -= totalUse;
@@ -1606,12 +1651,30 @@ async function loadSales() {
         dateKey: data.dateKey || todayKey(createdDate),
       });
     });
+
+    // simpan snapshot untuk offline reload
+    saveSnapshot(SNAP_SALES_KEY, salesCache);
+
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
   } catch (err) {
     console.error("loadSales error:", err);
-    showToast("Gagal mengambil data penjualan", "error");
+
+    const cached = loadSnapshot(SNAP_SALES_KEY);
+    if (cached) {
+      salesCache = cached.map((s) => ({
+        ...s,
+        createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
+      }));
+      updateCharts();
+      updateTopMenu();
+      updateHistoryTable();
+      showToast("Memuat data penjualan dari cache offline", "info");
+      return;
+    }
+
+    showToast("Gagal mengambil data penjualan & tidak ada cache offline", "error");
   }
 }
 
@@ -2026,8 +2089,21 @@ async function loadOpnameLogs() {
         dateKey: data.dateKey || todayKey(createdDate),
       });
     });
+
+    // simpan snapshot
+    saveSnapshot(SNAP_OPNAME_KEY, opnameLogsCache);
   } catch (err) {
     console.error("loadOpnameLogs error:", err);
+
+    const cached = loadSnapshot(SNAP_OPNAME_KEY);
+    if (cached) {
+      opnameLogsCache = cached.map((o) => ({
+        ...o,
+        createdAtDate: new Date(o.createdAtDate || o.createdAtLocal || Date.now()),
+      }));
+      showToast("Memuat data opname dari cache offline", "info");
+      return;
+    }
   }
 }
 
@@ -2332,6 +2408,7 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
+    // kalau online → tarik dari Firestore, kalau error akan fallback ke snapshot
     await loadProducts();
     await loadSales();
     await loadOpnameLogs();
