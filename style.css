@@ -1,6 +1,10 @@
 /* -------------------------------------------------- 
   ROOT VARIABLE (LIGHT MODE) 
 -------------------------------------------------- */
+.side-item.disabled {
+  display: none !important;
+}
+
 :root {
   --bg: #f5f7fb;
   --bg-card: #ffffff;
