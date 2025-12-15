@@ -157,7 +157,7 @@
         <p>Akses cepat POS, inventory, dashboard, dan laporan.</p>
       </section>
 
-      <!-- WAREHOUSE -->
+      <!-- ===================== WAREHOUSE ===================== -->
       <section id="whDashboardSection" class="section">
         <h2>Dashboard Opname</h2>
         <p style="opacity:.8;margin-top:-6px;">Klik indikator untuk filter otomatis ke <b>Halaman Opname</b>.</p>
@@ -193,16 +193,215 @@
         </div>
       </section>
 
+      <!-- ===================== WAREHOUSE OPNAME ===================== -->
       <section id="whOpnameSection" class="section hidden">
-        <!-- (isi sama persis punya kamu, nggak kuubah) -->
+        <h2>Halaman Opname</h2>
+
+        <!-- MASTER ITEM -->
+        <div class="card glass" style="margin-top:12px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:180px;">
+              <label>Nama Item</label>
+              <input id="whItemName" type="text" placeholder="Contoh: Tepung Terigu">
+            </div>
+
+            <!-- legacy (biar sesuai warehouse.js yang fallback ke whItemUnit) -->
+            <div style="width:140px;">
+              <label>Unit Dus (legacy)</label>
+              <input id="whItemUnit" type="text" placeholder="dus">
+            </div>
+
+            <!-- field baru (opsional, tapi warehouse.js sudah siap) -->
+            <div style="width:140px;">
+              <label>Unit Besar</label>
+              <input id="whItemUnitBig" type="text" placeholder="dus">
+            </div>
+            <div style="width:140px;">
+              <label>Unit Isi</label>
+              <input id="whItemUnitSmall" type="text" placeholder="pcs/ml/gram">
+            </div>
+            <div style="width:160px;">
+              <label>Isi per Dus</label>
+              <input id="whItemPackQty" type="number" min="0" step="1" placeholder="cth 12">
+            </div>
+            <div style="width:180px;">
+              <label>Harga / Dus (Supplier)</label>
+              <input id="whItemPricePerPack" type="number" min="0" step="1" placeholder="cth 250000">
+            </div>
+
+            <div style="width:160px;">
+              <label>EXP Date</label>
+              <input id="whItemExp" type="date">
+            </div>
+
+            <div style="width:160px;">
+              <label>Tanggal Masuk</label>
+              <input id="whItemReceivedAt" type="date">
+            </div>
+
+            <div style="flex:1;min-width:200px;">
+              <label>Supplier</label>
+              <input id="whItemSupplier" type="text" placeholder="Nama supplier">
+            </div>
+
+            <div style="flex:2;min-width:240px;">
+              <label>Info</label>
+              <input id="whItemInfo" type="text" placeholder="Catatan (opsional)">
+            </div>
+
+            <div>
+              <button id="btnSaveItem" class="btn-primary" type="button">Simpan Item</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- FILTER + TABLE -->
+        <div class="card glass" style="margin-top:14px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="width:180px;">
+              <label>Pilih Gudang</label>
+              <select id="whOpnameGudang">
+                <option value="w1">Gudang 1</option>
+                <option value="w2">Gudang 2</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:220px;">
+              <label>Cari Item</label>
+              <input id="whOpnameSearch" type="text" placeholder="Cari nama/supplier/unit...">
+            </div>
+          </div>
+
+          <div style="overflow:auto;margin-top:12px;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Unit</th>
+                  <th>EXP</th>
+                  <th>Info</th>
+                  <th>Masuk</th>
+                  <th>Supplier</th>
+                  <th>Stok Sistem</th>
+                  <th>Stok Fisik</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="whOpnameTableBody">
+                <tr><td colspan="9">Memuat...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TRANSFER -->
+        <div class="card glass" style="margin-top:14px;">
+          <h3 style="margin:0 0 10px;">Transfer Gudang 1 → Gudang 2</h3>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:240px;">
+              <label>Pilih Item</label>
+              <select id="moveItemSelect"></select>
+            </div>
+            <div style="width:160px;">
+              <label>Qty (dus)</label>
+              <input id="moveQty" type="number" min="0" step="1" placeholder="cth 2">
+            </div>
+            <div>
+              <button id="btnMove" class="btn-secondary" type="button">Transfer</button>
+            </div>
+          </div>
+          <div style="font-size:12px;opacity:.7;margin-top:8px;">
+            * Qty transfer memakai unit besar (dus). Kalau mau unit kecil, nanti kita bikin konversi dari packQty.
+          </div>
+        </div>
       </section>
 
+      <!-- ===================== WAREHOUSE WASTE ===================== -->
       <section id="whWasteSection" class="section hidden">
-        <!-- (isi sama persis punya kamu, nggak kuubah) -->
+        <h2>Waste</h2>
+
+        <div class="card glass" style="margin-top:12px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:220px;">
+              <label>Search Item (opsional)</label>
+              <input id="wasteItemSearch" type="text" placeholder="Ketik nama item...">
+            </div>
+
+            <div style="flex:1;min-width:240px;">
+              <label>Pilih Item</label>
+              <select id="wasteItemSelect"></select>
+            </div>
+
+            <div style="width:170px;">
+              <label>Tanggal</label>
+              <input id="wasteDate" type="date">
+            </div>
+
+            <div style="width:150px;">
+              <label>Qty</label>
+              <input id="wasteQty" type="number" min="0" step="0.01" placeholder="cth 250">
+            </div>
+
+            <div style="width:140px;">
+              <label>Satuan</label>
+              <select id="wasteUnit"></select>
+            </div>
+
+            <div style="flex:2;min-width:240px;">
+              <label>Catatan</label>
+              <input id="wasteNote" type="text" placeholder="Alasan waste...">
+            </div>
+
+            <div>
+              <button id="btnSaveWaste" class="btn-primary" type="button">Simpan Waste</button>
+            </div>
+          </div>
+
+          <div style="font-size:12px;opacity:.7;margin-top:10px;">
+            * Waste tidak mengurangi stok gudang (sesuai warehouse.js kamu). Kalau mau nanti, kita bisa bikin opsi “kurangi stok W1/W2”.
+          </div>
+        </div>
       </section>
 
+      <!-- ===================== WAREHOUSE REPORT ===================== -->
       <section id="whReportSection" class="section hidden">
-        <!-- (isi sama persis punya kamu, nggak kuubah) -->
+        <h2>Laporan Warehouse</h2>
+
+        <div class="card glass" style="margin-top:12px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="width:220px;">
+              <label>Jenis Laporan</label>
+              <select id="whReportType">
+                <option value="opname_w1">Opname Gudang 1</option>
+                <option value="opname_w2">Opname Gudang 2</option>
+                <option value="waste_w1">Waste</option>
+                <option value="waste_w2">Waste</option>
+              </select>
+            </div>
+
+            <div style="width:170px;">
+              <label>Tanggal Mulai</label>
+              <input id="whReportStart" type="date">
+            </div>
+
+            <div style="width:170px;">
+              <label>Tanggal Akhir</label>
+              <input id="whReportEnd" type="date">
+            </div>
+
+            <div>
+              <button id="btnWhReport" class="btn-primary" type="button">Generate</button>
+            </div>
+          </div>
+
+          <div style="overflow:auto;margin-top:12px;">
+            <table class="table">
+              <thead id="whReportHead"></thead>
+              <tbody id="whReportBody">
+                <tr><td>Silakan generate laporan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- SECTION LAMA (boleh tetap ada) -->
