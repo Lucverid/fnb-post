@@ -333,31 +333,39 @@ function initFromSnapshotsIfOffline() {
 
   // Produk / menu
   const cachedProducts = loadSnapshot(SNAP_PRODUCTS_KEY);
-  if (cachedProducts && cachedProducts.length) {
-    productsCache = cachedProducts;
-    renderProductTable();
-    renderRecipeTable();
-    renderSaleMenu();
+ if (cachedProducts && cachedProducts.length) {
+  productsCache = cachedProducts;
+
+  if (isEnabled("inventory")) renderProductTable();
+  if (isEnabled("recipe")) renderRecipeTable();
+  if (isEnabled("sales")) renderSaleMenu();
+
+  if (isEnabled("dashboard")) {
     updateStockMetrics();
     updateStockNotif();
-    renderOpnameTable();
-    hasAny = true;
   }
+
+  if (isEnabled("opname")) renderOpnameTable();
+  hasAny = true;
+}
+
 
   // Sales (dashboard + history)
   const cachedSales = loadSnapshot(SNAP_SALES_KEY);
-  if (cachedSales && cachedSales.length) {
-    salesCache = cachedSales.map((s) => ({
-      ...s,
-      createdAtDate: new Date(
-        s.createdAtDate || s.createdAtLocal || Date.now()
-      ),
-    }));
+ if (cachedSales && cachedSales.length) {
+  salesCache = cachedSales.map((s) => ({
+    ...s,
+    createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
+  }));
+
+  if (isEnabled("dashboard")) {
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
-    hasAny = true;
   }
+  hasAny = true;
+}
+
 
   // Opname logs (laporan)
   const cachedOpname = loadSnapshot(SNAP_OPNAME_KEY);
@@ -409,14 +417,19 @@ function updateConnectionStatus(showNotif = false) {
         "info",
         4000
       );
-      if (currentUser) {
-        syncOfflineSales();
-        syncOfflineOpname();
-        // refresh data fresh dari server
-        loadProducts();
-        loadSales();
-        loadOpnameLogs();
-      }
+   if (currentUser) {
+  if (isEnabled("sales")) syncOfflineSales();
+  if (isEnabled("opname")) syncOfflineOpname();
+
+  const needProducts = isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
+  const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
+  const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
+
+  if (needProducts) loadProducts();
+  if (needSales) loadSales();
+  if (needOpnameLogs) loadOpnameLogs();
+}
+
     }
   }
 
@@ -484,7 +497,6 @@ function applyDisabledSidebarUI() {
   });
 }
 
-applyDisabledSidebarUI();
 
 
 // ================= NAV =================
@@ -850,6 +862,10 @@ async function deleteProduct(id) {
 
 if (btnSaveProduct) {
   btnSaveProduct.addEventListener("click", async () => {
+      if (!isEnabled("inventory")) {
+      showToast("Fitur inventory nonaktif", "info");
+      return;
+    }
     try {
       const name = (productName?.value || "").trim();
       const type = "bahan_baku";
@@ -1154,6 +1170,12 @@ async function deleteRecipe(id) {
 
 if (btnSaveRecipe) {
   btnSaveRecipe.addEventListener("click", async () => {
+
+   if (!isEnabled("recipe")) {
+      showToast("Fitur recipe nonaktif", "info");
+      return;
+    }
+
     try {
       const name = (recipeName?.value || "").trim();
       const category = recipeCategory?.value || "lainnya";
@@ -1565,8 +1587,10 @@ async function applyBomForSale(saleDoc) {
 }
 
 // ================== SAVE SALE (ONLINE + OFFLINE) ==================
+
 if (btnSaveSale) {
   btnSaveSale.addEventListener("click", async () => {
+    if (!isEnabled("sales")) return showToast("Fitur sales nonaktif", "info");
     try {
       if (!currentCart.length) {
         showToast("Keranjang kosong", "error");
@@ -2088,6 +2112,10 @@ if (opnameSearch) {
 }
 
 async function saveOpnameRow(id) {
+  if (!isEnabled("opname")) {
+    showToast("Fitur opname nonaktif", "info");
+    return;
+  }
   try {
     const prod = productsCache.find((p) => p.id === id);
     if (!prod) return;
@@ -2496,24 +2524,34 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
-    if (navigator.onLine) {
-      await loadProducts();
-      await loadSales();
-      await loadOpnameLogs();
-      syncOfflineSales();
-      syncOfflineOpname();
-    } else {
-      renderProductTable();
-      renderRecipeTable();
-      renderSaleMenu();
-      updateStockMetrics();
-      updateStockNotif();
-      renderOpnameTable();
-      updateCharts();
-      updateTopMenu();
-      updateHistoryTable();
-      showToast("Anda login dalam mode offline (pakai data cache).", "info");
-    }
+   const needProducts = isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
+const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
+const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
+
+if (navigator.onLine) {
+  if (needProducts) await loadProducts();
+  if (needSales) await loadSales();
+  if (needOpnameLogs) await loadOpnameLogs();
+
+  if (isEnabled("sales")) syncOfflineSales();
+  if (isEnabled("opname")) syncOfflineOpname();
+} else {
+  if (isEnabled("inventory")) renderProductTable();
+  if (isEnabled("recipe")) renderRecipeTable();
+  if (isEnabled("sales")) renderSaleMenu();
+
+  if (isEnabled("dashboard")) {
+    updateStockMetrics();
+    updateStockNotif();
+    updateCharts();
+    updateTopMenu();
+    updateHistoryTable();
+  }
+
+  if (isEnabled("opname")) renderOpnameTable();
+
+  showToast("Anda login dalam mode offline (pakai data cache).", "info");
+}
 
     ensureReportDateDefaults();
     applyDisabledSidebarUI();
