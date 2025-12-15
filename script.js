@@ -325,65 +325,78 @@ let opnameStatusFilter = null;
 // flag supaya listener metric tidak dobel
 let metricClickInited = false;
 
+// ===== FEATURE FLAGS (OPS1: hide) =====
+const FEATURES = {
+  dashboard: false,
+  sales: false,
+  inventory: false,
+  recipe: false,
+  opname: false,
+  reports: false,
+};
+function isEnabled(section) {
+  return FEATURES[section] === true;
+}
+
+function applyDisabledSidebarUI() {
+  document.querySelectorAll(".side-item").forEach((btn) => {
+    const section = btn.dataset.section;
+    if (!section) return;
+
+    if (!isEnabled(section)) btn.classList.add("disabled");
+    else btn.classList.remove("disabled");
+  });
+}
+
 // ================ INIT DARI SNAPSHOT (STARTUP OFFLINE) ================
 function initFromSnapshotsIfOffline() {
   if (navigator.onLine) return;
 
   let hasAny = false;
 
-  // Produk / menu
   const cachedProducts = loadSnapshot(SNAP_PRODUCTS_KEY);
- if (cachedProducts && cachedProducts.length) {
-  productsCache = cachedProducts;
+  if (cachedProducts && cachedProducts.length) {
+    productsCache = cachedProducts;
 
-  if (isEnabled("inventory")) renderProductTable();
-  if (isEnabled("recipe")) renderRecipeTable();
-  if (isEnabled("sales")) renderSaleMenu();
+    if (isEnabled("inventory")) renderProductTable();
+    if (isEnabled("recipe")) renderRecipeTable();
+    if (isEnabled("sales")) renderSaleMenu();
+    if (isEnabled("dashboard")) {
+      updateStockMetrics();
+      updateStockNotif();
+    }
+    if (isEnabled("opname")) renderOpnameTable();
 
-  if (isEnabled("dashboard")) {
-    updateStockMetrics();
-    updateStockNotif();
+    hasAny = true;
   }
 
-  if (isEnabled("opname")) renderOpnameTable();
-  hasAny = true;
-}
-
-
-  // Sales (dashboard + history)
   const cachedSales = loadSnapshot(SNAP_SALES_KEY);
- if (cachedSales && cachedSales.length) {
-  salesCache = cachedSales.map((s) => ({
-    ...s,
-    createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
-  }));
+  if (cachedSales && cachedSales.length) {
+    salesCache = cachedSales.map((s) => ({
+      ...s,
+      createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
+    }));
 
-  if (isEnabled("dashboard")) {
-    updateCharts();
-    updateTopMenu();
-    updateHistoryTable();
+    if (isEnabled("dashboard")) {
+      updateCharts();
+      updateTopMenu();
+      updateHistoryTable();
+    }
+
+    hasAny = true;
   }
-  hasAny = true;
-}
 
-
-  // Opname logs (laporan)
   const cachedOpname = loadSnapshot(SNAP_OPNAME_KEY);
   if (cachedOpname && cachedOpname.length) {
     opnameLogsCache = cachedOpname.map((o) => ({
       ...o,
-      createdAtDate: new Date(
-        o.createdAtDate || o.createdAtLocal || Date.now()
-      ),
+      createdAtDate: new Date(o.createdAtDate || o.createdAtLocal || Date.now()),
     }));
     hasAny = true;
   }
 
-  if (hasAny) {
-    showToast("Mode offline: data dimuat dari cache perangkat", "info", 3500);
-  }
+  if (hasAny) showToast("Mode offline: data dimuat dari cache perangkat", "info", 3500);
 }
-// panggil segera saat load
 initFromSnapshotsIfOffline();
 
 // ================= CONNECTION LABEL + NOTIF =================
@@ -412,24 +425,21 @@ function updateConnectionStatus(showNotif = false) {
         4000
       );
     } else {
-      showToast(
-        "Koneksi kembali online. Menyinkronkan data offline...",
-        "info",
-        4000
-      );
-   if (currentUser) {
-  if (isEnabled("sales")) syncOfflineSales();
-  if (isEnabled("opname")) syncOfflineOpname();
+      showToast("Koneksi kembali online. Menyinkronkan data offline...", "info", 4000);
 
-  const needProducts = isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
-  const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
-  const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
+      if (currentUser) {
+        if (isEnabled("sales")) syncOfflineSales();
+        if (isEnabled("opname")) syncOfflineOpname();
 
-  if (needProducts) loadProducts();
-  if (needSales) loadSales();
-  if (needOpnameLogs) loadOpnameLogs();
-}
+        const needProducts =
+          isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
+        const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
+        const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
 
+        if (needProducts) loadProducts();
+        if (needSales) loadSales();
+        if (needOpnameLogs) loadOpnameLogs();
+      }
     }
   }
 
@@ -467,37 +477,8 @@ function applyRoleUI(role) {
     else el.classList.add("hidden");
   });
 
-  if (bannerRole)
-    bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
+  if (bannerRole) bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
-// ===== FEATURE FLAGS (OPS1: hide) =====
-const FEATURES = {
-  dashboard: false,
-  sales: false,
-  inventory: false,
-  recipe: false,
-  opname: false,
-  reports: false,
-};
-
-function isEnabled(section) {
-  return FEATURES[section] === true;
-}
-
-function applyDisabledSidebarUI() {
-  document.querySelectorAll(".side-item").forEach((btn) => {
-    const section = btn.dataset.section;
-    if (!section) return;
-
-    if (!isEnabled(section)) {
-      btn.classList.add("disabled");   // ⛔ disembunyikan
-    } else {
-      btn.classList.remove("disabled");
-    }
-  });
-}
-
-
 
 // ================= NAV =================
 function showSection(name) {
@@ -506,14 +487,9 @@ function showSection(name) {
     return;
   }
 
-  [
-    salesSection,
-    inventorySection,
-    recipeSection,
-    dashboardSection,
-    opnameSection,
-    reportsSection,
-  ].forEach((sec) => sec && sec.classList.add("hidden"));
+  [salesSection, inventorySection, recipeSection, dashboardSection, opnameSection, reportsSection].forEach(
+    (sec) => sec && sec.classList.add("hidden")
+  );
 
   if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
   if (name === "inventory" && inventorySection) inventorySection.classList.remove("hidden");
@@ -571,29 +547,25 @@ if (burgerBtn && sidebar) {
 // ================= CLICK METRIC -> BUKA OPNAME + FILTER =================
 function initMetricClickToOpname() {
   if (metricClickInited) return;
+  if (!isEnabled("opname")) return;
 
   [metricEmptyCard, metricLowCard, metricOkCard].forEach((card) => {
     if (!card) return;
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
-      if (card === metricEmptyCard) {
-        opnameStatusFilter = "Habis";
-      } else if (card === metricLowCard) {
-        opnameStatusFilter = "Hampir habis";
-      } else if (card === metricOkCard) {
-        opnameStatusFilter = "Aman";
-      } else {
-        opnameStatusFilter = null;
-      }
+      if (!isEnabled("opname")) return;
+
+      if (card === metricEmptyCard) opnameStatusFilter = "Habis";
+      else if (card === metricLowCard) opnameStatusFilter = "Hampir habis";
+      else if (card === metricOkCard) opnameStatusFilter = "Aman";
+      else opnameStatusFilter = null;
 
       if (opnameSearch) opnameSearch.value = "";
 
       showSection("opname");
       renderOpnameTable();
 
-      if (opnameSection) {
-        opnameSection.scrollIntoView({ behavior: "smooth" });
-      }
+      if (opnameSection) opnameSection.scrollIntoView({ behavior: "smooth" });
     });
   });
 
@@ -611,17 +583,14 @@ function productStatus(prod) {
 }
 
 function updateStockNotif() {
+  if (!isEnabled("dashboard")) return;
   if (!notifList || !notifBadge) return;
 
   notifList.innerHTML = "";
   let count = 0;
 
-  const emptyItems = productsCache.filter(
-    (p) => productStatus(p).label === "Habis"
-  );
-  const lowItems = productsCache.filter(
-    (p) => productStatus(p).label === "Hampir habis"
-  );
+  const emptyItems = productsCache.filter((p) => productStatus(p).label === "Habis");
+  const lowItems = productsCache.filter((p) => productStatus(p).label === "Hampir habis");
 
   emptyItems.forEach((p) => {
     const li = document.createElement("li");
@@ -629,11 +598,10 @@ function updateStockNotif() {
     notifList.appendChild(li);
     count++;
   });
+
   lowItems.forEach((p) => {
     const li = document.createElement("li");
-    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${
-      p.unit || ""
-    })`;
+    li.textContent = `Hampir habis: ${p.name} (sisa ${p.stock} ${p.unit || ""})`;
     notifList.appendChild(li);
     count++;
   });
@@ -643,6 +611,7 @@ function updateStockNotif() {
     li.textContent = "Tidak ada notifikasi stok.";
     notifList.appendChild(li);
   }
+
   notifBadge.textContent = String(count);
 }
 
@@ -746,28 +715,37 @@ async function loadProducts() {
     productsCache = [];
     snap.forEach((d) => productsCache.push({ id: d.id, ...d.data() }));
 
-    // simpan snapshot untuk offline
     saveSnapshot(SNAP_PRODUCTS_KEY, productsCache);
 
-    renderProductTable();
-    renderRecipeTable();
-    renderSaleMenu();
-    updateStockMetrics();
-    updateStockNotif();
-    renderOpnameTable();
+    // ✅ render hanya fitur yang ON
+    if (isEnabled("inventory")) renderProductTable();
+    if (isEnabled("recipe")) renderRecipeTable();
+    if (isEnabled("sales")) renderSaleMenu();
+
+    if (isEnabled("dashboard")) {
+      updateStockMetrics();
+      updateStockNotif();
+    }
+
+    if (isEnabled("opname")) renderOpnameTable();
   } catch (err) {
     console.error("loadProducts error:", err);
 
-    // fallback ke snapshot kalau ada
     const cached = loadSnapshot(SNAP_PRODUCTS_KEY);
     if (cached) {
       productsCache = cached;
-      renderProductTable();
-      renderRecipeTable();
-      renderSaleMenu();
-      updateStockMetrics();
-      updateStockNotif();
-      renderOpnameTable();
+
+      if (isEnabled("inventory")) renderProductTable();
+      if (isEnabled("recipe")) renderRecipeTable();
+      if (isEnabled("sales")) renderSaleMenu();
+
+      if (isEnabled("dashboard")) {
+        updateStockMetrics();
+        updateStockNotif();
+      }
+
+      if (isEnabled("opname")) renderOpnameTable();
+
       showToast("Memuat data produk dari cache offline", "info");
       return;
     }
@@ -778,7 +756,9 @@ async function loadProducts() {
 
 // ================= INVENTORY (BAHAN BAKU) =================
 function renderProductTable() {
+  if (!isEnabled("inventory")) return;
   if (!productTable) return;
+
   productTable.innerHTML = "";
 
   let bahanList = productsCache.filter((p) => p.type === "bahan_baku");
@@ -794,8 +774,7 @@ function renderProductTable() {
 
   if (!bahanList.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="7">Belum ada bahan baku yang cocok.</td>';
+    tr.innerHTML = '<td colspan="7">Belum ada bahan baku yang cocok.</td>';
     productTable.appendChild(tr);
     return;
   }
@@ -828,28 +807,36 @@ function renderProductTable() {
 }
 
 if (inventorySearch) {
-  inventorySearch.addEventListener("input", renderProductTable);
+  inventorySearch.addEventListener("input", () => {
+    if (!isEnabled("inventory")) return;
+    renderProductTable();
+  });
 }
 
 function fillProductForm(id) {
+  if (!isEnabled("inventory")) return;
   const p = productsCache.find((x) => x.id === id);
   if (!p) return;
+
   editingProductId = id;
   if (productName) productName.value = p.name || "";
   if (productType) productType.value = p.type || "bahan_baku";
   if (productCategory) productCategory.value = p.category || "makanan";
   if (productPrice) productPrice.value = formatRupiahInput(p.price || 0);
   if (productStock) productStock.value = formatRupiahInput(p.stock || 0);
-  if (productMinStock)
-    productMinStock.value = formatRupiahInput(p.minStock || 0);
+  if (productMinStock) productMinStock.value = formatRupiahInput(p.minStock || 0);
   if (productUnit) productUnit.value = p.unit || "";
+
   updateInventoryFormVisibility();
 }
 
 async function deleteProduct(id) {
+  if (!isEnabled("inventory")) return;
   const p = productsCache.find((x) => x.id === id);
   if (!p) return;
+
   if (!confirm(`Hapus "${p.name}"?`)) return;
+
   try {
     await deleteDoc(doc(db, "products", id));
     showToast("Produk dihapus", "success");
@@ -862,10 +849,11 @@ async function deleteProduct(id) {
 
 if (btnSaveProduct) {
   btnSaveProduct.addEventListener("click", async () => {
-      if (!isEnabled("inventory")) {
+    if (!isEnabled("inventory")) {
       showToast("Fitur inventory nonaktif", "info");
       return;
     }
+
     try {
       const name = (productName?.value || "").trim();
       const type = "bahan_baku";
@@ -895,10 +883,7 @@ if (btnSaveProduct) {
         await updateDoc(doc(db, "products", editingProductId), payload);
         showToast("Produk diupdate", "success");
       } else {
-        await addDoc(colProducts, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
+        await addDoc(colProducts, { ...payload, createdAt: serverTimestamp() });
         showToast("Produk ditambahkan", "success");
       }
 
@@ -907,6 +892,7 @@ if (btnSaveProduct) {
       if (productStock) productStock.value = "";
       if (productMinStock) productMinStock.value = "";
       if (productUnit) productUnit.value = "";
+
       await loadProducts();
     } catch (err) {
       console.error(err);
@@ -917,6 +903,7 @@ if (btnSaveProduct) {
 
 // ================= RESEP / BOM (MENU) =================
 function addBomRow(selectedId = "", qty = 1) {
+  if (!isEnabled("recipe")) return;
   if (!bomList) return;
 
   const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
@@ -946,9 +933,9 @@ function addBomRow(selectedId = "", qty = 1) {
   const removeBtn = row.querySelector(".bom-remove");
 
   if (selectedBahan) {
-    searchInput.value = `${selectedBahan.name} (${Number(
-      selectedBahan.stock || 0
-    ).toLocaleString("id-ID")} ${selectedBahan.unit || ""})`;
+    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString(
+      "id-ID"
+    )} ${selectedBahan.unit || ""})`;
   }
 
   function renderSuggest(keyword) {
@@ -965,8 +952,7 @@ function addBomRow(selectedId = "", qty = 1) {
     }
 
     if (!list.length) {
-      suggestBox.innerHTML =
-        '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
+      suggestBox.innerHTML = '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
       suggestBox.classList.remove("hidden");
       return;
     }
@@ -975,9 +961,7 @@ function addBomRow(selectedId = "", qty = 1) {
       .map(
         (b) => `
       <div class="bom-suggest-item" data-id="${b.id}">
-        ${b.name} (${Number(b.stock || 0).toLocaleString(
-          "id-ID"
-        )} ${b.unit || ""})
+        ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
       </div>`
       )
       .join("");
@@ -990,9 +974,9 @@ function addBomRow(selectedId = "", qty = 1) {
       item.addEventListener("click", () => {
         const bahan = allBahan.find((b) => b.id === id);
         hiddenId.value = id;
-        searchInput.value = `${bahan.name} (${Number(
-          bahan.stock || 0
-        ).toLocaleString("id-ID")} ${bahan.unit || ""})`;
+        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString(
+          "id-ID"
+        )} ${bahan.unit || ""})`;
         suggestBox.classList.add("hidden");
       });
     });
@@ -1000,9 +984,9 @@ function addBomRow(selectedId = "", qty = 1) {
     if (list.length === 1) {
       const b = list[0];
       hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString(
-        "id-ID"
-      )} ${b.unit || ""})`;
+      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${
+        b.unit || ""
+      })`;
       suggestBox.classList.add("hidden");
     }
   }
@@ -1017,16 +1001,17 @@ function addBomRow(selectedId = "", qty = 1) {
   });
 
   document.addEventListener("click", (e) => {
-    if (!row.contains(e.target)) {
-      suggestBox.classList.add("hidden");
-    }
+    if (!row.contains(e.target)) suggestBox.classList.add("hidden");
   });
 
   removeBtn.addEventListener("click", () => row.remove());
 }
 
 if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => addBomRow());
+  btnAddBomRow.addEventListener("click", () => {
+    if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
+    addBomRow();
+  });
 }
 
 function openBomModal(menuId) {
@@ -1053,10 +1038,7 @@ function openBomModal(menuId) {
         <div class="modal-sec-title">Bahan per 1 porsi</div>
         <ul class="modal-bom-list">
           ${m.bom
-            .map(
-              (b) =>
-                `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`
-            )
+            .map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`)
             .join("")}
         </ul>
       </div>
@@ -1071,22 +1053,18 @@ function openBomModal(menuId) {
 
 // close modal
 if (bomModalClose && bomModal) {
-  bomModalClose.addEventListener("click", () => {
-    bomModal.classList.add("hidden");
-  });
+  bomModalClose.addEventListener("click", () => bomModal.classList.add("hidden"));
   const backdrop = bomModal.querySelector(".modal-backdrop");
-  if (backdrop) {
-    backdrop.addEventListener("click", () => {
-      bomModal.classList.add("hidden");
-    });
-  }
+  if (backdrop) backdrop.addEventListener("click", () => bomModal.classList.add("hidden"));
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") bomModal.classList.add("hidden");
   });
 }
 
 function renderRecipeTable() {
+  if (!isEnabled("recipe")) return;
   if (!recipeTable) return;
+
   recipeTable.innerHTML = "";
 
   let menus = productsCache.filter((p) => p.type === "menu");
@@ -1136,12 +1114,17 @@ function renderRecipeTable() {
 }
 
 if (recipeSearch) {
-  recipeSearch.addEventListener("input", renderRecipeTable);
+  recipeSearch.addEventListener("input", () => {
+    if (!isEnabled("recipe")) return;
+    renderRecipeTable();
+  });
 }
 
 function fillRecipeForm(id) {
+  if (!isEnabled("recipe")) return;
   const m = productsCache.find((x) => x.id === id && x.type === "menu");
   if (!m) return;
+
   editingRecipeId = id;
   if (recipeName) recipeName.value = m.name || "";
   if (recipeCategory) recipeCategory.value = m.category || "makanan";
@@ -1155,9 +1138,12 @@ function fillRecipeForm(id) {
 }
 
 async function deleteRecipe(id) {
+  if (!isEnabled("recipe")) return;
   const m = productsCache.find((x) => x.id === id && x.type === "menu");
   if (!m) return;
+
   if (!confirm(`Hapus resep/menu "${m.name}"?`)) return;
+
   try {
     await deleteDoc(doc(db, "products", id));
     showToast("Resep dihapus", "success");
@@ -1170,8 +1156,7 @@ async function deleteRecipe(id) {
 
 if (btnSaveRecipe) {
   btnSaveRecipe.addEventListener("click", async () => {
-
-   if (!isEnabled("recipe")) {
+    if (!isEnabled("recipe")) {
       showToast("Fitur recipe nonaktif", "info");
       return;
     }
@@ -1182,14 +1167,8 @@ if (btnSaveRecipe) {
       const price = cleanNumber(recipePrice?.value || 0);
       const desc = (recipeDesc?.value || "").trim();
 
-      if (!name) {
-        showToast("Nama menu wajib diisi", "error");
-        return;
-      }
-      if (!price || price <= 0) {
-        showToast("Harga jual wajib diisi", "error");
-        return;
-      }
+      if (!name) return showToast("Nama menu wajib diisi", "error");
+      if (!price || price <= 0) return showToast("Harga jual wajib diisi", "error");
 
       const bom = [];
       if (bomList) {
@@ -1208,6 +1187,7 @@ if (btnSaveRecipe) {
           });
         });
       }
+
       const payload = {
         name,
         type: "menu",
@@ -1224,10 +1204,7 @@ if (btnSaveRecipe) {
         await updateDoc(doc(db, "products", editingRecipeId), payload);
         showToast("Resep diupdate", "success");
       } else {
-        await addDoc(colProducts, {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
+        await addDoc(colProducts, { ...payload, createdAt: serverTimestamp() });
         showToast("Resep ditambahkan", "success");
       }
 
@@ -1247,7 +1224,9 @@ if (btnSaveRecipe) {
 
 // ================= POS =================
 function renderSaleMenu() {
+  if (!isEnabled("sales")) return;
   if (!saleMenuBody) return;
+
   saleMenuBody.innerHTML = "";
   let list = productsCache.filter((p) => p.type === "menu");
   const q = (saleSearch?.value || "").trim().toLowerCase();
@@ -1268,11 +1247,19 @@ function renderSaleMenu() {
     b.addEventListener("click", () => addToCart(id));
   });
 }
-if (saleSearch) saleSearch.addEventListener("input", renderSaleMenu);
+
+if (saleSearch) {
+  saleSearch.addEventListener("input", () => {
+    if (!isEnabled("sales")) return;
+    renderSaleMenu();
+  });
+}
 
 function addToCart(productId) {
+  if (!isEnabled("sales")) return;
   const menu = productsCache.find((p) => p.id === productId);
   if (!menu) return;
+
   const existing = currentCart.find((i) => i.productId === productId);
   if (existing) {
     existing.qty += 1;
@@ -1288,8 +1275,11 @@ function addToCart(productId) {
   }
   renderCart();
 }
+
 function renderCart() {
+  if (!isEnabled("sales")) return;
   if (!cartBody) return;
+
   cartBody.innerHTML = "";
   currentCart.forEach((it, idx) => {
     const tr = document.createElement("tr");
@@ -1301,6 +1291,7 @@ function renderCart() {
     `;
     cartBody.appendChild(tr);
   });
+
   cartBody.querySelectorAll("button").forEach((btn) => {
     const idx = Number(btn.getAttribute("data-idx"));
     btn.addEventListener("click", () => {
@@ -1308,18 +1299,16 @@ function renderCart() {
       renderCart();
     });
   });
+
   updateCartSummary();
 }
 
 function updateCartSummary() {
-  const subtotal = currentCart.reduce(
-    (sum, it) => sum + Number(it.subtotal || 0),
-    0
-  );
+  if (!isEnabled("sales")) return;
 
-  if (cartSubtotalLabel) {
-    cartSubtotalLabel.textContent = formatCurrency(subtotal);
-  }
+  const subtotal = currentCart.reduce((sum, it) => sum + Number(it.subtotal || 0), 0);
+
+  if (cartSubtotalLabel) cartSubtotalLabel.textContent = formatCurrency(subtotal);
 
   const discPct = Number(saleDiscount?.value || 0);
   const voucher = cleanNumber(saleVoucher?.value || 0);
@@ -1343,9 +1332,7 @@ function updateCartSummary() {
 function updatePrintAreaFromSale(saleDoc) {
   if (!printArea) return;
 
-  const d = saleDoc.createdAtLocal
-    ? new Date(saleDoc.createdAtLocal)
-    : new Date();
+  const d = saleDoc.createdAtLocal ? new Date(saleDoc.createdAtLocal) : new Date();
   const waktu = formatDateTime(d);
   const items = saleDoc.items || [];
 
@@ -1355,7 +1342,6 @@ function updatePrintAreaFromSale(saleDoc) {
   }
 
   const line = "-".repeat(39);
-
   const nameWidth = 18;
   const qtyWidth = 6;
   const subWidth = 11;
@@ -1368,21 +1354,13 @@ function updatePrintAreaFromSale(saleDoc) {
   }
 
   let text = "";
-
   text += "F&B Cafe\n";
   text += "Jl. Mawar No.123 - Bandung\n";
   text += waktu + "\n";
   text += line + "\n";
 
-  text +=
-    "Item".padEnd(nameWidth) +
-    "Qty".padEnd(qtyWidth) +
-    "Subtotal".padStart(subWidth) +
-    "\n";
-
-  items.forEach((it) => {
-    text += makeItemLine(it.name, it.qty, it.subtotal) + "\n";
-  });
+  text += "Item".padEnd(nameWidth) + "Qty".padEnd(qtyWidth) + "Subtotal".padStart(subWidth) + "\n";
+  items.forEach((it) => (text += makeItemLine(it.name, it.qty, it.subtotal) + "\n"));
 
   text += line + "\n";
 
@@ -1392,17 +1370,10 @@ function updatePrintAreaFromSale(saleDoc) {
   }
 
   const subtotalStr = formatNumberPlain(saleDoc.subtotal || 0);
-  const diskonLabel = saleDoc.discountPercent
-    ? `Diskon (${saleDoc.discountPercent}%) :`
-    : "Diskon :";
+  const diskonLabel = saleDoc.discountPercent ? `Diskon (${saleDoc.discountPercent}%) :` : "Diskon :";
   const diskonStr =
-    saleDoc.discountAmount && saleDoc.discountAmount > 0
-      ? formatNumberPlain(saleDoc.discountAmount)
-      : "-";
-  const voucherStr =
-    saleDoc.voucher && saleDoc.voucher > 0
-      ? formatNumberPlain(saleDoc.voucher)
-      : "-";
+    saleDoc.discountAmount && saleDoc.discountAmount > 0 ? formatNumberPlain(saleDoc.discountAmount) : "-";
+  const voucherStr = saleDoc.voucher && saleDoc.voucher > 0 ? formatNumberPlain(saleDoc.voucher) : "-";
 
   const totalStr = formatNumberPlain(saleDoc.total || 0);
   const bayarStr = formatNumberPlain(saleDoc.pay || 0);
@@ -1438,7 +1409,6 @@ if (btnPrint) {
     }
 
     const win = window.open("", "_blank");
-
     const html = `
       <!DOCTYPE html>
       <html>
@@ -1448,18 +1418,8 @@ if (btnPrint) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           * { box-sizing: border-box; }
-          @page {
-            size: 58mm auto;
-            margin: 2mm 0.5mm 26mm 0.5mm;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            max-width: 100%;
-            font-family: "Courier New", monospace;
-            background: #fff;
-          }
+          @page { size: 58mm auto; margin: 2mm 0.5mm 26mm 0.5mm; }
+          body { margin:0; padding:0; width:100%; font-family:"Courier New", monospace; background:#fff; }
           .print-wrapper { width: 100%; }
           .receipt-pre {
             font-size: 20px;
@@ -1478,9 +1438,7 @@ if (btnPrint) {
             white-space: pre;
             margin: 0;
           }
-          .bottom-gap {
-            height: 43px;
-          }
+          .bottom-gap { height: 43px; }
         </style>
       </head>
       <body>
@@ -1508,18 +1466,13 @@ function checkStockForCurrentCart() {
   const shortage = [];
 
   currentCart.forEach((it) => {
-    const menu = productsCache.find(
-      (p) => p.id === it.productId && p.type === "menu"
-    );
+    const menu = productsCache.find((p) => p.id === it.productId && p.type === "menu");
     if (!menu || !Array.isArray(menu.bom)) return;
 
     menu.bom.forEach((b) => {
       if (!b.materialId || !b.qty) return;
 
-      const bahan = productsCache.find(
-        (p) => p.id === b.materialId && p.type === "bahan_baku"
-      );
-
+      const bahan = productsCache.find((p) => p.id === b.materialId && p.type === "bahan_baku");
       const required = Number(b.qty) * Number(it.qty || 0);
       const available = Number(bahan?.stock || 0);
 
@@ -1534,9 +1487,7 @@ function checkStockForCurrentCart() {
     });
   });
 
-  if (!shortage.length) {
-    return true;
-  }
+  if (!shortage.length) return true;
 
   let msg = "Transaksi dibatalkan. Bahan baku kurang:\n";
   shortage.forEach((s) => {
@@ -1554,14 +1505,11 @@ async function applyBomForSale(saleDoc) {
   const bahanDelta = {};
 
   saleDoc.items.forEach((it) => {
-    const menu = productsCache.find(
-      (p) => p.id === it.productId && p.type === "menu"
-    );
+    const menu = productsCache.find((p) => p.id === it.productId && p.type === "menu");
     if (!menu || !Array.isArray(menu.bom)) return;
 
     menu.bom.forEach((b) => {
       if (!b.materialId || !b.qty) return;
-
       const totalUse = Number(b.qty) * Number(it.qty || 0);
       if (!bahanDelta[b.materialId]) bahanDelta[b.materialId] = 0;
       bahanDelta[b.materialId] -= totalUse;
@@ -1587,36 +1535,25 @@ async function applyBomForSale(saleDoc) {
 }
 
 // ================== SAVE SALE (ONLINE + OFFLINE) ==================
-
 if (btnSaveSale) {
   btnSaveSale.addEventListener("click", async () => {
     if (!isEnabled("sales")) return showToast("Fitur sales nonaktif", "info");
     try {
-      if (!currentCart.length) {
-        showToast("Keranjang kosong", "error");
-        return;
-      }
+      if (!currentCart.length) return showToast("Keranjang kosong", "error");
 
       const stokOk = checkStockForCurrentCart();
       if (!stokOk) return;
 
-      const subtotal = currentCart.reduce(
-        (sum, it) => sum + Number(it.subtotal || 0),
-        0
-      );
+      const subtotal = currentCart.reduce((sum, it) => sum + Number(it.subtotal || 0), 0);
       const discountPercent = Number(saleDiscount?.value || 0);
       const voucher = cleanNumber(saleVoucher?.value || 0);
-      const discountAmount =
-        discountPercent > 0 ? subtotal * (discountPercent / 100) : 0;
+      const discountAmount = discountPercent > 0 ? subtotal * (discountPercent / 100) : 0;
 
       let total = subtotal - discountAmount - voucher;
       if (total < 0) total = 0;
 
       const pay = cleanNumber(salePay?.value || 0);
-      if (pay < total) {
-        showToast("Uang bayar kurang dari total", "error");
-        return;
-      }
+      if (pay < total) return showToast("Uang bayar kurang dari total", "error");
 
       const change = pay - total;
       const now = new Date();
@@ -1638,11 +1575,8 @@ if (btnSaveSale) {
 
       if (!navigator.onLine) {
         queueOfflineSale(saleDoc);
-        showToast(
-          "Transaksi disimpan di perangkat (offline). Akan disinkron saat online.",
-          "info",
-          4000
-        );
+        showToast("Transaksi disimpan di perangkat (offline). Akan disinkron saat online.", "info", 4000);
+
         updatePrintAreaFromSale(saleDoc);
         currentCart = [];
         renderCart();
@@ -1675,15 +1609,14 @@ if (btnSaveSale) {
 
 // ================= SYNC OFFLINE SALES =================
 async function syncOfflineSales() {
+  if (!isEnabled("sales")) return;
+
   const queue = loadOfflineQueue();
   if (!queue.length) return;
 
   try {
     for (const sale of queue) {
-      await addDoc(colSales, {
-        ...sale,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(colSales, { ...sale, createdAt: serverTimestamp() });
       await applyBomForSale(sale);
     }
     saveOfflineQueue([]);
@@ -1697,15 +1630,14 @@ async function syncOfflineSales() {
 
 // ================= SYNC OFFLINE OPNAME =================
 async function syncOfflineOpname() {
+  if (!isEnabled("opname")) return;
+
   const queue = loadOfflineOpnameQueue();
   if (!queue.length) return;
 
   try {
     for (const op of queue) {
-      await addDoc(colOpname, {
-        ...op,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(colOpname, { ...op, createdAt: serverTimestamp() });
 
       if (op.productId && typeof op.physicalStock === "number") {
         await updateDoc(doc(db, "products", op.productId), {
@@ -1716,11 +1648,7 @@ async function syncOfflineOpname() {
     }
 
     saveOfflineOpnameQueue([]);
-    showToast(
-      `${queue.length} data opname offline tersinkron`,
-      "success",
-      4000
-    );
+    showToast(`${queue.length} data opname offline tersinkron`, "success", 4000);
 
     await loadProducts();
     await loadOpnameLogs();
@@ -1738,11 +1666,9 @@ async function loadSales() {
     snap.forEach((d) => {
       const data = d.data();
       let createdDate = new Date();
-      if (data.createdAt && typeof data.createdAt.toDate === "function") {
-        createdDate = data.createdAt.toDate();
-      } else if (data.createdAtLocal) {
-        createdDate = new Date(data.createdAtLocal);
-      }
+      if (data.createdAt && typeof data.createdAt.toDate === "function") createdDate = data.createdAt.toDate();
+      else if (data.createdAtLocal) createdDate = new Date(data.createdAtLocal);
+
       salesCache.push({
         id: d.id,
         ...data,
@@ -1751,12 +1677,14 @@ async function loadSales() {
       });
     });
 
-    // simpan snapshot untuk offline reload
     saveSnapshot(SNAP_SALES_KEY, salesCache);
 
-    updateCharts();
-    updateTopMenu();
-    updateHistoryTable();
+    // ✅ hanya kalau dashboard ON
+    if (isEnabled("dashboard")) {
+      updateCharts();
+      updateTopMenu();
+      updateHistoryTable();
+    }
   } catch (err) {
     console.error("loadSales error:", err);
 
@@ -1764,21 +1692,20 @@ async function loadSales() {
     if (cached) {
       salesCache = cached.map((s) => ({
         ...s,
-        createdAtDate: new Date(
-          s.createdAtDate || s.createdAtLocal || Date.now()
-        ),
+        createdAtDate: new Date(s.createdAtDate || s.createdAtLocal || Date.now()),
       }));
-      updateCharts();
-      updateTopMenu();
-      updateHistoryTable();
+
+      if (isEnabled("dashboard")) {
+        updateCharts();
+        updateTopMenu();
+        updateHistoryTable();
+      }
+
       showToast("Memuat data penjualan dari cache offline", "info");
       return;
     }
 
-    showToast(
-      "Gagal mengambil data penjualan & tidak ada cache offline",
-      "error"
-    );
+    showToast("Gagal mengambil data penjualan & tidak ada cache offline", "error");
   }
 }
 
@@ -1799,11 +1726,8 @@ function getFilteredSales() {
 }
 
 function updateCharts() {
-  if (
-    !dailyChartCanvas ||
-    !monthlyChartCanvas ||
-    typeof Chart === "undefined"
-  ) {
+  if (!isEnabled("dashboard")) return;
+  if (!dailyChartCanvas || !monthlyChartCanvas || typeof Chart === "undefined") {
     console.warn("Chart.js belum siap, chart dilewati");
     return;
   }
@@ -1819,9 +1743,7 @@ function updateCharts() {
     d.setDate(d.getDate() - i);
     const key = todayKey(d);
     dayLabels.push(`${d.getDate()}/${d.getMonth() + 1}`);
-    const sum = src
-      .filter((s) => s.dateKey === key)
-      .reduce((n, s) => n + Number(s.total || 0), 0);
+    const sum = src.filter((s) => s.dateKey === key).reduce((n, s) => n + Number(s.total || 0), 0);
     dayData.push(sum);
   }
 
@@ -1830,15 +1752,8 @@ function updateCharts() {
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}`;
-    monthLabels.push(
-      d.toLocaleString("id-ID", {
-        month: "short",
-      })
-    );
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthLabels.push(d.toLocaleString("id-ID", { month: "short" }));
     const sum = src
       .filter((s) => (s.dateKey || "").startsWith(ym))
       .reduce((n, s) => n + Number(s.total || 0), 0);
@@ -1846,29 +1761,18 @@ function updateCharts() {
   }
 
   let refDate = today;
-  if (filterStart && filterStart.value) {
-    refDate = new Date(filterStart.value + "T00:00:00");
-  }
+  if (filterStart && filterStart.value) refDate = new Date(filterStart.value + "T00:00:00");
 
   const refKey = todayKey(refDate);
-  const ymRef = `${refDate.getFullYear()}-${String(
-    refDate.getMonth() + 1
-  ).padStart(2, "0")}`;
+  const ymRef = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}`;
 
-  const todayTotal = src
-    .filter((s) => s.dateKey === refKey)
-    .reduce((n, s) => n + Number(s.total || 0), 0);
-
+  const todayTotal = src.filter((s) => s.dateKey === refKey).reduce((n, s) => n + Number(s.total || 0), 0);
   const thisMonthTotal = src
     .filter((s) => (s.dateKey || "").startsWith(ymRef))
     .reduce((n, s) => n + Number(s.total || 0), 0);
 
-  if (dailyTotalLabel) {
-    dailyTotalLabel.textContent = formatCurrency(todayTotal);
-  }
-  if (monthlyTotalLabel) {
-    monthlyTotalLabel.textContent = formatCurrency(thisMonthTotal);
-  }
+  if (dailyTotalLabel) dailyTotalLabel.textContent = formatCurrency(todayTotal);
+  if (monthlyTotalLabel) monthlyTotalLabel.textContent = formatCurrency(thisMonthTotal);
 
   if (dailyChart) dailyChart.destroy();
   if (monthlyChart) monthlyChart.destroy();
@@ -1876,28 +1780,18 @@ function updateCharts() {
   dailyChart = new Chart(dailyChartCanvas.getContext("2d"), {
     type: "line",
     data: { labels: dayLabels, datasets: [{ label: "Omzet", data: dayData }] },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } },
-    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
   });
 
   monthlyChart = new Chart(monthlyChartCanvas.getContext("2d"), {
     type: "bar",
-    data: {
-      labels: monthLabels,
-      datasets: [{ label: "Omzet", data: monthData }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } },
-    },
+    data: { labels: monthLabels, datasets: [{ label: "Omzet", data: monthData }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
   });
 }
 
 function updateTopMenu() {
+  if (!isEnabled("dashboard")) return;
   if (!topMenuTable) return;
 
   const src = getFilteredSales();
@@ -1912,15 +1806,12 @@ function updateTopMenu() {
     });
   });
 
-  const rows = Object.entries(agg)
-    .sort((a, b) => b[1].qty - a[1].qty)
-    .slice(0, 10);
+  const rows = Object.entries(agg).sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
 
   topMenuTable.innerHTML = "";
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="3">Belum ada data penjualan untuk periode ini.</td>';
+    tr.innerHTML = '<td colspan="3">Belum ada data penjualan untuk periode ini.</td>';
     topMenuTable.appendChild(tr);
     return;
   }
@@ -1937,6 +1828,7 @@ function updateTopMenu() {
 }
 
 function updateHistoryTable() {
+  if (!isEnabled("dashboard")) return;
   if (!historyTable) return;
 
   const src = getFilteredSales();
@@ -1959,72 +1851,60 @@ function updateHistoryTable() {
 
   if (!list.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="3">Belum ada transaksi pada periode ini.</td>';
+    tr.innerHTML = '<td colspan="3">Belum ada transaksi pada periode ini.</td>';
     historyTable.appendChild(tr);
     return;
   }
 
-  list
-    .sort((a, b) => b.createdAtDate - a.createdAtDate)
-    .forEach((s) => {
-      const d = s.createdAtDate || new Date();
-      const timeStr = formatDateTime(d);
-      const itemsStr = (s.items || [])
-        .map((it) => `${it.name} x${it.qty}`)
-        .join(", ");
+  list.sort((a, b) => b.createdAtDate - a.createdAtDate).forEach((s) => {
+    const d = s.createdAtDate || new Date();
+    const timeStr = formatDateTime(d);
+    const itemsStr = (s.items || []).map((it) => `${it.name} x${it.qty}`).join(", ");
 
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${timeStr}</td>
-        <td>${itemsStr}</td>
-        <td>${formatCurrency(s.total || 0)}</td>
-      `;
-      historyTable.appendChild(tr);
-    });
-}
-
-if (btnFilterApply) {
-  btnFilterApply.addEventListener("click", () => {
-    updateCharts();
-    updateTopMenu();
-    updateHistoryTable();
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${timeStr}</td>
+      <td>${itemsStr}</td>
+      <td>${formatCurrency(s.total || 0)}</td>
+    `;
+    historyTable.appendChild(tr);
   });
 }
-if (btnFilterReset) {
+
+if (btnFilterApply) btnFilterApply.addEventListener("click", () => isEnabled("dashboard") && (updateCharts(), updateTopMenu(), updateHistoryTable()));
+if (btnFilterReset)
   btnFilterReset.addEventListener("click", () => {
+    if (!isEnabled("dashboard")) return;
     if (filterStart) filterStart.value = "";
     if (filterEnd) filterEnd.value = "";
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
   });
-}
-if (filterStart) {
+if (filterStart)
   filterStart.addEventListener("change", () => {
+    if (!isEnabled("dashboard")) return;
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
   });
-}
-if (filterEnd) {
+if (filterEnd)
   filterEnd.addEventListener("change", () => {
+    if (!isEnabled("dashboard")) return;
     updateCharts();
     updateTopMenu();
     updateHistoryTable();
   });
-}
-if (historySearch) {
-  historySearch.addEventListener("input", () => {
-    updateHistoryTable();
-  });
-}
+if (historySearch) historySearch.addEventListener("input", () => isEnabled("dashboard") && updateHistoryTable());
 
 // ================= METRIC STOK =================
 function updateStockMetrics() {
+  if (!isEnabled("dashboard")) return;
+
   let empty = 0,
     low = 0,
     ok = 0;
+
   productsCache.forEach((p) => {
     if (p.type !== "bahan_baku") return;
     const st = productStatus(p).label;
@@ -2032,6 +1912,7 @@ function updateStockMetrics() {
     else if (st === "Hampir habis") low++;
     else if (st === "Aman") ok++;
   });
+
   if (metricEmptyCount) metricEmptyCount.textContent = empty;
   if (metricLowCount) metricLowCount.textContent = low;
   if (metricOkCount) metricOkCount.textContent = ok;
@@ -2039,16 +1920,14 @@ function updateStockMetrics() {
 
 // ================= OPNAME =================
 function renderOpnameTable() {
+  if (!isEnabled("opname")) return;
   if (!opnameTable) return;
+
   opnameTable.innerHTML = "";
 
   let bahan = productsCache.filter((p) => p.type === "bahan_baku");
 
-  if (opnameStatusFilter) {
-    bahan = bahan.filter(
-      (p) => productStatus(p).label === opnameStatusFilter
-    );
-  }
+  if (opnameStatusFilter) bahan = bahan.filter((p) => productStatus(p).label === opnameStatusFilter);
 
   const q = (opnameSearch?.value || "").trim().toLowerCase();
   if (q) {
@@ -2061,8 +1940,7 @@ function renderOpnameTable() {
 
   if (!bahan.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="6">Belum ada data bahan baku untuk opname.</td>';
+    tr.innerHTML = '<td colspan="6">Belum ada data bahan baku untuk opname.</td>';
     opnameTable.appendChild(tr);
     return;
   }
@@ -2080,7 +1958,8 @@ function renderOpnameTable() {
         </div>
       </td>
       <td>${Number(currentStock).toLocaleString("id-ID")} ${p.unit || ""}</td>
-      <td><input type="number" data-id="${p.id}" value="${currentStock}"></td>
+      <!-- ✅ simpan stok sistem awal di data-system -->
+      <td><input type="number" data-id="${p.id}" data-system="${currentStock}" value="${currentStock}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
       <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
@@ -2090,12 +1969,14 @@ function renderOpnameTable() {
     opnameTable.appendChild(tr);
   });
 
+  // ✅ diff selalu pakai data-system, bukan productsCache (biar nggak jadi 0 setelah offline update)
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
-    const prod = productsCache.find((p) => p.id === id);
+    const systemStock = Number(inp.getAttribute("data-system") || 0);
+
     inp.addEventListener("input", () => {
       const fisik = Number(inp.value || 0);
-      const sel = fisik - Number(prod?.stock || 0);
+      const sel = fisik - systemStock;
       const span = opnameTable.querySelector(`span[data-id="${id}-diff"]`);
       if (span) span.textContent = sel;
     });
@@ -2108,7 +1989,10 @@ function renderOpnameTable() {
 }
 
 if (opnameSearch) {
-  opnameSearch.addEventListener("input", renderOpnameTable);
+  opnameSearch.addEventListener("input", () => {
+    if (!isEnabled("opname")) return;
+    renderOpnameTable();
+  });
 }
 
 async function saveOpnameRow(id) {
@@ -2116,16 +2000,20 @@ async function saveOpnameRow(id) {
     showToast("Fitur opname nonaktif", "info");
     return;
   }
+
   try {
     const prod = productsCache.find((p) => p.id === id);
     if (!prod) return;
 
-    const inp = opnameTable.querySelector(`input[data-id="${id}"]`);
+    const inp = opnameTable?.querySelector(`input[data-id="${id}"]`);
     if (!inp) return;
 
     const fisik = Number(inp.value || 0);
-    const systemStock = Number(prod.stock || 0);
+
+    // ✅ stok sistem pakai data-system
+    const systemStock = Number(inp.getAttribute("data-system") || Number(prod.stock || 0));
     const selisih = fisik - systemStock;
+
     const now = new Date();
 
     const opDoc = {
@@ -2143,29 +2031,22 @@ async function saveOpnameRow(id) {
     if (!navigator.onLine) {
       queueOfflineOpname(opDoc);
 
+      // update cache supaya tabel inventory & notif sesuai stok fisik
       prod.stock = fisik;
-      showToast(
-        `Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`,
-        "info",
-        3500
-      );
 
-      renderProductTable();
+      showToast(`Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`, "info", 3500);
+
+      if (isEnabled("inventory")) renderProductTable();
       renderOpnameTable();
-      updateStockMetrics();
-      updateStockNotif();
+      if (isEnabled("dashboard")) {
+        updateStockMetrics();
+        updateStockNotif();
+      }
       return;
     }
 
-    await addDoc(colOpname, {
-      ...opDoc,
-      createdAt: serverTimestamp(),
-    });
-
-    await updateDoc(doc(db, "products", id), {
-      stock: fisik,
-      updatedAt: serverTimestamp(),
-    });
+    await addDoc(colOpname, { ...opDoc, createdAt: serverTimestamp() });
+    await updateDoc(doc(db, "products", id), { stock: fisik, updatedAt: serverTimestamp() });
 
     showToast(`Opname tersimpan untuk ${prod.name}`, "success");
 
@@ -2185,11 +2066,9 @@ async function loadOpnameLogs() {
     snap.forEach((d) => {
       const data = d.data();
       let createdDate = new Date();
-      if (data.createdAt && typeof data.createdAt.toDate === "function") {
-        createdDate = data.createdAt.toDate();
-      } else if (data.createdAtLocal) {
-        createdDate = new Date(data.createdAtLocal);
-      }
+      if (data.createdAt && typeof data.createdAt.toDate === "function") createdDate = data.createdAt.toDate();
+      else if (data.createdAtLocal) createdDate = new Date(data.createdAtLocal);
+
       opnameLogsCache.push({
         id: d.id,
         ...data,
@@ -2198,7 +2077,6 @@ async function loadOpnameLogs() {
       });
     });
 
-    // simpan snapshot
     saveSnapshot(SNAP_OPNAME_KEY, opnameLogsCache);
   } catch (err) {
     console.error("loadOpnameLogs error:", err);
@@ -2207,9 +2085,7 @@ async function loadOpnameLogs() {
     if (cached) {
       opnameLogsCache = cached.map((o) => ({
         ...o,
-        createdAtDate: new Date(
-          o.createdAtDate || o.createdAtLocal || Date.now()
-        ),
+        createdAtDate: new Date(o.createdAtDate || o.createdAtLocal || Date.now()),
       }));
       showToast("Memuat data opname dari cache offline", "info");
       return;
@@ -2225,10 +2101,7 @@ function ensureReportDateDefaults() {
 
   function setInputDate(el, d) {
     if (!el) return;
-    const v = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-      d.getDate()
-    )}`;
-    el.value = v;
+    el.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   const type = reportType.value || "sales_day";
@@ -2262,44 +2135,33 @@ function ensureReportDateDefaults() {
 
 function parseDateInput(value, isEnd = false) {
   if (!value) return null;
-  if (isEnd) {
-    return new Date(value + "T23:59:59");
-  }
-  return new Date(value + "T00:00:00");
+  return isEnd ? new Date(value + "T23:59:59") : new Date(value + "T00:00:00");
 }
 
 function buildSalesReportRows(startDate, endDate) {
   const rows = [];
-
   salesCache.forEach((s) => {
     const d = s.createdAtDate || new Date();
     if (d < startDate || d > endDate) return;
-    const timeStr = formatDateTime(d);
-    const itemsStr = (s.items || [])
-      .map((it) => `${it.name} x${it.qty}`)
-      .join(", ");
 
     rows.push({
-      tanggal: timeStr,
-      items: itemsStr,
+      tanggal: formatDateTime(d),
+      items: (s.items || []).map((it) => `${it.name} x${it.qty}`).join(", "),
       total: Number(s.total || 0),
       kasir: s.createdBy || "-",
     });
   });
-
   return rows;
 }
 
 function buildOpnameWeeklyRows(startDate, endDate) {
   const rows = [];
-
   opnameLogsCache.forEach((o) => {
     const d = o.createdAtDate || new Date();
     if (d < startDate || d > endDate) return;
 
-    const timeStr = formatDateTime(d);
     rows.push({
-      tanggal: timeStr,
+      tanggal: formatDateTime(d),
       produk: o.productName || "-",
       systemStock: Number(o.systemStock ?? 0),
       physicalStock: Number(o.physicalStock ?? 0),
@@ -2308,7 +2170,6 @@ function buildOpnameWeeklyRows(startDate, endDate) {
       user: o.createdBy || "-",
     });
   });
-
   return rows;
 }
 
@@ -2317,7 +2178,6 @@ function renderReportHeader() {
   reportTableHead.innerHTML = "";
 
   const tr = document.createElement("tr");
-
   if (currentReportKind.startsWith("sales_")) {
     tr.innerHTML = `
       <th>Tanggal & Waktu</th>
@@ -2349,8 +2209,7 @@ function renderReportTable() {
 
   if (!currentReportRows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML =
-      '<td colspan="6">Tidak ada data untuk periode ini.</td>';
+    tr.innerHTML = '<td colspan="6">Tidak ada data untuk periode ini.</td>';
     reportTableBody.appendChild(tr);
     return;
   }
@@ -2372,12 +2231,8 @@ function renderReportTable() {
       tr.innerHTML = `
         <td>${r.tanggal}</td>
         <td>${r.produk}</td>
-        <td>${Number(r.systemStock).toLocaleString("id-ID")} ${
-        r.unit || ""
-      }</td>
-        <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${
-        r.unit || ""
-      }</td>
+        <td>${Number(r.systemStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
+        <td>${Number(r.physicalStock).toLocaleString("id-ID")} ${r.unit || ""}</td>
         <td>${r.diff}</td>
         <td>${r.user}</td>
       `;
@@ -2387,6 +2242,7 @@ function renderReportTable() {
 }
 
 function generateReport() {
+  if (!isEnabled("reports")) return showToast("Fitur reports nonaktif", "info");
   if (!reportType || !reportStart || !reportEnd) return;
 
   const type = reportType.value || "sales_day";
@@ -2397,7 +2253,6 @@ function generateReport() {
     showToast("Tanggal awal & akhir laporan wajib diisi", "error");
     return;
   }
-
   if (endDate < startDate) {
     showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
     return;
@@ -2416,10 +2271,8 @@ function generateReport() {
 }
 
 function downloadReportCSV() {
-  if (!currentReportRows.length) {
-    showToast("Tidak ada data laporan untuk diunduh", "error");
-    return;
-  }
+  if (!isEnabled("reports")) return showToast("Fitur reports nonaktif", "info");
+  if (!currentReportRows.length) return showToast("Tidak ada data laporan untuk diunduh", "error");
 
   let csv = "";
   const sep = ",";
@@ -2436,16 +2289,7 @@ function downloadReportCSV() {
       csv += row.join(sep) + "\n";
     });
   } else if (currentReportKind === "opname_week") {
-    csv +=
-      [
-        "Tanggal",
-        "Produk",
-        "Stok Sistem",
-        "Stok Fisik",
-        "Selisih",
-        "Satuan",
-        "User",
-      ].join(sep) + "\n";
+    csv += ["Tanggal", "Produk", "Stok Sistem", "Stok Fisik", "Selisih", "Satuan", "User"].join(sep) + "\n";
     currentReportRows.forEach((r) => {
       const row = [
         `"${r.tanggal}"`,
@@ -2485,18 +2329,8 @@ if (reportType) {
     ensureReportDateDefaults();
   });
 }
-
-if (btnReportGenerate) {
-  btnReportGenerate.addEventListener("click", () => {
-    generateReport();
-  });
-}
-
-if (btnReportDownload) {
-  btnReportDownload.addEventListener("click", () => {
-    downloadReportCSV();
-  });
-}
+if (btnReportGenerate) btnReportGenerate.addEventListener("click", generateReport);
+if (btnReportDownload) btnReportDownload.addEventListener("click", downloadReportCSV);
 
 // ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
 attachRupiahFormatter([
@@ -2524,43 +2358,42 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
-   const needProducts = isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
-const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
-const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
+    const needProducts =
+      isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
+    const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
+    const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
 
-if (navigator.onLine) {
-  if (needProducts) await loadProducts();
-  if (needSales) await loadSales();
-  if (needOpnameLogs) await loadOpnameLogs();
+    if (navigator.onLine) {
+      if (needProducts) await loadProducts();
+      if (needSales) await loadSales();
+      if (needOpnameLogs) await loadOpnameLogs();
 
-  if (isEnabled("sales")) syncOfflineSales();
-  if (isEnabled("opname")) syncOfflineOpname();
-} else {
-  if (isEnabled("inventory")) renderProductTable();
-  if (isEnabled("recipe")) renderRecipeTable();
-  if (isEnabled("sales")) renderSaleMenu();
+      if (isEnabled("sales")) syncOfflineSales();
+      if (isEnabled("opname")) syncOfflineOpname();
+    } else {
+      if (isEnabled("inventory")) renderProductTable();
+      if (isEnabled("recipe")) renderRecipeTable();
+      if (isEnabled("sales")) renderSaleMenu();
 
-  if (isEnabled("dashboard")) {
-    updateStockMetrics();
-    updateStockNotif();
-    updateCharts();
-    updateTopMenu();
-    updateHistoryTable();
-  }
+      if (isEnabled("dashboard")) {
+        updateStockMetrics();
+        updateStockNotif();
+        updateCharts();
+        updateTopMenu();
+        updateHistoryTable();
+      }
 
-  if (isEnabled("opname")) renderOpnameTable();
+      if (isEnabled("opname")) renderOpnameTable();
 
-  showToast("Anda login dalam mode offline (pakai data cache).", "info");
-}
+      showToast("Anda login dalam mode offline (pakai data cache).", "info");
+    }
 
     ensureReportDateDefaults();
     applyDisabledSidebarUI();
 
-    // jangan init metric klik kalau opname OFF
     if (isEnabled("opname")) initMetricClickToOpname();
 
     showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
-    // showSection("welcome"); // kalau ada
   } else {
     currentRole = null;
     productsCache = [];
@@ -2573,4 +2406,3 @@ if (navigator.onLine) {
     if (topbarEmail) topbarEmail.textContent = "–";
   }
 });
-
