@@ -2497,16 +2497,12 @@ onAuthStateChanged(auth, async (user) => {
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
     if (navigator.onLine) {
-      // online: tarik data fresh dari Firestore (fallback ke snapshot sudah di-handle di masing2 fungsi)
       await loadProducts();
       await loadSales();
       await loadOpnameLogs();
-
-      // sync antrian offline kalau ada
       syncOfflineSales();
       syncOfflineOpname();
     } else {
-      // offline: jangan call Firestore (biar nggak delay/error), pakai cache yang sudah di-init
       renderProductTable();
       renderRecipeTable();
       renderSaleMenu();
@@ -2519,12 +2515,14 @@ onAuthStateChanged(auth, async (user) => {
       showToast("Anda login dalam mode offline (pakai data cache).", "info");
     }
 
-  initMetricClickToOpname();
-  ensureReportDateDefaults();
-  applyDisabledSidebarUI();
-  showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
-// showSection("welcome"); // kalau ada
+    ensureReportDateDefaults();
+    applyDisabledSidebarUI();
 
+    // jangan init metric klik kalau opname OFF
+    if (isEnabled("opname")) initMetricClickToOpname();
+
+    showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
+    // showSection("welcome"); // kalau ada
   } else {
     currentRole = null;
     productsCache = [];
@@ -2537,3 +2535,4 @@ onAuthStateChanged(auth, async (user) => {
     if (topbarEmail) topbarEmail.textContent = "–";
   }
 });
+
