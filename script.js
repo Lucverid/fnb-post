@@ -2519,15 +2519,12 @@ onAuthStateChanged(auth, async (user) => {
       showToast("Anda login dalam mode offline (pakai data cache).", "info");
     }
 
-    initMetricClickToOpname();
-    ensureReportDateDefaults();
+  initMetricClickToOpname();
+  ensureReportDateDefaults();
+  applyDisabledSidebarUI();
+  showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
+// showSection("welcome"); // kalau ada
 
-    if (role === "admin") {
-      showSection("dashboard");
-    } else {
-      showSection("sales");
-    }
-      applyDisabledSidebarUI();
   } else {
     currentRole = null;
     productsCache = [];
