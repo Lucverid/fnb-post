@@ -1,96 +1,71 @@
-// warehouse.js — Warehouse realtime + konversi Dus -> (PCS/BAREL) + harga supplier per dus
-// Cocok dengan HTML kamu. Tidak perlu ubah HTML (field baru di-inject via JS).
+// warehouse.js
+// =======================================================
+// WAREHOUSE MODULE (Dashboard Opname, Opname W1/W2, Waste, Report)
+// - Nav via #navWhDashboard/#navWhOpname/#navWhWaste/#navWhReport
+// - Dashboard indikator (habis=0, lumayan<10, banyak>50) per gudang
+// - Notifikasi: stok habis, hampir habis, dan exp mendekati
+// - Master item: unit dus + unit isi (pcs/barel/pack dll) + nominal isi/dus + harga/dus dari supplier
+// - Waste: tidak pakai gudang, pilih item via search, satuan gram/ml via dropdown (sesuai request)
+// =======================================================
 
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
-  doc,
   addDoc,
-  setDoc,
-  updateDoc,
-  getDoc,
   getDocs,
   query,
   orderBy,
+  where,
+  doc,
+  updateDoc,
   serverTimestamp,
-  onSnapshot,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-/* ================= FIREBASE CONFIG ================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
-  authDomain: "app-387dc.firebaseapp.com",
-  projectId: "app-387dc",
-  storageBucket: "app-387dc.firebasestorage.app",
-  messagingSenderId: "227151496412",
-  appId: "1:227151496412:web:ac35b7ecd7f39905cba019",
-  measurementId: "G-9E282TKXSJ",
-};
+import {
+  getAuth,
+  onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-/* ================= UTIL ================= */
+// ============== SAFE GET DOM ==============
 const $ = (id) => document.getElementById(id);
 
-const toastContainer = $("toast-container");
-function showToast(msg, type = "info", time = 3200) {
-  if (!toastContainer) return;
+// ============== FALLBACK TOAST ==============
+function fallbackToast(msg, type = "info", time = 3000) {
+  const box = $("toast-container");
+  if (!box) return alert(msg);
   const div = document.createElement("div");
   div.className = `toast toast-${type}`;
   div.textContent = msg;
-  toastContainer.appendChild(div);
+  box.appendChild(div);
   setTimeout(() => div.remove(), time);
 }
 
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
+// Jika script.js punya showToast global, pakai itu
+const showToast = window.showToast || fallbackToast;
 
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
+// ============== FIREBASE (reuse existing app) ==============
+const auth = getAuth();
+const db = getFirestore();
 
-function formatDateShort(isoOrDate) {
-  try {
-    const d = isoOrDate instanceof Date ? isoOrDate : new Date(String(isoOrDate) + "T00:00:00");
-    if (isNaN(d)) return "-";
-    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
-  } catch {
-    return "-";
-  }
-}
+// ============== COLLECTIONS ==============
+const colWhItems = collection(db, "wh_items");           // master item
+const colWhStock = collection(db, "wh_stock");           // stok per gudang
+const colWhStockLogs = collection(db, "wh_stock_logs");  // riwayat opname/masuk/transfer
+const colWhWaste = collection(db, "wh_waste");           // waste log
 
-function daysDiff(a, b) {
-  const ms = b.getTime() - a.getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
-
-function cleanNumber(v) {
-  const n = Number(String(v ?? "").replace(/[^\d.-]/g, ""));
-  return isNaN(n) ? 0 : n;
-}
-
-/* ================= DOM (NAV) ================= */
-const sidebar = $("sidebar");
-const burgerBtn = $("burgerBtn");
-
+// ============== DOM NAV ==============
 const navWhDashboard = $("navWhDashboard");
 const navWhOpname = $("navWhOpname");
 const navWhWaste = $("navWhWaste");
 const navWhReport = $("navWhReport");
 
-/* ================= DOM (SECTIONS) ================= */
+// ============== DOM SECTIONS ==============
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
 const whWasteSection = $("whWasteSection");
 const whReportSection = $("whReportSection");
 
-/* ================= DOM (DASHBOARD CARDS) ================= */
+// ============== DASHBOARD METRICS DOM ==============
 const w1Habis = $("w1Habis");
 const w1Lumayan = $("w1Lumayan");
 const w1Banyak = $("w1Banyak");
@@ -105,33 +80,42 @@ const cardW2Habis = $("cardW2Habis");
 const cardW2Lumayan = $("cardW2Lumayan");
 const cardW2Banyak = $("cardW2Banyak");
 
-/* ================= DOM (OPNAME + MASTER ITEM + TRANSFER) ================= */
+// ============== OPNAME DOM (MASTER ITEM) ==============
 const whItemName = $("whItemName");
-const whItemUnit = $("whItemUnit"); // akan kita auto-set "dus" (pack unit), tetap dipakai
+
+// unit besar (dus) + unit isi
+const whItemUnit = $("whItemUnit"); // legacy dari HTML kamu (biar nggak error)
+const whItemUnitBig = $("whItemUnitBig"); // kalau kamu nanti tambahkan
+const whItemUnitSmall = $("whItemUnitSmall"); // kalau kamu nanti tambahkan
+const whItemPackQty = $("whItemPackQty"); // isi per dus
+const whItemPricePerPack = $("whItemPricePerPack"); // harga per dus
+
 const whItemExp = $("whItemExp");
 const whItemInfo = $("whItemInfo");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
 const btnSaveItem = $("btnSaveItem");
 
+// ============== OPNAME TABLE ==============
 const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 
+// ============== TRANSFER ==============
 const moveItemSelect = $("moveItemSelect");
-const moveQty = $("moveQty"); // qty transfer dalam DUS
+const moveQty = $("moveQty");
 const btnMove = $("btnMove");
 
-/* ================= DOM (WASTE) ================= */
-const wasteGudang = $("wasteGudang");
+// ============== WASTE ==============
+const wasteItemSearch = $("wasteItemSearch"); // kalau kamu pakai input search
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
-const wasteGram = $("wasteGram");
-const wasteMl = $("wasteMl");
+const wasteQty = $("wasteQty");         // qty number (gram/ml)
+const wasteUnit = $("wasteUnit");       // dropdown gram/ml
 const wasteNote = $("wasteNote");
 const btnSaveWaste = $("btnSaveWaste");
 
-/* ================= DOM (REPORT) ================= */
+// ============== REPORT ==============
 const whReportType = $("whReportType");
 const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
@@ -139,204 +123,149 @@ const btnWhReport = $("btnWhReport");
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
-/* ================= COLLECTIONS ================= */
-const colItems = collection(db, "warehouse_items");
-const colStock = collection(db, "warehouse_stock");
-const colOpnameLogs = collection(db, "warehouse_opname_logs");
-const colMoves = collection(db, "warehouse_moves");
-const colWaste = collection(db, "warehouse_waste");
+// ============== NOTIF PANEL (reuse existing) ==============
+const notifBadge = $("notifBadge");
+const notifList = $("notifList");
 
-/* ================= STATE ================= */
+// ============== STATE ==============
 let currentUser = null;
-let itemsCache = []; // master item
-let stockCache = []; // stok per gudang (disimpan dalam base unit)
-let unsubscribeItems = null;
-let unsubscribeStock = null;
+let items = [];     // master
+let stock = [];     // per gudang
+let stockLogs = []; // logs
+let wasteLogs = []; // waste
 
-/* ================= UI HELPERS ================= */
-function hideAllWarehouseSections() {
-  [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((s) => {
-    if (s) s.classList.add("hidden");
+// filter dari dashboard -> opname
+let activeGudang = "w1";
+let activeFilter = null; // "habis" | "lumayan" | "banyak" | null
+
+// ============== UTIL ==============
+function todayStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function parseDate(val) {
+  if (!val) return null;
+  const d = new Date(val + "T00:00:00");
+  return isNaN(d) ? null : d;
+}
+
+function daysDiff(from, to) {
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((b - a) / 86400000);
+}
+
+function setActiveSidebar(btn) {
+  document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+}
+
+function showWhSection(name) {
+  [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((sec) => {
+    if (sec) sec.classList.add("hidden");
   });
+
+  if (name === "dashboard" && whDashboardSection) whDashboardSection.classList.remove("hidden");
+  if (name === "opname" && whOpnameSection) whOpnameSection.classList.remove("hidden");
+  if (name === "waste" && whWasteSection) whWasteSection.classList.remove("hidden");
+  if (name === "report" && whReportSection) whReportSection.classList.remove("hidden");
 }
 
-function setActiveNav(btn) {
-  [navWhDashboard, navWhOpname, navWhWaste, navWhReport].forEach((b) => b?.classList.remove("active"));
-  btn?.classList.add("active");
+// ============== DATA LOADERS ==============
+async function loadItems() {
+  const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
+  items = [];
+  snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
 }
 
-function showWarehouseSection(which) {
-  hideAllWarehouseSections();
-  if (which === "dashboard") whDashboardSection?.classList.remove("hidden");
-  if (which === "opname") whOpnameSection?.classList.remove("hidden");
-  if (which === "waste") whWasteSection?.classList.remove("hidden");
-  if (which === "report") whReportSection?.classList.remove("hidden");
-  if (window.innerWidth <= 900 && sidebar) sidebar.classList.remove("open");
+async function loadStock() {
+  const snap = await getDocs(query(colWhStock, orderBy("updatedAt", "desc")));
+  stock = [];
+  snap.forEach((d) => stock.push({ id: d.id, ...d.data() }));
 }
 
-function ensureDefaultDates() {
-  if (wasteDate && !wasteDate.value) wasteDate.value = todayISO();
-  if (whReportStart && !whReportStart.value) whReportStart.value = todayISO();
-  if (whReportEnd && !whReportEnd.value) whReportEnd.value = todayISO();
+async function loadStockLogs() {
+  const snap = await getDocs(query(colWhStockLogs, orderBy("createdAt", "desc")));
+  stockLogs = [];
+  snap.forEach((d) => stockLogs.push({ id: d.id, ...d.data() }));
 }
 
-/* ================= DATA HELPERS ================= */
-function getStockBase(itemId, wh) {
-  const row = stockCache.find((s) => s.itemId === itemId && s.warehouse === wh);
-  return Number(row?.stockBase ?? row?.stock ?? 0);
+async function loadWasteLogs() {
+  const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc")));
+  wasteLogs = [];
+  snap.forEach((d) => wasteLogs.push({ id: d.id, ...d.data() }));
 }
 
-function stockBucket(baseQty) {
-  const x = Number(baseQty || 0);
-  if (x <= 0) return "habis";
-  if (x < 10) return "lumayan";
-  if (x > 50) return "banyak";
+async function loadAllWarehouseData() {
+  await Promise.all([loadItems(), loadStock(), loadStockLogs(), loadWasteLogs()]);
+  renderDashboard();
+  renderOpnameTable();
+  renderSelects();
+  updateWarehouseNotif();
+}
+
+// ============== STOCK HELPERS ==============
+function getStockRow(itemId, gudang) {
+  return stock.find((s) => s.itemId === itemId && s.gudang === gudang) || null;
+}
+
+function ensureStockValue(itemId, gudang) {
+  const row = getStockRow(itemId, gudang);
+  return Number(row?.stock || 0);
+}
+
+function bucketByQty(qty) {
+  const n = Number(qty || 0);
+  if (n <= 0) return "habis";
+  if (n < 10) return "lumayan";
+  if (n > 50) return "banyak";
   return "normal";
 }
 
-function expAlertLevel(item) {
-  const exp = item?.expDate;
-  if (!exp) return "none";
-  const expDate = new Date(String(exp) + "T00:00:00");
-  if (isNaN(expDate)) return "none";
-  const today = new Date();
-  const diff = daysDiff(today, expDate);
-  if (diff < 0) return "expired";
-  if (diff <= 7) return "near";
-  return "ok";
-}
-
-function getPackSize(item) {
-  const ps = Number(item?.packSize || 0);
-  return ps > 0 ? ps : 1;
-}
-
-function toPackAndLoose(baseQty, item) {
-  const packSize = getPackSize(item);
-  const base = Number(baseQty || 0);
-  const pack = Math.floor(base / packSize);
-  const loose = base % packSize;
-  return { pack, loose, packSize };
-}
-
-function toBaseFromPackLoose(pack, loose, item) {
-  const packSize = getPackSize(item);
-  const p = Number(pack || 0);
-  const l = Number(loose || 0);
-  return Math.max(0, p * packSize + l);
-}
-
-/* ================= NOTIF ================= */
-function updateNotifPanel() {
-  const notifList = $("notifList");
-  const notifBadge = $("notifBadge");
-  if (!notifList || !notifBadge) return;
-
-  notifList.innerHTML = "";
-  let count = 0;
-
-  // EXP
-  itemsCache.forEach((it) => {
-    const lvl = expAlertLevel(it);
-    if (lvl === "near") {
-      const li = document.createElement("li");
-      li.textContent = `⚠️ EXP mendekati: ${it.name} (EXP ${it.expDate})`;
-      notifList.appendChild(li);
-      count++;
-    } else if (lvl === "expired") {
-      const li = document.createElement("li");
-      li.textContent = `⛔ EXPIRED: ${it.name} (EXP ${it.expDate})`;
-      notifList.appendChild(li);
-      count++;
-    }
-  });
-
-  // stok
-  itemsCache.forEach((it) => {
-    const s1 = getStockBase(it.id, "w1");
-    const s2 = getStockBase(it.id, "w2");
-
-    const b1 = stockBucket(s1);
-    const b2 = stockBucket(s2);
-
-    if (b1 === "habis") {
-      const li = document.createElement("li");
-      li.textContent = `⛔ Habis (Gudang 1): ${it.name}`;
-      notifList.appendChild(li);
-      count++;
-    } else if (b1 === "lumayan") {
-      const li = document.createElement("li");
-      li.textContent = `⚠️ Hampir habis <10 (Gudang 1): ${it.name} (sisa ${s1} ${it.baseUnit || "pcs"})`;
-      notifList.appendChild(li);
-      count++;
-    }
-
-    if (b2 === "habis") {
-      const li = document.createElement("li");
-      li.textContent = `⛔ Habis (Gudang 2): ${it.name}`;
-      notifList.appendChild(li);
-      count++;
-    } else if (b2 === "lumayan") {
-      const li = document.createElement("li");
-      li.textContent = `⚠️ Hampir habis <10 (Gudang 2): ${it.name} (sisa ${s2} ${it.baseUnit || "pcs"})`;
-      notifList.appendChild(li);
-      count++;
-    }
-  });
-
-  if (count === 0) {
-    const li = document.createElement("li");
-    li.textContent = "Tidak ada notifikasi.";
-    notifList.appendChild(li);
-  }
-
-  notifBadge.textContent = String(count);
-}
-
-/* ================= DASHBOARD ================= */
-function setMetricLabel(el, val) {
-  if (el) el.textContent = String(val || 0);
-}
-
-function renderWarehouseDashboard() {
+// ============== RENDER DASHBOARD ==============
+function renderDashboard() {
   let w1 = { habis: 0, lumayan: 0, banyak: 0 };
   let w2 = { habis: 0, lumayan: 0, banyak: 0 };
 
-  itemsCache.forEach((it) => {
-    const s1 = getStockBase(it.id, "w1");
-    const s2 = getStockBase(it.id, "w2");
-
-    const b1 = stockBucket(s1);
-    const b2 = stockBucket(s2);
-
+  items.forEach((it) => {
+    const s1 = ensureStockValue(it.id, "w1");
+    const s2 = ensureStockValue(it.id, "w2");
+    const b1 = bucketByQty(s1);
+    const b2 = bucketByQty(s2);
     if (b1 === "habis") w1.habis++;
-    else if (b1 === "lumayan") w1.lumayan++;
-    else if (b1 === "banyak") w1.banyak++;
-
+    if (b1 === "lumayan") w1.lumayan++;
+    if (b1 === "banyak") w1.banyak++;
     if (b2 === "habis") w2.habis++;
-    else if (b2 === "lumayan") w2.lumayan++;
-    else if (b2 === "banyak") w2.banyak++;
+    if (b2 === "lumayan") w2.lumayan++;
+    if (b2 === "banyak") w2.banyak++;
   });
 
-  setMetricLabel(w1Habis, w1.habis);
-  setMetricLabel(w1Lumayan, w1.lumayan);
-  setMetricLabel(w1Banyak, w1.banyak);
-  setMetricLabel(w2Habis, w2.habis);
-  setMetricLabel(w2Lumayan, w2.lumayan);
-  setMetricLabel(w2Banyak, w2.banyak);
+  if (w1Habis) w1Habis.textContent = w1.habis;
+  if (w1Lumayan) w1Lumayan.textContent = w1.lumayan;
+  if (w1Banyak) w1Banyak.textContent = w1.banyak;
+
+  if (w2Habis) w2Habis.textContent = w2.habis;
+  if (w2Lumayan) w2Lumayan.textContent = w2.lumayan;
+  if (w2Banyak) w2Banyak.textContent = w2.banyak;
 }
 
-function initDashboardClickToOpname() {
-  const bind = (card, wh, bucket) => {
+// Klik metric -> filter opname
+function initDashboardMetricClicks() {
+  const bind = (card, gudang, filter) => {
     if (!card) return;
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
-      setActiveNav(navWhOpname);
-      showWarehouseSection("opname");
-      if (whOpnameGudang) whOpnameGudang.value = wh;
-      if (whOpnameSection) whOpnameSection.dataset.bucket = bucket;
+      activeGudang = gudang;
+      activeFilter = filter;
+
+      if (whOpnameGudang) whOpnameGudang.value = gudang;
+      if (whOpnameSearch) whOpnameSearch.value = "";
+
+      setActiveSidebar(navWhOpname);
+      showWhSection("opname");
       renderOpnameTable();
-      whOpnameSection?.scrollIntoView({ behavior: "smooth" });
     });
   };
 
@@ -348,785 +277,501 @@ function initDashboardClickToOpname() {
   bind(cardW2Banyak, "w2", "banyak");
 }
 
-/* ================== INJECT FIELD BARU (Dus -> Base Unit + Harga Supplier) ==================
-   - baseUnit: pcs / barel
-   - packUnit: dus (default)
-   - packSize: isi per dus (misal 24 pcs)
-   - supplierPackPrice: harga per dus dari supplier
-*/
-let injected = false;
-function injectExtraItemFields() {
-  if (injected) return;
-  const root = whItemName?.closest(".card");
-  const formGrid = root?.querySelector(".form-grid");
-  if (!formGrid) return;
-
-  // default pack unit "dus"
-  if (whItemUnit && !whItemUnit.value) whItemUnit.value = "dus";
-
-  const html = `
-    <div>
-      <label>Satuan Isi (PCS/BAREL)</label>
-      <select id="whBaseUnit">
-        <option value="pcs">pcs</option>
-        <option value="barel">barel</option>
-      </select>
-    </div>
-
-    <div>
-      <label>Satuan Kemasan (default: dus)</label>
-      <input id="whPackUnit" placeholder="dus" value="dus">
-    </div>
-
-    <div>
-      <label>Isi per Dus (berapa pcs/barel)</label>
-      <input id="whPackSize" type="number" min="1" step="1" placeholder="contoh: 24">
-    </div>
-
-    <div>
-      <label>Harga Dus dari Supplier (Rp)</label>
-      <input id="whSupplierPackPrice" type="number" min="0" step="1" placeholder="contoh: 250000">
-    </div>
-
-    <div class="full" style="font-size:12px;opacity:.75;margin-top:-4px;">
-      * Stok disimpan dalam satuan isi (pcs/barel) supaya akurat. Input/opname bisa pakai dus + pcs/barel.
-    </div>
-  `;
-
-  const wrap = document.createElement("div");
-  wrap.className = "full";
-  wrap.innerHTML = `<div class="form-grid" style="margin-top:10px;">${html}</div>`;
-
-  // sisipkan sebelum tombol simpan item
-  const btn = btnSaveItem;
-  if (btn && btn.parentElement === formGrid) {
-    formGrid.insertBefore(wrap, btn);
-  } else {
-    formGrid.appendChild(wrap);
+// ============== RENDER SELECTS ==============
+function renderSelects() {
+  if (moveItemSelect) {
+    moveItemSelect.innerHTML = items.map((it) => `<option value="${it.id}">${it.name}</option>`).join("");
   }
 
-  injected = true;
-}
-
-/* ================== MASTER ITEM SAVE ================== */
-async function saveMasterItem() {
-  const name = (whItemName?.value || "").trim();
-  const packUnit = (($("whPackUnit")?.value || whItemUnit?.value || "dus") + "").trim() || "dus";
-  const baseUnit = ($("whBaseUnit")?.value || "pcs").trim();
-  const packSize = cleanNumber($("whPackSize")?.value || 0);
-  const supplierPackPrice = cleanNumber($("whSupplierPackPrice")?.value || 0);
-
-  const expDate = (whItemExp?.value || "").trim();
-  const info = (whItemInfo?.value || "").trim();
-  const receivedAt = (whItemReceivedAt?.value || "").trim();
-  const supplier = (whItemSupplier?.value || "").trim();
-
-  if (!name) return showToast("Nama item wajib diisi", "error");
-  if (!packUnit) return showToast("Satuan kemasan wajib diisi (mis: dus)", "error");
-  if (!baseUnit) return showToast("Satuan isi wajib dipilih (pcs/barel)", "error");
-  if (!packSize || packSize <= 0) return showToast("Isi per dus wajib diisi (>= 1)", "error");
-  if (supplierPackPrice < 0) return showToast("Harga dus tidak valid", "error");
-
-  const supplierUnitPrice = packSize > 0 ? Math.round(supplierPackPrice / packSize) : 0;
-
-  const slug =
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || ("item-" + Date.now());
-
-  const ref = doc(db, "warehouse_items", slug);
-  const existing = await getDoc(ref).catch(() => null);
-
-  const payload = {
-    name,
-    packUnit,            // dus
-    baseUnit,            // pcs/barel
-    packSize,            // isi per dus
-    supplierPackPrice,   // harga per dus
-    supplierUnitPrice,   // auto (per pcs/barel)
-    expDate: expDate || null,
-    info: info || "",
-    receivedAt: receivedAt || null,
-    supplier: supplier || "",
-    updatedAt: serverTimestamp(),
-  };
-
-  if (existing && existing.exists()) {
-    await updateDoc(ref, payload);
-    showToast("Item diupdate", "success");
-  } else {
-    await setDoc(ref, { ...payload, createdAt: serverTimestamp() });
-
-    // init stok base = 0
-    await setDoc(doc(db, "warehouse_stock", `${slug}_w1`), {
-      itemId: slug,
-      warehouse: "w1",
-      stockBase: 0,
-      updatedAt: serverTimestamp(),
-    });
-    await setDoc(doc(db, "warehouse_stock", `${slug}_w2`), {
-      itemId: slug,
-      warehouse: "w2",
-      stockBase: 0,
-      updatedAt: serverTimestamp(),
-    });
-
-    showToast("Item ditambahkan", "success");
+  // waste: pilih item lebih enak pakai search + select
+  if (wasteItemSelect) {
+    wasteItemSelect.innerHTML = items.map((it) => `<option value="${it.id}">${it.name}</option>`).join("");
   }
 
-  // reset form
-  if (whItemName) whItemName.value = "";
-  if (whItemUnit) whItemUnit.value = "dus";
-  $("whPackUnit") && ($("whPackUnit").value = "dus");
-  $("whBaseUnit") && ($("whBaseUnit").value = "pcs");
-  $("whPackSize") && ($("whPackSize").value = "");
-  $("whSupplierPackPrice") && ($("whSupplierPackPrice").value = "");
-  if (whItemExp) whItemExp.value = "";
-  if (whItemInfo) whItemInfo.value = "";
-  if (whItemReceivedAt) whItemReceivedAt.value = "";
-  if (whItemSupplier) whItemSupplier.value = "";
+  if (wasteUnit) {
+    // dropdown satuan waste: gram/ml
+    wasteUnit.innerHTML = `
+      <option value="gram">Gram</option>
+      <option value="ml">ML</option>
+    `;
+  }
+
+  // default tanggal
+  if (wasteDate && !wasteDate.value) wasteDate.value = todayStr();
+  if (whReportStart && !whReportStart.value) whReportStart.value = todayStr();
+  if (whReportEnd && !whReportEnd.value) whReportEnd.value = todayStr();
 }
 
-/* ================== OPNAME TABLE (Dus + Base) ================== */
+// ============== OPNAME TABLE ==============
+function expBadge(expStr) {
+  if (!expStr) return `<span class="status-badge">-</span>`;
+  const exp = parseDate(expStr);
+  if (!exp) return `<span class="status-badge">-</span>`;
+
+  const now = new Date();
+  const diff = daysDiff(now, exp); // exp - now
+  // <= 7 hari merah
+  if (diff <= 7) return `<span class="status-badge red">EXP ${diff}h</span>`;
+  // <= 30 hari kuning
+  if (diff <= 30) return `<span class="status-badge yellow">EXP ${diff}h</span>`;
+  return `<span class="status-badge green">OK</span>`;
+}
+
 function renderOpnameTable() {
   if (!whOpnameTableBody) return;
-  whOpnameTableBody.innerHTML = "";
 
-  const wh = whOpnameGudang?.value || "w1";
-  const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
-  const bucket = whOpnameSection?.dataset?.bucket || "";
+  const gudang = whOpnameGudang?.value || activeGudang || "w1";
+  const qtxt = (whOpnameSearch?.value || "").trim().toLowerCase();
 
-  let list = itemsCache.map((it) => {
-    const stockBase = getStockBase(it.id, wh);
-    return { ...it, stockBase };
+  let list = items.map((it) => {
+    const sys = ensureStockValue(it.id, gudang);
+    return { it, sys, bucket: bucketByQty(sys) };
   });
 
-  if (bucket) list = list.filter((x) => stockBucket(x.stockBase) === bucket);
+  if (activeFilter) {
+    list = list.filter((x) => x.bucket === activeFilter);
+  }
 
-  if (keyword) {
-    list = list.filter((it) => {
+  if (qtxt) {
+    list = list.filter(({ it }) => {
       const a = (it.name || "").toLowerCase();
-      const b = (it.supplier || "").toLowerCase();
-      const c = (it.baseUnit || "").toLowerCase();
-      const d = (it.packUnit || "").toLowerCase();
-      const e = (it.info || "").toLowerCase();
-      return a.includes(keyword) || b.includes(keyword) || c.includes(keyword) || d.includes(keyword) || e.includes(keyword);
+      const b = (it.supplierName || "").toLowerCase();
+      const c = (it.unitPack || it.unit || "").toLowerCase();
+      const d = (it.unitInner || "").toLowerCase();
+      return a.includes(qtxt) || b.includes(qtxt) || c.includes(qtxt) || d.includes(qtxt);
     });
   }
 
   if (!list.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="9">Tidak ada item yang cocok.</td>`;
-    whOpnameTableBody.appendChild(tr);
+    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Tidak ada item.</td></tr>`;
     return;
   }
 
-  list.forEach((it) => {
-    const expLvl = expAlertLevel(it);
-    const expBadge =
-      expLvl === "expired"
-        ? `<span class="status-badge red">EXPIRED</span>`
-        : expLvl === "near"
-        ? `<span class="status-badge red">EXP Soon</span>`
-        : `<span class="status-badge green">OK</span>`;
+  whOpnameTableBody.innerHTML = list.map(({ it, sys }) => {
+    const unitPack = it.unitPack || it.unit || "dus";
+    const unitInner = it.unitInner || "-";
+    const packQty = Number(it.packQty || 0);
 
-    const sys = toPackAndLoose(it.stockBase, it);
-    const sysLabel = `${sys.pack} ${it.packUnit || "dus"} + ${sys.loose} ${it.baseUnit || "pcs"}`;
+    const sysText = `${sys.toLocaleString("id-ID")} ${unitPack}`;
+    const helper = packQty > 0 && unitInner !== "-"
+      ? `<div style="font-size:11px;opacity:.7;margin-top:2px;">= ${(sys * packQty).toLocaleString("id-ID")} ${unitInner}</div>`
+      : "";
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><b>${it.name || "-"}</b></td>
-      <td>${(it.packUnit || "dus")} / ${ (it.baseUnit || "pcs") }</td>
-      <td>
-        ${it.expDate ? formatDateShort(it.expDate) : "-"}
-        <div style="margin-top:4px;">${it.expDate ? expBadge : ""}</div>
-      </td>
-      <td style="max-width:220px;">
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${(it.info || "-")}
-        </div>
-      </td>
-      <td>${it.receivedAt ? formatDateShort(it.receivedAt) : "-"}</td>
-      <td>${it.supplier || "-"}</td>
-      <td>
-        <div>${sysLabel}</div>
-        <div style="font-size:12px;opacity:.7;">
-          (Isi per ${it.packUnit || "dus"}: ${getPackSize(it)} ${it.baseUnit || "pcs"})
-        </div>
-      </td>
-      <td>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <div style="display:flex;gap:6px;align-items:center;">
-            <span style="font-size:12px;opacity:.7;">${it.packUnit || "dus"}</span>
-            <input type="number" min="0" step="1" style="width:92px;" data-pack="${it.id}" value="${sys.pack}">
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;">
-            <span style="font-size:12px;opacity:.7;">${it.baseUnit || "pcs"}</span>
-            <input type="number" min="0" step="1" style="width:92px;" data-loose="${it.id}" value="${sys.loose}">
-          </div>
-        </div>
-      </td>
-      <td>
-        <button class="btn-table btn-table-delete small" data-save="${it.id}">Simpan</button>
-      </td>
+    return `
+      <tr>
+        <td><b>${it.name || "-"}</b></td>
+        <td>${unitPack}${unitInner !== "-" ? ` <div style="font-size:11px;opacity:.7;">isi: ${packQty} ${unitInner}</div>` : ""}</td>
+        <td>${expBadge(it.expDate || "")}</td>
+        <td style="max-width:220px;">${(it.info || "-")}</td>
+        <td>${it.receivedAt || "-"}</td>
+        <td>${it.supplierName || "-"}</td>
+        <td>${sysText}${helper}</td>
+        <td>
+          <input type="number" min="0" step="1"
+                 data-phys="1"
+                 data-item="${it.id}"
+                 data-gudang="${gudang}"
+                 value="${sys}">
+        </td>
+        <td>
+          <button class="btn-table small" type="button"
+                  data-save="1"
+                  data-item="${it.id}"
+                  data-gudang="${gudang}">
+            Simpan
+          </button>
+        </td>
+      </tr>
     `;
-    whOpnameTableBody.appendChild(tr);
-  });
+  }).join("");
 
-  whOpnameTableBody.querySelectorAll("button[data-save]").forEach((btn) => {
-    const itemId = btn.getAttribute("data-save");
-    btn.addEventListener("click", () => saveOpnameRow(itemId));
+  // bind save opname
+  whOpnameTableBody.querySelectorAll("button[data-save='1']").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const itemId = btn.getAttribute("data-item");
+      const gudang = btn.getAttribute("data-gudang");
+      const inp = whOpnameTableBody.querySelector(`input[data-phys='1'][data-item='${itemId}'][data-gudang='${gudang}']`);
+      const phys = Number(inp?.value || 0);
+
+      await saveOpname(itemId, gudang, phys);
+    });
   });
 }
 
-async function saveOpnameRow(itemId) {
-  try {
-    const wh = whOpnameGudang?.value || "w1";
-    const item = itemsCache.find((x) => x.id === itemId);
-    if (!item) return;
+async function saveOpname(itemId, gudang, physicalStock) {
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return;
 
-    const packInp = whOpnameTableBody.querySelector(`input[data-pack="${itemId}"]`);
-    const looseInp = whOpnameTableBody.querySelector(`input[data-loose="${itemId}"]`);
-    if (!packInp || !looseInp) return;
+  const sysRow = getStockRow(itemId, gudang);
+  const systemStock = Number(sysRow?.stock || 0);
+  const diff = physicalStock - systemStock;
 
-    const physicalPack = Number(packInp.value || 0);
-    const physicalLoose = Number(looseInp.value || 0);
-    const physicalBase = toBaseFromPackLoose(physicalPack, physicalLoose, item);
-
-    const systemBase = getStockBase(itemId, wh);
-    const diffBase = physicalBase - systemBase;
-
-    const stockDocId = `${itemId}_${wh}`;
-    await updateDoc(doc(db, "warehouse_stock", stockDocId), {
-      stockBase: physicalBase,
+  // upsert stock doc: pakai doc id custom "itemId_gudang"
+  const stockDocId = `${itemId}_${gudang}`;
+  await updateDoc(doc(db, "wh_stock", stockDocId), {
+    itemId,
+    gudang,
+    stock: physicalStock,
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUser?.email || "-",
+  }).catch(async () => {
+    // kalau belum ada doc, addDoc manual dgn id = stockDocId (via setDoc ideal, tapi kita keep simple)
+    await addDoc(colWhStock, {
+      itemId,
+      gudang,
+      stock: physicalStock,
       updatedAt: serverTimestamp(),
       updatedBy: currentUser?.email || "-",
+      _docIdHint: stockDocId,
     });
-
-    await addDoc(colOpnameLogs, {
-      itemId,
-      itemName: item.name || "-",
-      warehouse: wh,
-      systemBase,
-      physicalBase,
-      diffBase,
-      packUnit: item.packUnit || "dus",
-      baseUnit: item.baseUnit || "pcs",
-      packSize: getPackSize(item),
-      createdBy: currentUser?.email || "-",
-      createdByUid: currentUser?.uid || null,
-      createdAt: serverTimestamp(),
-      createdAtLocal: new Date().toISOString(),
-    });
-
-    showToast(`Opname tersimpan: ${item.name} (${wh.toUpperCase()})`, "success");
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menyimpan opname", "error");
-  }
-}
-
-/* ================== TRANSFER W1 -> W2 (qty dalam DUS) ================== */
-function renderMoveSelect() {
-  if (!moveItemSelect) return;
-  moveItemSelect.innerHTML = "";
-  const opt0 = document.createElement("option");
-  opt0.value = "";
-  opt0.textContent = "Pilih item...";
-  moveItemSelect.appendChild(opt0);
-
-  itemsCache.forEach((it) => {
-    const s1 = getStockBase(it.id, "w1");
-    const w1 = toPackAndLoose(s1, it);
-    const opt = document.createElement("option");
-    opt.value = it.id;
-    opt.textContent = `${it.name} (W1: ${w1.pack} ${it.packUnit || "dus"} + ${w1.loose} ${it.baseUnit || "pcs"})`;
-    moveItemSelect.appendChild(opt);
   });
 
-  // label input transfer: dus
-  if (moveQty) moveQty.placeholder = "Qty (dus)";
+  await addDoc(colWhStockLogs, {
+    kind: "opname",
+    itemId,
+    itemName: it.name || "-",
+    gudang,
+    systemStock,
+    physicalStock,
+    diff,
+    createdAt: serverTimestamp(),
+    createdBy: currentUser?.email || "-",
+  });
+
+  showToast(`Opname tersimpan (${it.name}) - ${gudang.toUpperCase()}`, "success");
+  await loadAllWarehouseData();
 }
 
+// ============== SAVE MASTER ITEM ==============
+async function saveItem() {
+  const name = (whItemName?.value || "").trim();
+  if (!name) return showToast("Nama item wajib diisi", "error");
+
+  // support field baru + fallback field lama (whItemUnit)
+  const unitPack = (whItemUnitBig?.value || whItemUnit?.value || "dus").trim() || "dus";
+  const unitInner = (whItemUnitSmall?.value || "").trim() || "pcs";
+  const packQty = Number(whItemPackQty?.value || 0); // isi per dus
+  const pricePerPack = Number(whItemPricePerPack?.value || 0); // harga/dus
+
+  const expDate = whItemExp?.value || "";
+  const info = (whItemInfo?.value || "").trim();
+  const receivedAt = whItemReceivedAt?.value || "";
+  const supplierName = (whItemSupplier?.value || "").trim();
+
+  // NOTE: HTML kamu belum ada input2 baru (unitBig/unitSmall/packQty/pricePerPack).
+  // Tapi warehouse.js sudah siap. Kamu tinggal tambah inputnya nanti.
+
+  await addDoc(colWhItems, {
+    name,
+    unitPack,     // contoh: dus
+    unitInner,    // contoh: pcs / barel
+    packQty,      // nominal pcs per dus
+    pricePerPack, // harga dus dari supplier
+    expDate,
+    info,
+    receivedAt,
+    supplierName,
+    createdAt: serverTimestamp(),
+    createdBy: currentUser?.email || "-",
+  });
+
+  showToast("Item tersimpan", "success");
+
+  if (whItemName) whItemName.value = "";
+  if (whItemUnit) whItemUnit.value = "";
+  if (whItemUnitBig) whItemUnitBig.value = "";
+  if (whItemUnitSmall) whItemUnitSmall.value = "";
+  if (whItemPackQty) whItemPackQty.value = "";
+  if (whItemPricePerPack) whItemPricePerPack.value = "";
+  if (whItemExp) whItemExp.value = "";
+  if (whItemInfo) whItemInfo.value = "";
+  if (whItemReceivedAt) whItemReceivedAt.value = "";
+  if (whItemSupplier) whItemSupplier.value = "";
+
+  await loadAllWarehouseData();
+}
+
+// ============== TRANSFER W1 -> W2 ==============
 async function transferW1toW2() {
   const itemId = moveItemSelect?.value || "";
-  const packQty = Number(moveQty?.value || 0);
+  const qty = Number(moveQty?.value || 0);
+  if (!itemId) return showToast("Pilih item transfer", "error");
+  if (qty <= 0) return showToast("Qty transfer harus > 0", "error");
 
-  if (!itemId) return showToast("Pilih item dulu", "error");
-  if (!packQty || packQty <= 0) return showToast("Qty transfer (dus) harus > 0", "error");
+  const it = items.find((x) => x.id === itemId);
+  const s1 = ensureStockValue(itemId, "w1");
+  const s2 = ensureStockValue(itemId, "w2");
 
-  const item = itemsCache.find((x) => x.id === itemId);
-  if (!item) return showToast("Item tidak ditemukan", "error");
+  if (qty > s1) return showToast("Stok Gudang 1 tidak cukup", "error");
 
-  const s1 = getStockBase(itemId, "w1");
-  const s2 = getStockBase(itemId, "w2");
+  const newW1 = s1 - qty;
+  const newW2 = s2 + qty;
 
-  const baseMove = toBaseFromPackLoose(packQty, 0, item);
-  if (baseMove > s1) return showToast(`Stok Gudang 1 kurang.`, "error");
+  const docW1 = `${itemId}_w1`;
+  const docW2 = `${itemId}_w2`;
 
-  try {
-    await updateDoc(doc(db, "warehouse_stock", `${itemId}_w1`), {
-      stockBase: s1 - baseMove,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "-",
-    });
-    await updateDoc(doc(db, "warehouse_stock", `${itemId}_w2`), {
-      stockBase: s2 + baseMove,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "-",
-    });
-
-    await addDoc(colMoves, {
-      itemId,
-      itemName: item?.name || "-",
-      packQty,
-      baseQty: baseMove,
-      packUnit: item.packUnit || "dus",
-      baseUnit: item.baseUnit || "pcs",
-      packSize: getPackSize(item),
-      from: "w1",
-      to: "w2",
-      createdBy: currentUser?.email || "-",
-      createdByUid: currentUser?.uid || null,
-      createdAt: serverTimestamp(),
-      createdAtLocal: new Date().toISOString(),
-    });
-
-    showToast(`Transfer sukses: ${item?.name} ${packQty} ${item?.packUnit || "dus"}`, "success");
-    if (moveQty) moveQty.value = "";
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal transfer", "error");
-  }
-}
-
-/* ================== WASTE (tetap sesuai request kamu sebelumnya) ==================
-   - Tidak pakai gudang
-   - Pilih item pakai search suggestion
-   - Gram/ML dropdown + 1 input jumlah
-*/
-let wasteSelectedItemId = "";
-let wasteUnitSelect = null;
-let wasteQtyInput = null;
-let wasteItemSearch = null;
-let wasteSuggestBox = null;
-
-function initWasteUIRewrite() {
-  // hide gudang
-  if (wasteGudang) wasteGudang.parentElement?.classList?.add("hidden");
-  // hide select item lama
-  if (wasteItemSelect) wasteItemSelect.parentElement?.classList?.add("hidden");
-  // hide ML input lama
-  if (wasteMl) wasteMl.parentElement?.classList?.add("hidden");
-
-  // repurpose wasteGram jadi qty input
-  if (wasteGram) {
-    wasteGram.placeholder = "Jumlah...";
-    wasteQtyInput = wasteGram;
-  }
-
-  const card = whWasteSection?.querySelector(".card .form-grid");
-  if (!card) return;
-
-  // search + suggest
-  const wrap = document.createElement("div");
-  wrap.className = "full";
-  wrap.innerHTML = `
-    <label>Cari & Pilih Item</label>
-    <div class="suggest-wrap">
-      <input id="wasteItemSearchNew" type="text" placeholder="Ketik nama item..." autocomplete="off" />
-      <div id="wasteSuggestNew" class="suggest-box hidden"></div>
-    </div>
-    <div style="margin-top:6px;font-size:12px;opacity:.7;" id="wastePickedLabel">Belum pilih item</div>
-  `;
-  card.insertBefore(wrap, card.firstChild);
-
-  // unit dropdown gram/ml
-  const unitDiv = document.createElement("div");
-  unitDiv.innerHTML = `
-    <label>Satuan</label>
-    <select id="wasteUnitNew">
-      <option value="gram">Gram</option>
-      <option value="ml">ML</option>
-    </select>
-  `;
-  if (wasteGram?.parentElement) card.insertBefore(unitDiv, wasteGram.parentElement);
-
-  wasteUnitSelect = $("wasteUnitNew");
-  wasteItemSearch = $("wasteItemSearchNew");
-  wasteSuggestBox = $("wasteSuggestNew");
-  const pickedLabel = $("wastePickedLabel");
-
-  function renderWasteSuggest(keyword) {
-    const q = (keyword || "").trim().toLowerCase();
-    let list = [...itemsCache];
-    if (q) list = list.filter((it) => (it.name || "").toLowerCase().includes(q));
-
-    if (!list.length) {
-      wasteSuggestBox.innerHTML = `<div class="suggest-item">Tidak ada item</div>`;
-      wasteSuggestBox.classList.remove("hidden");
-      return;
-    }
-
-    wasteSuggestBox.innerHTML = list
-      .slice(0, 25)
-      .map((it) => `<div class="suggest-item" data-id="${it.id}">${it.name}</div>`)
-      .join("");
-    wasteSuggestBox.classList.remove("hidden");
-
-    wasteSuggestBox.querySelectorAll(".suggest-item").forEach((el) => {
-      const id = el.getAttribute("data-id");
-      if (!id) return;
-      el.addEventListener("click", () => {
-        wasteSelectedItemId = id;
-        const it = itemsCache.find((x) => x.id === id);
-        if (pickedLabel) pickedLabel.textContent = `Dipilih: ${it?.name || "-"}`;
-        if (wasteItemSearch) wasteItemSearch.value = it?.name || "";
-        wasteSuggestBox.classList.add("hidden");
-      });
-    });
-
-    if (list.length === 1) {
-      const it = list[0];
-      wasteSelectedItemId = it.id;
-      if (pickedLabel) pickedLabel.textContent = `Dipilih: ${it.name}`;
-      if (wasteItemSearch) wasteItemSearch.value = it.name;
-      wasteSuggestBox.classList.add("hidden");
-    }
-  }
-
-  wasteItemSearch?.addEventListener("input", () => {
-    wasteSelectedItemId = "";
-    if (pickedLabel) pickedLabel.textContent = "Belum pilih item";
-    renderWasteSuggest(wasteItemSearch.value);
+  await updateDoc(doc(db, "wh_stock", docW1), {
+    itemId, gudang: "w1", stock: newW1, updatedAt: serverTimestamp(),
+  }).catch(async () => {
+    await addDoc(colWhStock, { itemId, gudang: "w1", stock: newW1, updatedAt: serverTimestamp(), _docIdHint: docW1 });
   });
 
-  wasteItemSearch?.addEventListener("focus", () => renderWasteSuggest(wasteItemSearch.value));
-
-  document.addEventListener("click", (e) => {
-    if (!wrap.contains(e.target)) wasteSuggestBox?.classList?.add("hidden");
+  await updateDoc(doc(db, "wh_stock", docW2), {
+    itemId, gudang: "w2", stock: newW2, updatedAt: serverTimestamp(),
+  }).catch(async () => {
+    await addDoc(colWhStock, { itemId, gudang: "w2", stock: newW2, updatedAt: serverTimestamp(), _docIdHint: docW2 });
   });
+
+  await addDoc(colWhStockLogs, {
+    kind: "transfer",
+    itemId,
+    itemName: it?.name || "-",
+    from: "w1",
+    to: "w2",
+    qty,
+    createdAt: serverTimestamp(),
+    createdBy: currentUser?.email || "-",
+  });
+
+  showToast("Transfer berhasil (W1 → W2)", "success");
+  if (moveQty) moveQty.value = "";
+  await loadAllWarehouseData();
 }
 
+// ============== WASTE (no gudang, unit dropdown gram/ml) ==============
 async function saveWaste() {
-  try {
-    if (!wasteSelectedItemId) return showToast("Pilih item waste dulu (pakai search)", "error");
-    const item = itemsCache.find((x) => x.id === wasteSelectedItemId);
-    if (!item) return showToast("Item tidak ditemukan", "error");
+  const itemId = wasteItemSelect?.value || "";
+  if (!itemId) return showToast("Pilih item waste", "error");
 
-    const dt = (wasteDate?.value || "").trim() || todayISO();
-    const unit = wasteUnitSelect?.value || "gram";
-    const qty = Number(wasteQtyInput?.value || 0);
-    const note = (wasteNote?.value || "").trim();
+  const date = wasteDate?.value || todayStr();
+  const qty = Number(wasteQty?.value || 0);
+  const unit = wasteUnit?.value || "gram";
+  const note = (wasteNote?.value || "").trim();
 
-    if (!qty || qty <= 0) return showToast("Jumlah waste harus > 0", "error");
+  if (qty <= 0) return showToast("Qty waste harus > 0", "error");
 
-    // gudang otomatis: yang stoknya lebih besar
-    const s1 = getStockBase(item.id, "w1");
-    const s2 = getStockBase(item.id, "w2");
-    const warehouse = s2 > s1 ? "w2" : "w1";
+  const it = items.find((x) => x.id === itemId);
 
-    await addDoc(colWaste, {
-      itemId: item.id,
-      itemName: item.name || "-",
-      unitMeasure: unit,
-      qty,
-      note,
-      warehouse,
-      createdBy: currentUser?.email || "-",
-      createdByUid: currentUser?.uid || null,
-      wasteDate: dt,
-      createdAt: serverTimestamp(),
-      createdAtLocal: new Date().toISOString(),
-    });
+  await addDoc(colWhWaste, {
+    itemId,
+    itemName: it?.name || "-",
+    date,
+    qty,
+    unit,   // gram / ml
+    note,
+    createdAt: serverTimestamp(),
+    createdBy: currentUser?.email || "-",
+  });
 
-    showToast("Waste tersimpan", "success");
-    if (wasteQtyInput) wasteQtyInput.value = "";
-    if (wasteNote) wasteNote.value = "";
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menyimpan waste", "error");
-  }
+  showToast("Waste tersimpan", "success");
+  if (wasteQty) wasteQty.value = "";
+  if (wasteNote) wasteNote.value = "";
+  await loadAllWarehouseData();
 }
 
-/* ================== REPORT ================== */
-function parseDateInput(v) {
-  if (!v) return null;
-  const d = new Date(v + "T00:00:00");
-  return isNaN(d) ? null : d;
-}
-function parseDateEndInput(v) {
-  if (!v) return null;
-  const d = new Date(v + "T23:59:59");
-  return isNaN(d) ? null : d;
+// ============== REPORT ==============
+function renderReportTable(headCols, rows, rowRenderer) {
+  if (!whReportHead || !whReportBody) return;
+  whReportHead.innerHTML = `<tr>${headCols.map((h) => `<th>${h}</th>`).join("")}</tr>`;
+  whReportBody.innerHTML = rows.length
+    ? rows.map(rowRenderer).join("")
+    : `<tr><td colspan="${headCols.length}">Tidak ada data.</td></tr>`;
 }
 
-function clearReportTable() {
-  if (whReportHead) whReportHead.innerHTML = "";
-  if (whReportBody) whReportBody.innerHTML = "";
-}
-
-function renderReportHead(kind) {
-  if (!whReportHead) return;
-  whReportHead.innerHTML = "";
-  const tr = document.createElement("tr");
-
-  if (kind.startsWith("opname_")) {
-    tr.innerHTML = `
-      <th>Tanggal</th>
-      <th>Item</th>
-      <th>Gudang</th>
-      <th>Sistem</th>
-      <th>Fisik</th>
-      <th>Selisih</th>
-      <th>User</th>
-    `;
-  } else {
-    tr.innerHTML = `
-      <th>Tanggal</th>
-      <th>Item</th>
-      <th>Qty</th>
-      <th>Satuan</th>
-      <th>Gudang</th>
-      <th>Catatan</th>
-      <th>User</th>
-    `;
-  }
-  whReportHead.appendChild(tr);
+function inRange(d, start, end) {
+  if (!d) return false;
+  return d >= start && d <= end;
 }
 
 async function generateReport() {
-  clearReportTable();
-  const kind = whReportType?.value || "opname_w1";
+  const type = whReportType?.value || "opname_w1";
+  const s = parseDate(whReportStart?.value || "");
+  const e = parseDate(whReportEnd?.value || "");
+  if (!s || !e) return showToast("Tanggal laporan wajib diisi", "error");
+  const end = new Date(e.getFullYear(), e.getMonth(), e.getDate(), 23, 59, 59);
 
-  const start = parseDateInput(whReportStart?.value);
-  const end = parseDateEndInput(whReportEnd?.value);
-  if (!start || !end) return showToast("Tanggal laporan wajib diisi", "error");
-  if (end < start) return showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
+  if (type === "opname_w1" || type === "opname_w2") {
+    const gudang = type === "opname_w1" ? "w1" : "w2";
 
-  renderReportHead(kind);
-  if (!whReportBody) return;
-
-  if (kind === "opname_w1" || kind === "opname_w2") {
-    const wh = kind === "opname_w1" ? "w1" : "w2";
-
-    const snap = await getDocs(query(colOpnameLogs, orderBy("createdAt", "desc")));
-    let rows = [];
-
-    snap.forEach((d) => {
-      const data = d.data();
-      const dt = data.createdAt?.toDate?.() || (data.createdAtLocal ? new Date(data.createdAtLocal) : null);
-      if (!dt || isNaN(dt)) return;
-      if (dt < start || dt > end) return;
-      if (data.warehouse !== wh) return;
-
-      const item = itemsCache.find((x) => x.id === data.itemId);
-      const packUnit = data.packUnit || item?.packUnit || "dus";
-      const baseUnit = data.baseUnit || item?.baseUnit || "pcs";
-      const packSize = Number(data.packSize || item?.packSize || 1);
-
-      const sys = toPackAndLoose(Number(data.systemBase ?? 0), { packSize });
-      const phy = toPackAndLoose(Number(data.physicalBase ?? 0), { packSize });
-      const dif = toPackAndLoose(Number(data.diffBase ?? 0), { packSize });
-
-      rows.push({
-        tanggal: dt,
-        itemName: data.itemName || "-",
-        warehouse: data.warehouse || "-",
-        systemText: `${sys.pack} ${packUnit} + ${sys.loose} ${baseUnit}`,
-        physicalText: `${phy.pack} ${packUnit} + ${phy.loose} ${baseUnit}`,
-        diffText: `${dif.pack} ${packUnit} + ${dif.loose} ${baseUnit}`,
-        user: data.createdBy || "-",
+    const rows = stockLogs
+      .filter((x) => x.kind === "opname" && x.gudang === gudang)
+      .filter((x) => {
+        // createdAt tidak bisa diparse di client tanpa toDate (kadang), jadi kita filter via fallback: tidak ketat
+        // untuk akurat, sebaiknya simpan "dateKey" juga. Untuk sekarang, pakai createdAtLocal bila ada.
+        const d = x.createdAtLocal ? new Date(x.createdAtLocal) : null;
+        if (!d) return true; // fallback: tampilkan
+        return inRange(d, s, end);
       });
-    });
 
-    if (!rows.length) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="7">Tidak ada data opname pada periode ini.</td>`;
-      whReportBody.appendChild(tr);
-      return;
-    }
-
-    rows.forEach((r) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${formatDateShort(r.tanggal)} ${pad2(r.tanggal.getHours())}:${pad2(r.tanggal.getMinutes())}</td>
-        <td>${r.itemName}</td>
-        <td>${(r.warehouse || "").toUpperCase()}</td>
-        <td>${r.systemText}</td>
-        <td>${r.physicalText}</td>
-        <td>${r.diffText}</td>
-        <td>${r.user}</td>
-      `;
-      whReportBody.appendChild(tr);
-    });
-
-    showToast("Laporan opname diperbarui", "success");
+    renderReportTable(
+      ["Waktu", "Item", "Gudang", "Sistem", "Fisik", "Selisih", "User"],
+      rows,
+      (r) => `
+        <tr>
+          <td>${r.createdAtLocal || "-"}</td>
+          <td>${r.itemName || "-"}</td>
+          <td>${(r.gudang || "-").toUpperCase()}</td>
+          <td>${Number(r.systemStock || 0).toLocaleString("id-ID")}</td>
+          <td>${Number(r.physicalStock || 0).toLocaleString("id-ID")}</td>
+          <td>${Number(r.diff || 0).toLocaleString("id-ID")}</td>
+          <td>${r.createdBy || "-"}</td>
+        </tr>
+      `
+    );
+    return;
   }
 
-  if (kind === "waste_w1" || kind === "waste_w2") {
-    const wh = kind === "waste_w1" ? "w1" : "w2";
-    const snap = await getDocs(query(colWaste, orderBy("createdAt", "desc")));
-
-    let rows = [];
-    snap.forEach((d) => {
-      const data = d.data();
-      const wd = data.wasteDate ? new Date(data.wasteDate + "T00:00:00") : null;
-      if (!wd || isNaN(wd)) return;
-      if (wd < start || wd > end) return;
-      if (data.warehouse !== wh) return;
-
-      rows.push({
-        wasteDate: data.wasteDate || "-",
-        itemName: data.itemName || "-",
-        qty: Number(data.qty ?? 0),
-        unitMeasure: data.unitMeasure || "-",
-        warehouse: data.warehouse || "-",
-        note: data.note || "",
-        user: data.createdBy || "-",
-      });
+  // Waste report (tidak pakai gudang) — tapi kamu minta dipisah gudang,
+  // jadi kita treat: waste_w1/w2 sebagai label saja jika nanti kamu mau log gudang.
+  // Untuk sekarang: tetap difilter jenisnya.
+  if (type === "waste_w1" || type === "waste_w2") {
+    const rows = wasteLogs.filter((x) => {
+      const d = parseDate(x.date || "");
+      if (!d) return true;
+      return inRange(d, s, end);
     });
 
-    if (!rows.length) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="7">Tidak ada data waste pada periode ini.</td>`;
-      whReportBody.appendChild(tr);
-      return;
-    }
-
-    rows.forEach((r) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${formatDateShort(r.wasteDate)}</td>
-        <td>${r.itemName}</td>
-        <td>${r.qty}</td>
-        <td>${r.unitMeasure}</td>
-        <td>${(r.warehouse || "").toUpperCase()}</td>
-        <td>${String(r.note || "").replace(/</g, "&lt;")}</td>
-        <td>${r.user}</td>
-      `;
-      whReportBody.appendChild(tr);
-    });
-
-    showToast("Laporan waste diperbarui", "success");
+    renderReportTable(
+      ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"],
+      rows,
+      (r) => `
+        <tr>
+          <td>${r.date || "-"}</td>
+          <td>${r.itemName || "-"}</td>
+          <td>${Number(r.qty || 0).toLocaleString("id-ID")}</td>
+          <td>${r.unit || "-"}</td>
+          <td>${r.note || "-"}</td>
+          <td>${r.createdBy || "-"}</td>
+        </tr>
+      `
+    );
   }
 }
 
-/* ================== REALTIME ================== */
-function startRealtime() {
-  unsubscribeItems?.();
-  unsubscribeStock?.();
+// ============== NOTIF (stok habis/low + exp warning) ==============
+function updateWarehouseNotif() {
+  if (!notifList || !notifBadge) return;
 
-  unsubscribeItems = onSnapshot(query(colItems, orderBy("name", "asc")), (snap) => {
-    itemsCache = [];
-    snap.forEach((d) => itemsCache.push({ id: d.id, ...d.data() }));
+  notifList.innerHTML = "";
+  let count = 0;
 
-    renderWarehouseDashboard();
-    renderOpnameTable();
-    renderMoveSelect();
-    updateNotifPanel();
+  const now = new Date();
+
+  // stok notif: habis & hampir habis (per gudang)
+  items.forEach((it) => {
+    const s1 = ensureStockValue(it.id, "w1");
+    const s2 = ensureStockValue(it.id, "w2");
+
+    if (s1 <= 0) {
+      notifList.appendChild(li(`Habis (Gudang 1): ${it.name}`));
+      count++;
+    } else if (s1 < 10) {
+      notifList.appendChild(li(`Hampir habis <10 (Gudang 1): ${it.name} (${s1})`));
+      count++;
+    }
+
+    if (s2 <= 0) {
+      notifList.appendChild(li(`Habis (Gudang 2): ${it.name}`));
+      count++;
+    } else if (s2 < 10) {
+      notifList.appendChild(li(`Hampir habis <10 (Gudang 2): ${it.name} (${s2})`));
+      count++;
+    }
+
+    // exp notif
+    if (it.expDate) {
+      const exp = parseDate(it.expDate);
+      if (exp) {
+        const diff = daysDiff(now, exp);
+        if (diff <= 7) {
+          notifList.appendChild(li(`⚠️ EXP dekat (${diff} hari): ${it.name}`));
+          count++;
+        }
+      }
+    }
   });
 
-  unsubscribeStock = onSnapshot(query(colStock, orderBy("warehouse", "asc")), (snap) => {
-    stockCache = [];
-    snap.forEach((d) => stockCache.push({ id: d.id, ...d.data() }));
+  if (count === 0) {
+    notifList.appendChild(li("Tidak ada notifikasi."));
+  }
+  notifBadge.textContent = String(count);
 
-    renderWarehouseDashboard();
-    renderOpnameTable();
-    renderMoveSelect();
-    updateNotifPanel();
-  });
+  function li(text) {
+    const el = document.createElement("li");
+    el.textContent = text;
+    return el;
+  }
 }
 
-/* ================== INIT ================== */
-function initNavHandlers() {
-  navWhDashboard?.addEventListener("click", () => {
-    setActiveNav(navWhDashboard);
-    showWarehouseSection("dashboard");
-  });
-
-  navWhOpname?.addEventListener("click", () => {
-    setActiveNav(navWhOpname);
-    if (whOpnameSection) delete whOpnameSection.dataset.bucket;
-    showWarehouseSection("opname");
-    renderOpnameTable();
-  });
-
-  navWhWaste?.addEventListener("click", () => {
-    setActiveNav(navWhWaste);
-    showWarehouseSection("waste");
-  });
-
-  navWhReport?.addEventListener("click", () => {
-    setActiveNav(navWhReport);
-    showWarehouseSection("report");
-  });
-
-  if (burgerBtn && sidebar) {
-    burgerBtn.addEventListener("click", (e) => {
+// ============== NAV INIT (INI KUNCI MENU BISA KLIK) ==============
+function initWarehouseNav() {
+  const bind = (btn, sectionName) => {
+    if (!btn) return;
+    btn.style.pointerEvents = "auto"; // jaga-jaga kalau CSS ke-disable
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      sidebar.classList.toggle("open");
+      setActiveSidebar(btn);
+      showWhSection(sectionName);
+
+      // khusus: reset filter ketika pindah halaman
+      if (sectionName !== "opname") activeFilter = null;
+
+      if (sectionName === "opname") renderOpnameTable();
+      if (sectionName === "dashboard") renderDashboard();
     });
-    document.addEventListener("click", (e) => {
-      if (
-        window.innerWidth <= 900 &&
-        sidebar.classList.contains("open") &&
-        !sidebar.contains(e.target) &&
-        !burgerBtn.contains(e.target)
-      ) sidebar.classList.remove("open");
-    });
-  }
+  };
+
+  bind(navWhDashboard, "dashboard");
+  bind(navWhOpname, "opname");
+  bind(navWhWaste, "waste");
+  bind(navWhReport, "report");
 }
 
-function initHandlers() {
-  btnSaveItem?.addEventListener("click", saveMasterItem);
+// ============== EVENTS ==============
+function bindEvents() {
+  if (btnSaveItem) btnSaveItem.addEventListener("click", saveItem);
 
-  whOpnameGudang?.addEventListener("change", () => {
-    if (whOpnameSection) delete whOpnameSection.dataset.bucket;
+  if (whOpnameGudang) whOpnameGudang.addEventListener("change", () => {
+    activeGudang = whOpnameGudang.value || "w1";
     renderOpnameTable();
   });
 
-  whOpnameSearch?.addEventListener("input", () => renderOpnameTable());
+  if (whOpnameSearch) whOpnameSearch.addEventListener("input", () => {
+    renderOpnameTable();
+  });
 
-  btnMove?.addEventListener("click", transferW1toW2);
+  if (btnMove) btnMove.addEventListener("click", transferW1toW2);
 
-  btnSaveWaste?.addEventListener("click", saveWaste);
+  if (btnSaveWaste) btnSaveWaste.addEventListener("click", saveWaste);
 
-  btnWhReport?.addEventListener("click", generateReport);
+  if (btnWhReport) btnWhReport.addEventListener("click", generateReport);
+
+  // waste search filter (kalau kamu pakai input search)
+  if (wasteItemSearch && wasteItemSelect) {
+    wasteItemSearch.addEventListener("input", () => {
+      const q = (wasteItemSearch.value || "").trim().toLowerCase();
+      const filtered = items.filter((it) => (it.name || "").toLowerCase().includes(q));
+      wasteItemSelect.innerHTML = filtered.map((it) => `<option value="${it.id}">${it.name}</option>`).join("");
+    });
+  }
 }
 
-initNavHandlers();
-initDashboardClickToOpname();
-initHandlers();
-ensureDefaultDates();
+// ============== INIT ==============
+function boot() {
+  initWarehouseNav();
+  initDashboardMetricClicks();
+  bindEvents();
 
-/* ================== AUTH ================== */
-onAuthStateChanged(auth, (user) => {
+  // default tampil dashboard warehouse
+  setActiveSidebar(navWhDashboard);
+  showWhSection("dashboard");
+}
+
+onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
+  if (!currentUser) return;
 
-  if (user) {
-    // inject field tambahan once
-    injectExtraItemFields();
-
-    // default view
-    setActiveNav(navWhDashboard);
-    showWarehouseSection("dashboard");
-
-    // init waste UI rewrite once
-    if (!window.__wasteUIInited) {
-      initWasteUIRewrite();
-      window.__wasteUIInited = true;
-    }
-
-    startRealtime();
-    showToast("Warehouse aktif (realtime + dus→pcs/barel)", "success", 2200);
-  } else {
-    unsubscribeItems?.();
-    unsubscribeStock?.();
-    unsubscribeItems = null;
-    unsubscribeStock = null;
-    itemsCache = [];
-    stockCache = [];
-  }
+  boot();
+  await loadAllWarehouseData();
 });
