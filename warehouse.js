@@ -202,7 +202,7 @@ function showWarehouseSection(which) {
 function ensureDefaultDates() {
   if (wasteDate && !wasteDate.value) wasteDate.value = todayISO();
   if (whReportStart && !whReportStart.value) whReportStart.value = todayISO();
-  if (whReportEnd && !whReportEnd.value) whReportEnd.value = todayISO();
+  if (whReportEnd && !whReportEnd.value) whReportEnd.value = todayISO(); 
 }
 
 /* ================== DATA HELPERS ================== */
