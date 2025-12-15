@@ -1,23 +1,26 @@
-// warehouse.js (NEW FEATURES ONLY - Dashboard + Opname Gudang 1/2 + Waste + Report)
-// ================= FIREBASE =================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+// warehouse.js — Realtime Warehouse (Gudang 1 & 2) + Waste + Report
+// Cocok dengan HTML yang punya section: whDashboardSection, whOpnameSection, whWasteSection, whReportSection
+// ID DOM semua pakai prefix "wh..."
+
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
   doc,
-  addDoc,
-  updateDoc,
   setDoc,
+  addDoc,
+  getDoc,
   getDocs,
   query,
   where,
   orderBy,
-  serverTimestamp,
   onSnapshot,
+  serverTimestamp,
+  Timestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// ✅ pake config kamu
+/* ================= FIREBASE CONFIG (SAMA DENGAN script.js) ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAu5VsFBmcOLZtUbNMjdue2vQeMhWVIRqk",
   authDomain: "app-387dc.firebaseapp.com",
@@ -28,27 +31,21 @@ const firebaseConfig = {
   measurementId: "G-9E282TKXSJ",
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ================= UTIL =================
+/* ================= UTIL ================= */
 const $ = (id) => document.getElementById(id);
 
 const toastContainer = $("toast-container");
-function showToast(msg, type = "info", time = 3000) {
+function showToast(msg, type = "info", time = 3200) {
   if (!toastContainer) return;
   const div = document.createElement("div");
   div.className = `toast toast-${type}`;
   div.textContent = msg;
   toastContainer.appendChild(div);
   setTimeout(() => div.remove(), time);
-}
-
-function cleanNumber(val) {
-  if (val == null) return 0;
-  const num = parseInt(val.toString().replace(/\D/g, ""), 10);
-  return isNaN(num) ? 0 : num;
 }
 
 function todayKey(d = new Date()) {
@@ -65,30 +62,38 @@ function formatDateTime(d) {
   )}:${pad(d.getMinutes())}`;
 }
 
-// ================= COLLECTIONS (NEW) =================
-// items master + stok per gudang
-const colItems = collection(db, "wh_items");
-// log opname per gudang
-const colOpname = collection(db, "wh_opname_logs");
-// log transfer gudang 1 -> gudang 2
-const colMoves = collection(db, "wh_moves");
-// waste
-const colWaste = collection(db, "wh_waste");
+function parseDateInput(value, isEnd = false) {
+  if (!value) return null;
+  return new Date(value + (isEnd ? "T23:59:59" : "T00:00:00"));
+}
 
-// ================= DOM (NEW UI) =================
-// Sections
-const dashSection = $("whDashboardSection");
-const opnameSection = $("whOpnameSection");
-const wasteSection = $("whWasteSection");
-const reportSection = $("whReportSection");
+function safeStr(v) {
+  return (v ?? "").toString();
+}
 
-// Nav buttons
-const navDash = $("navWhDashboard");
-const navOpname = $("navWhOpname");
-const navWaste = $("navWhWaste");
-const navReport = $("navWhReport");
+function normalize(s) {
+  return safeStr(s).trim().toLowerCase();
+}
 
-// Dashboard widgets
+/* ================= COLLECTIONS (BARU, TERPISAH DARI FITUR LAMA) ================= */
+const colItems = collection(db, "wh_items"); // master item
+const colStocks = collection(db, "wh_stocks"); // stok per gudang
+const colOpnameLogs = collection(db, "wh_opname_logs"); // log opname
+const colTransfers = collection(db, "wh_transfers"); // log transfer
+const colWaste = collection(db, "wh_waste"); // log waste
+
+/* ================= DOM — NAV BARU ================= */
+const navWhDashboard = $("navWhDashboard");
+const navWhOpname = $("navWhOpname");
+const navWhWaste = $("navWhWaste");
+const navWhReport = $("navWhReport");
+
+const whDashboardSection = $("whDashboardSection");
+const whOpnameSection = $("whOpnameSection");
+const whWasteSection = $("whWasteSection");
+const whReportSection = $("whReportSection");
+
+/* ================= DOM — DASHBOARD METRICS ================= */
 const w1Habis = $("w1Habis");
 const w1Lumayan = $("w1Lumayan");
 const w1Banyak = $("w1Banyak");
@@ -96,29 +101,33 @@ const w2Habis = $("w2Habis");
 const w2Lumayan = $("w2Lumayan");
 const w2Banyak = $("w2Banyak");
 
-// Opname UI
-const opnameGudangSelect = $("opnameGudang"); // "w1" | "w2"
-const opnameSearch = $("opnameSearch");
-const opnameTableBody = $("opnameTableBody");
+const cardW1Habis = $("cardW1Habis");
+const cardW1Lumayan = $("cardW1Lumayan");
+const cardW1Banyak = $("cardW1Banyak");
+const cardW2Habis = $("cardW2Habis");
+const cardW2Lumayan = $("cardW2Lumayan");
+const cardW2Banyak = $("cardW2Banyak");
 
-// Item form (tambah item baru / update cepat)
-const itemName = $("itemName");
-const itemUnit = $("itemUnit"); // dus/pcs/pack
-const itemExp = $("itemExp"); // date
-const itemInfo = $("itemInfo");
-const itemSupplier = $("itemSupplier");
-const itemReceivedAt = $("itemReceivedAt"); // date
+/* ================= DOM — MASTER ITEM + OPNAME ================= */
+const whItemName = $("whItemName");
+const whItemUnit = $("whItemUnit");
+const whItemExp = $("whItemExp");
+const whItemInfo = $("whItemInfo");
+const whItemReceivedAt = $("whItemReceivedAt");
+const whItemSupplier = $("whItemSupplier");
 const btnSaveItem = $("btnSaveItem");
 
-// Transfer W1 -> W2
-const moveSearch = $("moveSearch");
-const moveItemSelect = $("moveItemSelect"); // select item
+const whOpnameGudang = $("whOpnameGudang");
+const whOpnameSearch = $("whOpnameSearch");
+const whOpnameTableBody = $("whOpnameTableBody");
+
+/* ================= DOM — TRANSFER ================= */
+const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
 const btnMove = $("btnMove");
 
-// Waste UI
-const wasteGudangSelect = $("wasteGudang"); // w1/w2
-const wasteSearch = $("wasteSearch");
+/* ================= DOM — WASTE ================= */
+const wasteGudang = $("wasteGudang");
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
 const wasteGram = $("wasteGram");
@@ -126,340 +135,389 @@ const wasteMl = $("wasteMl");
 const wasteNote = $("wasteNote");
 const btnSaveWaste = $("btnSaveWaste");
 
-// Reports UI
-const reportType = $("whReportType"); // opname_w1, opname_w2, waste_w1, waste_w2
-const reportStart = $("whReportStart");
-const reportEnd = $("whReportEnd");
-const btnReport = $("btnWhReport");
-const reportTableHead = $("whReportHead");
-const reportTableBody = $("whReportBody");
+/* ================= DOM — REPORT ================= */
+const whReportType = $("whReportType");
+const whReportStart = $("whReportStart");
+const whReportEnd = $("whReportEnd");
+const btnWhReport = $("btnWhReport");
+const whReportHead = $("whReportHead");
+const whReportBody = $("whReportBody");
 
-// ================= STATE =================
+/* ================= STATE (REALTIME CACHES) ================= */
 let currentUser = null;
-let itemsCache = []; // [{id, name, unit, expDate, info, supplier, receivedAt, stockW1, stockW2}]
-let unsubItems = null;
 
-// filter dashboard click → opname
-let pendingOpnameFilter = { gudang: "w1", status: null };
+let itemsCache = []; // [{id, name, unit, expDate, info, receivedAt, supplier, ...}]
+let stocksCache = []; // [{id, warehouse, itemId, qty, updatedAt...}]
+let stockMap = new Map(); // key: `${warehouse}_${itemId}` -> qty
 
-// ================= NAV =================
-function showOnly(sectionName) {
-  [dashSection, opnameSection, wasteSection, reportSection].forEach((sec) => {
+let unsubscribeItems = null;
+let unsubscribeStocks = null;
+
+let opnameWarehouseFilter = "w1";
+let opnameStatusFilter = null; // "habis" | "lumayan" | "banyak" | null
+
+/* ================= SECTION SWITCHER (KHUSUS WAREHOUSE) ================= */
+function setActiveWhNav(btn) {
+  [navWhDashboard, navWhOpname, navWhWaste, navWhReport].forEach((b) => {
+    if (!b) return;
+    b.classList.remove("active");
+  });
+  if (btn) btn.classList.add("active");
+}
+
+function showWhSection(name) {
+  [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((sec) => {
     if (sec) sec.classList.add("hidden");
   });
 
-  if (sectionName === "dash" && dashSection) dashSection.classList.remove("hidden");
-  if (sectionName === "opname" && opnameSection) opnameSection.classList.remove("hidden");
-  if (sectionName === "waste" && wasteSection) wasteSection.classList.remove("hidden");
-  if (sectionName === "report" && reportSection) reportSection.classList.remove("hidden");
+  if (name === "dashboard" && whDashboardSection) whDashboardSection.classList.remove("hidden");
+  if (name === "opname" && whOpnameSection) whOpnameSection.classList.remove("hidden");
+  if (name === "waste" && whWasteSection) whWasteSection.classList.remove("hidden");
+  if (name === "report" && whReportSection) whReportSection.classList.remove("hidden");
 }
 
-if (navDash) navDash.addEventListener("click", () => showOnly("dash"));
-if (navOpname) navOpname.addEventListener("click", () => showOnly("opname"));
-if (navWaste) navWaste.addEventListener("click", () => showOnly("waste"));
-if (navReport) navReport.addEventListener("click", () => showOnly("report"));
-
-// ================= STOCK STATUS (per gudang) =================
-function stockStatus(stock) {
-  const s = Number(stock || 0);
-  if (s <= 0) return { key: "habis", label: "Habis" };
-  if (s < 10) return { key: "lumayan", label: "Lumayan banyak" };
-  if (s > 50) return { key: "banyak", label: "Banyak" };
-  return { key: "normal", label: "Normal" };
+/* ================= STOCK HELPERS ================= */
+function getQty(warehouse, itemId) {
+  const key = `${warehouse}_${itemId}`;
+  return Number(stockMap.get(key) || 0);
 }
 
-// ================= DASHBOARD =================
-function updateDashboard() {
-  let w1 = { habis: 0, lumayan: 0, banyak: 0 };
-  let w2 = { habis: 0, lumayan: 0, banyak: 0 };
+function classifyQty(qty) {
+  const n = Number(qty || 0);
+  if (n <= 0) return "habis";        // 0
+  if (n < 10) return "lumayan";      // < 10
+  if (n > 50) return "banyak";       // > 50
+  return "normal";
+}
 
-  itemsCache.forEach((it) => {
-    const st1 = stockStatus(it.stockW1).key;
-    const st2 = stockStatus(it.stockW2).key;
+function labelClass(status) {
+  if (status === "habis") return { text: "Habis", cls: "red" };
+  if (status === "lumayan") return { text: "Lumayan Banyak", cls: "yellow" };
+  if (status === "banyak") return { text: "Banyak", cls: "green" };
+  return { text: "Normal", cls: "" };
+}
 
-    if (st1 === "habis") w1.habis++;
-    if (st1 === "lumayan") w1.lumayan++;
-    if (st1 === "banyak") w1.banyak++;
+/* ================= REALTIME LISTENERS ================= */
+function startRealtime() {
+  stopRealtime();
 
-    if (st2 === "habis") w2.habis++;
-    if (st2 === "lumayan") w2.lumayan++;
-    if (st2 === "banyak") w2.banyak++;
+  // Items
+  unsubscribeItems = onSnapshot(query(colItems, orderBy("name", "asc")), (snap) => {
+    itemsCache = [];
+    snap.forEach((d) => itemsCache.push({ id: d.id, ...d.data() }));
+    renderOpnameTable();
+    refreshSelectOptions();
+    updateDashboardMetrics();
   });
 
-  if (w1Habis) w1Habis.textContent = String(w1.habis);
-  if (w1Lumayan) w1Lumayan.textContent = String(w1.lumayan);
-  if (w1Banyak) w1Banyak.textContent = String(w1.banyak);
-
-  if (w2Habis) w2Habis.textContent = String(w2.habis);
-  if (w2Lumayan) w2Lumayan.textContent = String(w2.lumayan);
-  if (w2Banyak) w2Banyak.textContent = String(w2.banyak);
-}
-
-function bindDashboardClicks() {
-  const bind = (el, gudang, statusKey) => {
-    if (!el) return;
-    el.style.cursor = "pointer";
-    el.addEventListener("click", () => {
-      pendingOpnameFilter = { gudang, status: statusKey };
-      if (opnameGudangSelect) opnameGudangSelect.value = gudang;
-      if (opnameSearch) opnameSearch.value = "";
-      showOnly("opname");
-      renderOpnameTable();
+  // Stocks
+  unsubscribeStocks = onSnapshot(query(colStocks, orderBy("warehouse", "asc")), (snap) => {
+    stocksCache = [];
+    stockMap = new Map();
+    snap.forEach((d) => {
+      const data = { id: d.id, ...d.data() };
+      stocksCache.push(data);
+      if (data.warehouse && data.itemId != null) {
+        stockMap.set(`${data.warehouse}_${data.itemId}`, Number(data.qty || 0));
+      }
     });
+    renderOpnameTable();
+    updateDashboardMetrics();
+  });
+}
+
+function stopRealtime() {
+  if (typeof unsubscribeItems === "function") unsubscribeItems();
+  if (typeof unsubscribeStocks === "function") unsubscribeStocks();
+  unsubscribeItems = null;
+  unsubscribeStocks = null;
+}
+
+/* ================= DASHBOARD METRICS ================= */
+function updateDashboardMetrics() {
+  const calc = (warehouse) => {
+    let habis = 0, lumayan = 0, banyak = 0;
+    itemsCache.forEach((it) => {
+      const q = getQty(warehouse, it.id);
+      const st = classifyQty(q);
+      if (st === "habis") habis++;
+      else if (st === "lumayan") lumayan++;
+      else if (st === "banyak") banyak++;
+    });
+    return { habis, lumayan, banyak };
   };
 
-  bind($("cardW1Habis"), "w1", "habis");
-  bind($("cardW1Lumayan"), "w1", "lumayan");
-  bind($("cardW1Banyak"), "w1", "banyak");
+  const w1 = calc("w1");
+  const w2 = calc("w2");
 
-  bind($("cardW2Habis"), "w2", "habis");
-  bind($("cardW2Lumayan"), "w2", "lumayan");
-  bind($("cardW2Banyak"), "w2", "banyak");
+  if (w1Habis) w1Habis.textContent = w1.habis;
+  if (w1Lumayan) w1Lumayan.textContent = w1.lumayan;
+  if (w1Banyak) w1Banyak.textContent = w1.banyak;
+
+  if (w2Habis) w2Habis.textContent = w2.habis;
+  if (w2Lumayan) w2Lumayan.textContent = w2.lumayan;
+  if (w2Banyak) w2Banyak.textContent = w2.banyak;
 }
 
-// ================= ITEMS REALTIME =================
-function startItemsRealtime() {
-  if (unsubItems) unsubItems();
-  const qItems = query(colItems, orderBy("name", "asc"));
-  unsubItems = onSnapshot(
-    qItems,
-    (snap) => {
-      const list = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      itemsCache = list;
-
-      updateDashboard();
-      renderOpnameTable();
-      refreshItemSelects();
-    },
-    (err) => {
-      console.error(err);
-      showToast("Gagal realtime items", "error");
-    }
-  );
-}
-
-// ================= ITEM SELECT (MOVE/WASTE) =================
-function refreshItemSelects() {
-  const makeOptions = (selectEl) => {
-    if (!selectEl) return;
-    const cur = selectEl.value || "";
-    selectEl.innerHTML = `<option value="">Pilih item...</option>` + itemsCache
-      .map((it) => `<option value="${it.id}">${it.name} (${it.unit || "-"})</option>`)
-      .join("");
-    if (cur) selectEl.value = cur;
+function initDashboardCardClicks() {
+  const go = (warehouse, status) => {
+    opnameWarehouseFilter = warehouse;
+    opnameStatusFilter = status;
+    if (whOpnameGudang) whOpnameGudang.value = warehouse;
+    if (whOpnameSearch) whOpnameSearch.value = "";
+    setActiveWhNav(navWhOpname);
+    showWhSection("opname");
+    renderOpnameTable();
+    if (whOpnameSection) whOpnameSection.scrollIntoView({ behavior: "smooth" });
   };
 
-  makeOptions(moveItemSelect);
-  makeOptions(wasteItemSelect);
+  if (cardW1Habis) cardW1Habis.addEventListener("click", () => go("w1", "habis"));
+  if (cardW1Lumayan) cardW1Lumayan.addEventListener("click", () => go("w1", "lumayan"));
+  if (cardW1Banyak) cardW1Banyak.addEventListener("click", () => go("w1", "banyak"));
+
+  if (cardW2Habis) cardW2Habis.addEventListener("click", () => go("w2", "habis"));
+  if (cardW2Lumayan) cardW2Lumayan.addEventListener("click", () => go("w2", "lumayan"));
+  if (cardW2Banyak) cardW2Banyak.addEventListener("click", () => go("w2", "banyak"));
 }
 
-// ================= ADD/UPDATE ITEM =================
+/* ================= SELECT OPTIONS (TRANSFER + WASTE) ================= */
+function refreshSelectOptions() {
+  const makeOptions = () => {
+    const opts = itemsCache.map((it) => {
+      const name = it.name || "(Tanpa Nama)";
+      const unit = it.unit ? ` (${it.unit})` : "";
+      return `<option value="${it.id}">${name}${unit}</option>`;
+    }).join("");
+
+    if (moveItemSelect) moveItemSelect.innerHTML = `<option value="">Pilih item...</option>${opts}`;
+    if (wasteItemSelect) wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>${opts}`;
+  };
+
+  makeOptions();
+}
+
+/* ================= MASTER ITEM SAVE ================= */
 async function saveItem() {
+  const name = safeStr(whItemName?.value).trim();
+  const unit = safeStr(whItemUnit?.value).trim();
+  const expDate = safeStr(whItemExp?.value).trim(); // yyyy-mm-dd
+  const info = safeStr(whItemInfo?.value).trim();
+  const receivedAt = safeStr(whItemReceivedAt?.value).trim();
+  const supplier = safeStr(whItemSupplier?.value).trim();
+
+  if (!name) return showToast("Nama item wajib diisi", "error");
+  if (!unit) return showToast("Satuan wajib diisi (misal: dus)", "error");
+
   try {
-    const name = (itemName?.value || "").trim();
-    const unit = (itemUnit?.value || "").trim(); // dus/pcs/pack
-    const expDate = itemExp?.value || ""; // YYYY-MM-DD
-    const info = (itemInfo?.value || "").trim();
-    const supplierName = (itemSupplier?.value || "").trim();
-    const receivedAt = itemReceivedAt?.value || "";
-
-    if (!name) return showToast("Nama item wajib diisi", "error");
-    if (!unit) return showToast("Satuan wajib diisi (dus/pcs/pack)", "error");
-
-    // id pakai slug biar konsisten (boleh juga auto ID, tapi ini lebih gampang)
-    const id = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-_]/g, "");
-    const ref = doc(db, "wh_items", id);
-
-    await setDoc(
-      ref,
-      {
-        name,
-        unit,
-        expDate,
-        info,
-        supplierName,
-        receivedAt,
-        stockW1: 0,
-        stockW2: 0,
-        updatedAt: serverTimestamp(),
-        updatedBy: currentUser?.email || "-",
-      },
-      { merge: true }
-    );
+    await addDoc(colItems, {
+      name,
+      unit,
+      expDate: expDate || "",
+      info,
+      receivedAt: receivedAt || "",
+      supplier,
+      createdAt: serverTimestamp(),
+      createdBy: currentUser?.email || "-",
+    });
 
     showToast("Item tersimpan", "success");
-    if (itemName) itemName.value = "";
-    if (itemInfo) itemInfo.value = "";
+    if (whItemName) whItemName.value = "";
+    if (whItemUnit) whItemUnit.value = "";
+    if (whItemExp) whItemExp.value = "";
+    if (whItemInfo) whItemInfo.value = "";
+    if (whItemReceivedAt) whItemReceivedAt.value = "";
+    if (whItemSupplier) whItemSupplier.value = "";
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan item", "error");
+    showToast("Gagal menyimpan item", "error");
   }
 }
 
-if (btnSaveItem) btnSaveItem.addEventListener("click", saveItem);
-
-// ================= OPNAME TABLE =================
+/* ================= OPNAME TABLE ================= */
 function renderOpnameTable() {
-  if (!opnameTableBody) return;
+  if (!whOpnameTableBody) return;
 
-  const gudang = opnameGudangSelect?.value || pendingOpnameFilter.gudang || "w1";
-  const q = (opnameSearch?.value || "").trim().toLowerCase();
-  const statusFilter = pendingOpnameFilter?.status || null;
+  const warehouse = whOpnameGudang?.value || opnameWarehouseFilter || "w1";
+  opnameWarehouseFilter = warehouse;
+
+  const q = normalize(whOpnameSearch?.value);
 
   let list = [...itemsCache];
 
   // search
   if (q) {
     list = list.filter((it) => {
-      return (
-        (it.name || "").toLowerCase().includes(q) ||
-        (it.supplierName || "").toLowerCase().includes(q) ||
-        (it.unit || "").toLowerCase().includes(q)
-      );
+      const hay = [
+        it.name,
+        it.unit,
+        it.expDate,
+        it.info,
+        it.receivedAt,
+        it.supplier,
+      ].map(normalize).join(" | ");
+      return hay.includes(q);
     });
   }
 
-  // status filter dari dashboard
-  if (statusFilter) {
-    list = list.filter((it) => {
-      const st = stockStatus(gudang === "w1" ? it.stockW1 : it.stockW2).key;
-      return st === statusFilter;
-    });
+  // status filter from dashboard clicks
+  if (opnameStatusFilter) {
+    list = list.filter((it) => classifyQty(getQty(warehouse, it.id)) === opnameStatusFilter);
   }
 
-  opnameTableBody.innerHTML = "";
+  whOpnameTableBody.innerHTML = "";
 
   if (!list.length) {
-    opnameTableBody.innerHTML = `<tr><td colspan="9">Tidak ada item.</td></tr>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="9">Tidak ada item yang cocok.</td>`;
+    whOpnameTableBody.appendChild(tr);
     return;
   }
 
   list.forEach((it) => {
-    const stockNow = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
-    const st = stockStatus(stockNow);
+    const systemQty = getQty(warehouse, it.id);
+    const st = classifyQty(systemQty);
+    const stBadge = labelClass(st);
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${it.name || "-"}</td>
       <td>${it.unit || "-"}</td>
       <td>${it.expDate || "-"}</td>
-      <td>${it.info || "-"}</td>
+      <td>${it.info ? `<span title="${it.info.replace(/"/g, "&quot;")}">${it.info}</span>` : "-"}</td>
       <td>${it.receivedAt || "-"}</td>
-      <td>${it.supplierName || "-"}</td>
-      <td>${stockNow}</td>
+      <td>${it.supplier || "-"}</td>
+      <td>${Number(systemQty).toLocaleString("id-ID")}</td>
       <td>
-        <input type="number" min="0" step="1" value="${stockNow}" data-id="${it.id}" class="opname-input" />
+        <input type="number" min="0" step="1"
+          data-item="${it.id}"
+          data-warehouse="${warehouse}"
+          value="${Number(systemQty)}"
+          style="width:110px;"
+        />
       </td>
       <td>
-        <span class="badge badge-${st.key}">${st.label}</span>
-        <button class="btn-table small" data-act="save-opname" data-id="${it.id}">Simpan</button>
+        <button class="btn-table btn-table-delete small"
+          data-save="1"
+          data-item="${it.id}"
+          data-warehouse="${warehouse}"
+        >Simpan</button>
+        <div style="margin-top:6px;">
+          <span class="status-badge ${stBadge.cls}">${stBadge.text}</span>
+        </div>
       </td>
     `;
-    opnameTableBody.appendChild(tr);
+    whOpnameTableBody.appendChild(tr);
   });
 
-  opnameTableBody.querySelectorAll("button[data-act='save-opname']").forEach((btn) => {
-    btn.addEventListener("click", () => saveOpname(btn.getAttribute("data-id")));
-  });
-}
-
-if (opnameGudangSelect) {
-  opnameGudangSelect.addEventListener("change", () => {
-    pendingOpnameFilter.status = null; // kalau user ganti gudang manual, reset filter status
-    renderOpnameTable();
+  // attach save handlers
+  whOpnameTableBody.querySelectorAll("button[data-save='1']").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const itemId = btn.getAttribute("data-item");
+      const warehouse = btn.getAttribute("data-warehouse");
+      await saveOpnameRow(warehouse, itemId);
+    });
   });
 }
-if (opnameSearch) opnameSearch.addEventListener("input", renderOpnameTable);
 
-// ================= SAVE OPNAME =================
-async function saveOpname(itemId) {
+async function ensureStockDoc(warehouse, itemId) {
+  const id = `${warehouse}_${itemId}`;
+  const ref = doc(db, "wh_stocks", id);
+  const snap = await getDoc(ref);
+  if (snap.exists()) return ref;
+
+  // create with 0
+  await setDoc(ref, {
+    warehouse,
+    itemId,
+    qty: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref;
+}
+
+async function saveOpnameRow(warehouse, itemId) {
   try {
-    const gudang = opnameGudangSelect?.value || "w1";
-    const it = itemsCache.find((x) => x.id === itemId);
-    if (!it) return;
-
-    const inp = opnameTableBody.querySelector(`input[data-id="${itemId}"]`);
+    const inp = whOpnameTableBody?.querySelector(
+      `input[data-item="${itemId}"][data-warehouse="${warehouse}"]`
+    );
     if (!inp) return;
 
     const physical = Number(inp.value || 0);
-    const system = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
+    const system = Number(getQty(warehouse, itemId) || 0);
     const diff = physical - system;
-    const now = new Date();
+
+    const item = itemsCache.find((x) => x.id === itemId);
+
+    // update stock
+    const stockRef = await ensureStockDoc(warehouse, itemId);
+    await setDoc(
+      stockRef,
+      {
+        warehouse,
+        itemId,
+        qty: physical,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     // log opname
-    await addDoc(colOpname, {
-      itemId: it.id,
-      itemName: it.name,
-      gudang, // w1/w2
-      systemStock: system,
-      physicalStock: physical,
+    await addDoc(colOpnameLogs, {
+      warehouse,
+      itemId,
+      itemName: item?.name || "-",
+      unit: item?.unit || "",
+      systemQty: system,
+      physicalQty: physical,
       diff,
-      unit: it.unit || "",
-      expDate: it.expDate || "",
-      supplierName: it.supplierName || "",
-      dateKey: todayKey(now),
-      createdAtLocal: now.toISOString(),
+      dateKey: todayKey(new Date()),
       createdAt: serverTimestamp(),
+      createdAtLocal: new Date().toISOString(),
       createdBy: currentUser?.email || "-",
     });
 
-    // update stok item sesuai gudang
-    const patch = gudang === "w1" ? { stockW1: physical } : { stockW2: physical };
-    await updateDoc(doc(db, "wh_items", it.id), {
-      ...patch,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "-",
-    });
-
-    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
+    showToast(`Opname tersimpan (${warehouse === "w1" ? "Gudang 1" : "Gudang 2"})`, "success");
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan opname", "error");
+    showToast("Gagal menyimpan opname", "error");
   }
 }
 
-// ================= TRANSFER W1 -> W2 =================
-async function doMoveW1toW2() {
+/* ================= TRANSFER (W1 -> W2) ================= */
+async function doTransfer() {
+  const itemId = safeStr(moveItemSelect?.value);
+  const qty = Number(moveQty?.value || 0);
+
+  if (!itemId) return showToast("Pilih item transfer dulu", "error");
+  if (!qty || qty <= 0) return showToast("Qty transfer harus > 0", "error");
+
   try {
-    const keyword = (moveSearch?.value || "").trim().toLowerCase();
-    const itemId = moveItemSelect?.value || "";
-    const qty = Number(moveQty?.value || 0);
+    const w1 = getQty("w1", itemId);
+    if (qty > w1) return showToast(`Stok Gudang 1 tidak cukup (sisa ${w1})`, "error");
 
-    if (!itemId) return showToast("Pilih item untuk dipindah", "error");
-    if (!qty || qty <= 0) return showToast("Qty pindah wajib > 0", "error");
+    const w2 = getQty("w2", itemId);
 
-    const it = itemsCache.find((x) => x.id === itemId);
-    if (!it) return;
+    const refW1 = await ensureStockDoc("w1", itemId);
+    const refW2 = await ensureStockDoc("w2", itemId);
 
-    const w1 = Number(it.stockW1 || 0);
-    if (qty > w1) return showToast(`Stok Gudang 1 kurang (stok ${w1})`, "error");
+    await setDoc(refW1, { qty: w1 - qty, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(refW2, { qty: w2 + qty, updatedAt: serverTimestamp() }, { merge: true });
 
-    const now = new Date();
+    const item = itemsCache.find((x) => x.id === itemId);
 
-    // log move
-    await addDoc(colMoves, {
-      itemId: it.id,
-      itemName: it.name,
+    await addDoc(colTransfers, {
+      itemId,
+      itemName: item?.name || "-",
       qty,
-      unit: it.unit || "",
       from: "w1",
       to: "w2",
-      dateKey: todayKey(now),
-      createdAtLocal: now.toISOString(),
       createdAt: serverTimestamp(),
+      createdAtLocal: new Date().toISOString(),
       createdBy: currentUser?.email || "-",
     });
 
-    // update stok
-    await updateDoc(doc(db, "wh_items", it.id), {
-      stockW1: w1 - qty,
-      stockW2: Number(it.stockW2 || 0) + qty,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "-",
-    });
-
-    showToast("Transfer W1 → W2 berhasil", "success");
+    showToast("Transfer berhasil (W1 → W2)", "success");
     if (moveQty) moveQty.value = "";
   } catch (e) {
     console.error(e);
@@ -467,51 +525,37 @@ async function doMoveW1toW2() {
   }
 }
 
-if (btnMove) btnMove.addEventListener("click", doMoveW1toW2);
-
-// ================= WASTE =================
+/* ================= WASTE ================= */
 async function saveWaste() {
+  const warehouse = wasteGudang?.value || "w1";
+  const itemId = safeStr(wasteItemSelect?.value);
+  const date = safeStr(wasteDate?.value);
+  const gram = Number(wasteGram?.value || 0);
+  const ml = Number(wasteMl?.value || 0);
+  const note = safeStr(wasteNote?.value).trim();
+
+  if (!itemId) return showToast("Pilih item waste dulu", "error");
+  if (!date) return showToast("Tanggal waste wajib diisi", "error");
+  if ((!gram || gram <= 0) && (!ml || ml <= 0)) {
+    return showToast("Isi minimal Gram atau ML", "error");
+  }
+
   try {
-    const gudang = wasteGudangSelect?.value || "w1";
-    const itemId = wasteItemSelect?.value || "";
-    const date = wasteDate?.value || todayKey(new Date());
-    const gram = Number(wasteGram?.value || 0);
-    const ml = Number(wasteMl?.value || 0);
-    const note = (wasteNote?.value || "").trim();
-
-    if (!itemId) return showToast("Pilih item waste", "error");
-    if ((gram <= 0) && (ml <= 0)) return showToast("Isi waste gram atau ml", "error");
-
-    const it = itemsCache.find((x) => x.id === itemId);
-    if (!it) return;
-
-    const now = new Date();
+    const item = itemsCache.find((x) => x.id === itemId);
 
     await addDoc(colWaste, {
-      itemId: it.id,
-      itemName: it.name,
-      gudang,
+      warehouse,
+      itemId,
+      itemName: item?.name || "-",
+      unit: item?.unit || "",
       wasteDate: date,
-      gram,
-      ml,
-      unit: it.unit || "",
+      gram: gram || 0,
+      ml: ml || 0,
       note,
-      dateKey: date, // pakai tanggal waste sebagai filter laporan
-      createdAtLocal: now.toISOString(),
+      dateKey: date,
       createdAt: serverTimestamp(),
+      createdAtLocal: new Date().toISOString(),
       createdBy: currentUser?.email || "-",
-    });
-
-    // ✅ waste juga potong stok (anggap 1 unit stok = 1 “paket/dus/pcs”)
-    // kalau kamu mau waste gram/ml tidak memotong stok unit, bilang ya nanti aku bikin konversi per item.
-    const cur = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
-    const next = Math.max(cur - 1, 0); // default: waste 1 unit
-    const patch = gudang === "w1" ? { stockW1: next } : { stockW2: next };
-
-    await updateDoc(doc(db, "wh_items", it.id), {
-      ...patch,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "-",
     });
 
     showToast("Waste tersimpan", "success");
@@ -520,21 +564,20 @@ async function saveWaste() {
     if (wasteNote) wasteNote.value = "";
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan waste", "error");
+    showToast("Gagal menyimpan waste", "error");
   }
 }
 
-if (btnSaveWaste) btnSaveWaste.addEventListener("click", saveWaste);
-
-// ================= REPORTS =================
-function renderReportHead(kind) {
-  if (!reportTableHead) return;
-  reportTableHead.innerHTML = "";
+/* ================= REPORTS (OPNAME/WASTE FILTER DATE) ================= */
+function renderReportHeader(kind) {
+  if (!whReportHead) return;
+  whReportHead.innerHTML = "";
 
   const tr = document.createElement("tr");
+
   if (kind.startsWith("opname_")) {
     tr.innerHTML = `
-      <th>Tanggal</th>
+      <th>Tanggal & Waktu</th>
       <th>Item</th>
       <th>Gudang</th>
       <th>Stok Sistem</th>
@@ -553,101 +596,212 @@ function renderReportHead(kind) {
       <th>User</th>
     `;
   }
-  reportTableHead.appendChild(tr);
+
+  whReportHead.appendChild(tr);
 }
 
 async function generateReport() {
-  if (!reportTableBody || !reportType || !reportStart || !reportEnd) return;
+  if (!whReportType || !whReportStart || !whReportEnd) return;
 
-  const kind = reportType.value || "opname_w1";
-  const start = reportStart.value || todayKey(new Date());
-  const end = reportEnd.value || todayKey(new Date());
+  const type = whReportType.value || "opname_w1";
+  const start = parseDateInput(whReportStart.value, false);
+  const end = parseDateInput(whReportEnd.value, true);
 
-  if (end < start) return showToast("Tanggal akhir tidak boleh < tanggal awal", "error");
+  if (!start || !end || isNaN(start) || isNaN(end)) {
+    return showToast("Tanggal mulai & sampai wajib diisi", "error");
+  }
+  if (end < start) return showToast("Tanggal akhir tidak boleh sebelum tanggal awal", "error");
 
-  reportTableBody.innerHTML = "";
-  renderReportHead(kind);
+  renderReportHeader(type);
+  if (!whReportBody) return;
+  whReportBody.innerHTML = `<tr><td colspan="7">Memuat...</td></tr>`;
+
+  const startTs = Timestamp.fromDate(start);
+  const endTs = Timestamp.fromDate(end);
 
   try {
-    if (kind.startsWith("opname_")) {
-      const gudang = kind.endsWith("_w2") ? "w2" : "w1";
-      const qy = query(
-        colOpname,
-        where("gudang", "==", gudang),
-        where("dateKey", ">=", start),
-        where("dateKey", "<=", end),
-        orderBy("dateKey", "desc")
+    if (type.startsWith("opname_")) {
+      const warehouse = type.endsWith("_w1") ? "w1" : "w2";
+      const q = query(
+        colOpnameLogs,
+        where("warehouse", "==", warehouse),
+        where("createdAt", ">=", startTs),
+        where("createdAt", "<=", endTs),
+        orderBy("createdAt", "desc")
       );
 
-      const snap = await getDocs(qy);
-      if (snap.empty) {
-        reportTableBody.innerHTML = `<tr><td colspan="7">Tidak ada data.</td></tr>`;
+      const snap = await getDocs(q);
+
+      const rows = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAtLocal || Date.now());
+        rows.push({
+          when: formatDateTime(createdAt),
+          item: data.itemName || "-",
+          wh: data.warehouse === "w1" ? "Gudang 1" : "Gudang 2",
+          system: Number(data.systemQty || 0),
+          physical: Number(data.physicalQty || 0),
+          diff: Number(data.diff || 0),
+          user: data.createdBy || "-",
+        });
+      });
+
+      whReportBody.innerHTML = "";
+      if (!rows.length) {
+        whReportBody.innerHTML = `<tr><td colspan="7">Tidak ada data untuk periode ini.</td></tr>`;
         return;
       }
 
-      snap.forEach((d) => {
-        const r = d.data();
+      rows.forEach((r) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${r.dateKey || "-"}</td>
-          <td>${r.itemName || "-"}</td>
-          <td>${(r.gudang || "-").toUpperCase()}</td>
-          <td>${Number(r.systemStock || 0)}</td>
-          <td>${Number(r.physicalStock || 0)}</td>
-          <td>${Number(r.diff || 0)}</td>
-          <td>${r.createdBy || "-"}</td>
+          <td>${r.when}</td>
+          <td>${r.item}</td>
+          <td>${r.wh}</td>
+          <td>${r.system.toLocaleString("id-ID")}</td>
+          <td>${r.physical.toLocaleString("id-ID")}</td>
+          <td>${r.diff}</td>
+          <td>${r.user}</td>
         `;
-        reportTableBody.appendChild(tr);
+        whReportBody.appendChild(tr);
       });
+
+      showToast("Laporan opname diperbarui", "success");
     } else {
-      const gudang = kind.endsWith("_w2") ? "w2" : "w1";
-      const qy = query(
+      const warehouse = type.endsWith("_w1") ? "w1" : "w2";
+      const q = query(
         colWaste,
-        where("gudang", "==", gudang),
-        where("dateKey", ">=", start),
-        where("dateKey", "<=", end),
-        orderBy("dateKey", "desc")
+        where("warehouse", "==", warehouse),
+        where("createdAt", ">=", startTs),
+        where("createdAt", "<=", endTs),
+        orderBy("createdAt", "desc")
       );
 
-      const snap = await getDocs(qy);
-      if (snap.empty) {
-        reportTableBody.innerHTML = `<tr><td colspan="7">Tidak ada data.</td></tr>`;
+      const snap = await getDocs(q);
+
+      const rows = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        rows.push({
+          date: data.wasteDate || data.dateKey || "-",
+          item: data.itemName || "-",
+          wh: data.warehouse === "w1" ? "Gudang 1" : "Gudang 2",
+          gram: Number(data.gram || 0),
+          ml: Number(data.ml || 0),
+          note: data.note || "-",
+          user: data.createdBy || "-",
+        });
+      });
+
+      whReportBody.innerHTML = "";
+      if (!rows.length) {
+        whReportBody.innerHTML = `<tr><td colspan="7">Tidak ada data untuk periode ini.</td></tr>`;
         return;
       }
 
-      snap.forEach((d) => {
-        const r = d.data();
+      rows.forEach((r) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${r.dateKey || "-"}</td>
-          <td>${r.itemName || "-"}</td>
-          <td>${(r.gudang || "-").toUpperCase()}</td>
-          <td>${Number(r.gram || 0)}</td>
-          <td>${Number(r.ml || 0)}</td>
-          <td>${r.note || "-"}</td>
-          <td>${r.createdBy || "-"}</td>
+          <td>${r.date}</td>
+          <td>${r.item}</td>
+          <td>${r.wh}</td>
+          <td>${r.gram.toLocaleString("id-ID")}</td>
+          <td>${r.ml.toLocaleString("id-ID")}</td>
+          <td>${r.note}</td>
+          <td>${r.user}</td>
         `;
-        reportTableBody.appendChild(tr);
+        whReportBody.appendChild(tr);
       });
-    }
 
-    showToast("Laporan dibuat", "success");
+      showToast("Laporan waste diperbarui", "success");
+    }
   } catch (e) {
     console.error(e);
-    showToast("Gagal generate laporan (cek index Firestore)", "error", 4000);
+    whReportBody.innerHTML = `<tr><td colspan="7">Gagal memuat laporan (cek index Firestore jika diminta).</td></tr>`;
+    showToast("Gagal generate laporan", "error");
   }
 }
 
-if (btnReport) btnReport.addEventListener("click", generateReport);
+/* ================= DEFAULT DATES FOR WASTE/REPORT ================= */
+function initDefaultDates() {
+  const today = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const yyyyMMdd = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 
-// ================= AUTH =================
-onAuthStateChanged(auth, (user) => {
-  currentUser = user || null;
-  if (!user) {
-    showToast("Silakan login dulu", "info");
-    return;
-  }
-  bindDashboardClicks();
-  showOnly("dash");
-  startItemsRealtime();
-});
+  if (wasteDate && !wasteDate.value) wasteDate.value = yyyyMMdd;
+  if (whReportStart && !whReportStart.value) whReportStart.value = yyyyMMdd;
+  if (whReportEnd && !whReportEnd.value) whReportEnd.value = yyyyMMdd;
+}
+
+/* ================= EVENTS ================= */
+function bindEvents() {
+  // NAV
+  if (navWhDashboard) navWhDashboard.addEventListener("click", () => {
+    setActiveWhNav(navWhDashboard);
+    showWhSection("dashboard");
+  });
+  if (navWhOpname) navWhOpname.addEventListener("click", () => {
+    opnameStatusFilter = null;
+    setActiveWhNav(navWhOpname);
+    showWhSection("opname");
+    renderOpnameTable();
+  });
+  if (navWhWaste) navWhWaste.addEventListener("click", () => {
+    setActiveWhNav(navWhWaste);
+    showWhSection("waste");
+  });
+  if (navWhReport) navWhReport.addEventListener("click", () => {
+    setActiveWhNav(navWhReport);
+    showWhSection("report");
+  });
+
+  // DASHBOARD clicks
+  initDashboardCardClicks();
+
+  // MASTER ITEM
+  if (btnSaveItem) btnSaveItem.addEventListener("click", saveItem);
+
+  // OPNAME filters
+  if (whOpnameGudang) whOpnameGudang.addEventListener("change", () => {
+    opnameWarehouseFilter = whOpnameGudang.value;
+    renderOpnameTable();
+  });
+
+  if (whOpnameSearch) whOpnameSearch.addEventListener("input", () => {
+    renderOpnameTable();
+  });
+
+  // TRANSFER
+  if (btnMove) btnMove.addEventListener("click", doTransfer);
+
+  // WASTE
+  if (btnSaveWaste) btnSaveWaste.addEventListener("click", saveWaste);
+
+  // REPORT
+  if (btnWhReport) btnWhReport.addEventListener("click", generateReport);
+}
+
+/* ================= AUTH & BOOT ================= */
+function boot() {
+  bindEvents();
+  initDefaultDates();
+
+  // Default: buka Dashboard Warehouse
+  setActiveWhNav(navWhDashboard);
+  showWhSection("dashboard");
+
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user || null;
+
+    if (!currentUser) {
+      stopRealtime();
+      // biarkan auth UI lama yang handle, kita cuma stop realtime
+      return;
+    }
+
+    startRealtime();
+  });
+}
+
+boot();
