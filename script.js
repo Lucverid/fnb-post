@@ -465,11 +465,10 @@ const FEATURES = {
   recipe: false,
   opname: false,
   reports: false,
-  // warehouse: true, // nanti kalau sudah ada
 };
 
 function isEnabled(section) {
-  return FEATURES[section] !== false;
+  return FEATURES[section] === true;
 }
 
 function applyDisabledSidebarUI() {
@@ -477,14 +476,24 @@ function applyDisabledSidebarUI() {
     const section = btn.dataset.section;
     if (!section) return;
 
-    if (!isEnabled(section)) btn.classList.add("disabled");
-    else btn.classList.remove("disabled");
+    if (!isEnabled(section)) {
+      btn.classList.add("disabled");   // ⛔ disembunyikan
+    } else {
+      btn.classList.remove("disabled");
+    }
   });
 }
+
 applyDisabledSidebarUI();
+
 
 // ================= NAV =================
 function showSection(name) {
+  if (!isEnabled(name)) {
+    showToast(`Fitur "${name}" sedang dinonaktifkan.`, "info", 2500);
+    return;
+  }
+
   [
     salesSection,
     inventorySection,
@@ -495,16 +504,11 @@ function showSection(name) {
   ].forEach((sec) => sec && sec.classList.add("hidden"));
 
   if (name === "sales" && salesSection) salesSection.classList.remove("hidden");
-  if (name === "inventory" && inventorySection)
-    inventorySection.classList.remove("hidden");
-  if (name === "recipe" && recipeSection)
-    recipeSection.classList.remove("hidden");
-  if (name === "dashboard" && dashboardSection)
-    dashboardSection.classList.remove("hidden");
-  if (name === "opname" && opnameSection)
-    opnameSection.classList.remove("hidden");
-  if (name === "reports" && reportsSection)
-    reportsSection.classList.remove("hidden");
+  if (name === "inventory" && inventorySection) inventorySection.classList.remove("hidden");
+  if (name === "recipe" && recipeSection) recipeSection.classList.remove("hidden");
+  if (name === "dashboard" && dashboardSection) dashboardSection.classList.remove("hidden");
+  if (name === "opname" && opnameSection) opnameSection.classList.remove("hidden");
+  if (name === "reports" && reportsSection) reportsSection.classList.remove("hidden");
 }
 
 // klik menu sidebar
@@ -513,9 +517,12 @@ document.querySelectorAll(".side-item").forEach((btn) => {
     const section = btn.dataset.section;
     if (!section) return;
 
-    document.querySelectorAll(".side-item").forEach((b) => {
-      b.classList.remove("active");
-    });
+    if (!isEnabled(section)) {
+      showToast(`Menu "${section}" dinonaktifkan.`, "info", 2200);
+      return;
+    }
+
+    document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
 
     if (section === "opname") {
@@ -526,9 +533,7 @@ document.querySelectorAll(".side-item").forEach((btn) => {
 
     showSection(section);
 
-    if (window.innerWidth <= 900 && sidebar) {
-      sidebar.classList.remove("open");
-    }
+    if (window.innerWidth <= 900 && sidebar) sidebar.classList.remove("open");
   });
 });
 
