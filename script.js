@@ -457,6 +457,31 @@ function applyRoleUI(role) {
   if (bannerRole)
     bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
 }
+// ===== FEATURE FLAGS (OPS1: hide) =====
+const FEATURES = {
+  dashboard: true,
+  sales: true,
+  inventory: true,
+  recipe: true,
+  opname: true,
+  reports: true,
+  // warehouse: true, // nanti kalau sudah ada
+};
+
+function isEnabled(section) {
+  return FEATURES[section] !== false;
+}
+
+function applyDisabledSidebarUI() {
+  document.querySelectorAll(".side-item").forEach((btn) => {
+    const section = btn.dataset.section;
+    if (!section) return;
+
+    if (!isEnabled(section)) btn.classList.add("disabled");
+    else btn.classList.remove("disabled");
+  });
+}
+applyDisabledSidebarUI();
 
 // ================= NAV =================
 function showSection(name) {
@@ -2497,6 +2522,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
       showSection("sales");
     }
+      applyDisabledSidebarUI();
   } else {
     currentRole = null;
     productsCache = [];
