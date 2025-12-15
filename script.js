@@ -459,12 +459,12 @@ function applyRoleUI(role) {
 }
 // ===== FEATURE FLAGS (OPS1: hide) =====
 const FEATURES = {
-  dashboard: true,
-  sales: true,
-  inventory: true,
-  recipe: true,
-  opname: true,
-  reports: true,
+  dashboard: false,
+  sales: false,
+  inventory: false,
+  recipe: false,
+  opname: false,
+  reports: false,
   // warehouse: true, // nanti kalau sudah ada
 };
 
