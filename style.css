@@ -1623,3 +1623,4 @@ select{
 input[type="date"]{
   color-scheme: dark;
 }
+body { outline: 8px solid lime !important; }
