@@ -20,6 +20,7 @@ const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
 
+// ===================== Utils =====================
 function showToast(msg, type = "info", time = 3000) {
   const container = $("toast-container");
   if (!container) return alert(msg);
@@ -64,11 +65,11 @@ function iconBtn(html, title, extraClass = "") {
   return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(title)}">${html}</button>`;
 }
 
-// ===== Collections
+// ===================== Collections =====================
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
-// ===== DOM
+// ===================== DOM =====================
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
 const whWasteSection = $("whWasteSection");
@@ -96,12 +97,12 @@ const cardW2Banyak = $("cardW2Banyak");
 
 const dashboardExpiryWrapId = "whExpiryWrap";
 
-// Master item
+// Master form
 const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemInitStockW1 = $("whItemInitStockW1"); // optional (kalau ada di HTML)
+const whItemInitStockW1 = $("whItemInitStockW1"); // optional jika ada di HTML
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -109,10 +110,10 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch"); // optional (kalau ada di HTML)
+const moveSearch = $("moveSearch"); // optional
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo"); // optional (kalau ada di HTML)
+const moveInfo = $("moveInfo"); // optional
 const btnMove = $("btnMove");
 
 // Opname
@@ -138,7 +139,7 @@ const wasteSortDirBtn = $("wasteSortDir");
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
-// ===== State
+// ===================== State =====================
 let currentUser = null;
 let items = [];
 let wasteLogs = [];
@@ -149,8 +150,11 @@ const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
 let whStockFilter = null;  // null | { gudang, bucket }
+
 let editingWasteId = null;
-let editingItemId = null;
+
+// ✅ NEW: mode edit lewat form master (bukan inline row)
+let editingMasterId = null;
 
 let wasteSortByState = "dateKey";
 let wasteSortDirState = "asc";
@@ -161,7 +165,7 @@ const WASTE_PRESET_ITEMS = [
   "Eskrim original","eskrim yoghurt","pendamping lemon",
 ];
 
-// ===== Navigation
+// ===================== Navigation =====================
 function setActiveNav(btn) {
   document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
@@ -199,7 +203,7 @@ navWhReport?.addEventListener("click", () => {
   showWhSection("report");
 });
 
-// ===== Load
+// ===================== Load =====================
 async function loadWhItems() {
   const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
   items = [];
@@ -218,7 +222,7 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   }
 }
 
-// ===== Expiry
+// ===================== Expiry =====================
 function getExpStatus(expStr) {
   if (!expStr) return "ok";
   const now = new Date();
@@ -231,7 +235,7 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===== Stock bucket
+// ===================== Stock bucket =====================
 function stockBucketCount(stock) {
   const n = Number(stock || 0);
   if (n <= 0) return "habis";
@@ -240,7 +244,7 @@ function stockBucketCount(stock) {
   return "mid";
 }
 
-// ===== Dashboard expiry cards + click filter
+// ===================== Dashboard expiry cards + click filter =====================
 function ensureExpiryCards() {
   if (!whDashboardSection) return;
 
@@ -399,221 +403,38 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ===== Transfer helpers (search + info)
-function currentTransferItem() {
-  const id = moveItemSelect?.value || "";
-  return items.find((x) => x.id === id) || null;
+// ===================== Master Form: fill/reset + create/update =====================
+function fillMasterForm(it) {
+  if (!it) return;
+  if (whItemName) whItemName.value = it.name || "";
+  if (whItemUnitBig) whItemUnitBig.value = it.unitBig || "";
+  if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
+  if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
+  if (whItemInitStockW1) whItemInitStockW1.value = String(clampInt(it.stockW1, 0));
+  if (whItemExp) whItemExp.value = it.expDate || "";
+  if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
+  if (whItemSupplier) whItemSupplier.value = it.supplier || "";
+  if (whItemInfo) whItemInfo.value = it.info || "";
+
+  if (btnSaveItem) btnSaveItem.textContent = "Update";
 }
 
-function updateMoveInfo() {
-  if (!moveInfo) return;
-  const it = currentTransferItem();
-  const qtyPack = Number(moveQty?.value || 0);
+function resetMasterForm() {
+  if (whItemName) whItemName.value = "";
+  if (whItemUnitBig) whItemUnitBig.value = "";
+  if (whItemUnitSmall) whItemUnitSmall.value = "";
+  if (whItemPackQty) whItemPackQty.value = "";
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
+  if (whItemExp) whItemExp.value = "";
+  if (whItemReceivedAt) whItemReceivedAt.value = "";
+  if (whItemSupplier) whItemSupplier.value = "";
+  if (whItemInfo) whItemInfo.value = "";
 
-  if (!it) {
-    moveInfo.textContent = "";
-    return;
-  }
-
-  const packQty = Number(it.packQty || 0);
-  const unitBig = it.unitBig || "dus";
-  const unitSmall = it.unitSmall || "pcs";
-
-  const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
-  moveInfo.textContent =
-    packQty > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty})`
-      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
+  editingMasterId = null;
+  if (btnSaveItem) btnSaveItem.textContent = "Simpan Item";
 }
 
-function fillMoveSelect(keyword = "") {
-  if (!moveItemSelect) return;
-
-  const kw = (keyword || "").trim().toLowerCase();
-  moveItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-
-  items.forEach((it) => {
-    // Transfer hanya boleh dari W1 yang punya stok
-    if (Number(it.stockW1 || 0) <= 0) return;
-
-    if (kw) {
-      const s = (it.name || "").toLowerCase();
-      if (!s.includes(kw)) return;
-    }
-
-    const opt = document.createElement("option");
-    opt.value = it.id;
-    opt.textContent = `${it.name} (W1: ${it.stockW1 || 0})`;
-    moveItemSelect.appendChild(opt);
-  });
-
-  updateMoveInfo();
-}
-
-// ===== Opname filters
-function applyExpiryFilter(list) {
-  if (!whExpiryFilter) return list;
-  return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
-}
-function applyStockFilter(list) {
-  if (!whStockFilter) return list;
-  const { gudang, bucket } = whStockFilter;
-  return (list || []).filter((it) => {
-    const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
-    return stockBucketCount(stock) === bucket;
-  });
-}
-
-/**
- * ✅ FIX UTAMA:
- * - Gudang 1: tampilkan semua master item (biar item baru tetap muncul walau stok 0)
- * - Gudang 2: tampilkan hanya item yg punya stockW2 > 0 (hasil transfer)
- */
-function applyGudangVisibility(list, gudang) {
-  if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
-  return (list || []); // ✅ W1 tampilkan semua
-}
-
-// ===== Opname CRUD
-function renderOpnameTable() {
-  if (!whOpnameTableBody || !whOpnameGudang) return;
-
-  const gudang = whOpnameGudang.value || "w1";
-  const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
-
-  let list = [...items];
-
-  if (keyword) {
-    list = list.filter(
-      (it) =>
-        (it.name || "").toLowerCase().includes(keyword) ||
-        (it.supplier || "").toLowerCase().includes(keyword) ||
-        (it.unitBig || "").toLowerCase().includes(keyword) ||
-        (it.unitSmall || "").toLowerCase().includes(keyword)
-    );
-  }
-
-  list = applyGudangVisibility(list, gudang);
-  list = applyExpiryFilter(list);
-  list = applyStockFilter(list);
-
-  whOpnameTableBody.innerHTML = "";
-  if (!list.length) {
-    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item untuk ${gudang.toUpperCase()}.</td></tr>`;
-    return;
-  }
-
-  list.forEach((it) => {
-    const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-    const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
-    const isEditing = editingItemId === it.id;
-
-    const expStr = it.expDate || "-";
-    const expStatus = getExpStatus(it.expDate || "");
-    const expBadge =
-      expStatus === "expired"
-        ? `<span class="status-badge red">EXPIRED</span>`
-        : expStatus === "soon"
-        ? `<span class="status-badge yellow">SOON</span>`
-        : `<span class="status-badge green">OK</span>`;
-
-    const tr = document.createElement("tr");
-    tr.dataset.itemId = it.id; // ✅ supaya edit row aman
-
-    tr.innerHTML = `
-      <td>${isEditing ? `<input data-iedit="name" value="${escapeHtmlAttr(it.name || "")}"/>` : (it.name || "-")}</td>
-      <td>${
-        isEditing
-          ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <input data-iedit="unitBig" style="max-width:110px" value="${escapeHtmlAttr(it.unitBig || "")}" placeholder="unit besar"/>
-              <input data-iedit="unitSmall" style="max-width:110px" value="${escapeHtmlAttr(it.unitSmall || "")}" placeholder="unit isi"/>
-              <input data-iedit="packQty" type="number" min="1" step="1" style="max-width:110px" value="${clampInt(it.packQty || 0, 0)}" placeholder="isi/dus"/>
-            </div>`
-          : `${unitText}<div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>`
-      }</td>
-      <td>${
-        isEditing
-          ? `<input data-iedit="expDate" type="date" value="${escapeHtmlAttr(it.expDate || "")}" />`
-          : `${expStr}<div style="margin-top:6px;">${expBadge}</div>`
-      }</td>
-      <td>${isEditing ? `<input data-iedit="info" value="${escapeHtmlAttr(it.info || "")}" />` : (it.info || "-")}</td>
-      <td>${isEditing ? `<input data-iedit="receivedAt" type="date" value="${escapeHtmlAttr(it.receivedAt || "")}" />` : (it.receivedAt || "-")}</td>
-      <td>${isEditing ? `<input data-iedit="supplier" value="${escapeHtmlAttr(it.supplier || "")}" />` : (it.supplier || "-")}</td>
-      <td>${systemStock}</td>
-      <td>
-        <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
-      </td>
-      <td style="text-align:right;">
-        <div class="table-actions">
-          <span data-ibtn="saveOpname">${iconBtn('<i class="lucide-save"></i>', "Simpan Opname")}</span>
-          ${
-            isEditing
-              ? `
-                <span data-ibtn="saveEdit">${iconBtn('<i class="lucide-check"></i>', "Simpan Edit")}</span>
-                <span data-ibtn="cancelEdit">${iconBtn('<i class="lucide-x"></i>', "Batal")}</span>
-              `
-              : `
-                <span data-ibtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit Item")}</span>
-                <span data-ibtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus Item", "danger")}</span>
-              `
-          }
-        </div>
-      </td>
-    `;
-
-    const bind = (key, fn) => {
-      const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
-      if (el) el.addEventListener("click", fn);
-    };
-
-    bind("saveOpname", async () => await saveOpname(it.id));
-    bind("edit", () => { editingItemId = it.id; renderOpnameTable(); });
-    bind("cancelEdit", () => { editingItemId = null; renderOpnameTable(); });
-    bind("saveEdit", async () => await saveEditItem(it.id));
-    bind("delete", async () => await deleteItem(it.id));
-
-    whOpnameTableBody.appendChild(tr);
-  });
-}
-
-// ✅ stok fisik > stok sistem => ERROR
-async function saveOpname(itemId) {
-  if (!currentUser) return showToast("Harus login", "error");
-
-  const gudang = whOpnameGudang?.value || "w1";
-  const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
-  if (!inp) return;
-
-  const physical = Number(inp.value || 0);
-  if (physical < 0) return showToast("Stok fisik tidak valid", "error");
-
-  const it = items.find((x) => x.id === itemId);
-  if (!it) return showToast("Item tidak ditemukan", "error");
-
-  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-  if (physical > systemStock) {
-    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
-  }
-
-  const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = physical;
-  else payload.stockW2 = physical;
-
-  try {
-    await updateDoc(doc(db, "wh_items", itemId), payload);
-    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
-    await loadWhItems();
-    fillMoveSelect(moveSearch?.value || "");
-    renderOpnameTable();
-    updateDashboard();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal simpan opname", "error");
-  }
-}
-
-// ===== Master item (stok awal W1 optional)
-async function saveMasterItem() {
+async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
 
   const name = (whItemName?.value || "").trim();
@@ -643,8 +464,8 @@ async function saveMasterItem() {
     receivedAt,
     supplier,
     info,
-    stockW1: safeInit,
-    stockW2: 0,
+    stockW1: safeInit, // stok sistem gudang 1 (dus)
+    stockW2: 0,        // gudang 2 awal kosong
     createdBy: currentUser.email || "-",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -654,67 +475,286 @@ async function saveMasterItem() {
     await addDoc(colWhItems, docData);
     showToast("Master item tersimpan", "success");
 
-    if (whItemName) whItemName.value = "";
-    if (whItemUnitBig) whItemUnitBig.value = "";
-    if (whItemUnitSmall) whItemUnitSmall.value = "";
-    if (whItemPackQty) whItemPackQty.value = "";
-    if (whItemInitStockW1) whItemInitStockW1.value = "";
-    if (whItemExp) whItemExp.value = "";
-    if (whItemReceivedAt) whItemReceivedAt.value = "";
-    if (whItemSupplier) whItemSupplier.value = "";
-    if (whItemInfo) whItemInfo.value = "";
+    resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan master item", "error");
   }
 }
 
-// ===== CRUD item
-async function saveEditItem(id) {
+async function updateMasterItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!whOpnameTableBody) return;
+  if (!id) return;
 
-  const target = whOpnameTableBody.querySelector(`tr[data-item-id="${id}"]`);
-  if (!target) return showToast("Row edit tidak ditemukan", "error");
+  const itOld = items.find((x) => x.id === id);
+  if (!itOld) return showToast("Item tidak ditemukan", "error");
 
-  const name = (target.querySelector(`input[data-iedit="name"]`)?.value || "").trim();
-  const unitBig = (target.querySelector(`input[data-iedit="unitBig"]`)?.value || "").trim();
-  const unitSmall = (target.querySelector(`input[data-iedit="unitSmall"]`)?.value || "").trim();
-  const packQty = Number(target.querySelector(`input[data-iedit="packQty"]`)?.value || 0);
-  const expDate = target.querySelector(`input[data-iedit="expDate"]`)?.value || "";
-  const receivedAt = target.querySelector(`input[data-iedit="receivedAt"]`)?.value || "";
-  const supplier = (target.querySelector(`input[data-iedit="supplier"]`)?.value || "").trim();
-  const info = (target.querySelector(`input[data-iedit="info"]`)?.value || "").trim();
+  const name = (whItemName?.value || "").trim();
+  const unitBig = (whItemUnitBig?.value || "").trim();
+  const unitSmall = (whItemUnitSmall?.value || "").trim();
+  const packQty = Number(whItemPackQty?.value || 0);
 
-  if (!name) return showToast("Nama item wajib", "error");
-  if (!unitBig) return showToast("Unit besar wajib", "error");
-  if (!unitSmall) return showToast("Unit isi wajib", "error");
-  if (!packQty || packQty <= 0) return showToast("Isi/dus wajib > 0", "error");
+  const expDate = whItemExp?.value || "";
+  const receivedAt = whItemReceivedAt?.value || "";
+  const supplier = (whItemSupplier?.value || "").trim();
+  const info = (whItemInfo?.value || "").trim();
+
+  if (!name) return showToast("Nama item wajib diisi", "error");
+  if (!unitBig) return showToast("Unit besar wajib diisi", "error");
+  if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
+  if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
+
+  const payload = {
+    name,
+    unitBig,
+    unitSmall,
+    packQty,
+    expDate,
+    receivedAt,
+    supplier,
+    info,
+    updatedAt: serverTimestamp(),
+  };
+
+  // stokW1 boleh ikut diupdate jika field ada di HTML
+  if (whItemInitStockW1) {
+    const initStockW1 = Number(whItemInitStockW1.value || 0);
+    payload.stockW1 = Number.isFinite(initStockW1) && initStockW1 >= 0 ? Math.trunc(initStockW1) : (itOld.stockW1 || 0);
+  }
 
   try {
-    await updateDoc(doc(db, "wh_items", id), {
-      name, unitBig, unitSmall, packQty, expDate, receivedAt, supplier, info,
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "wh_items", id), payload);
+    showToast("Master item diupdate", "success");
 
-    showToast("Item berhasil diupdate", "success");
-    editingItemId = null;
+    resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update item", "error");
+    showToast("Gagal update master item", "error");
   }
 }
 
+async function saveOrUpdateMasterItem() {
+  if (editingMasterId) return await updateMasterItem(editingMasterId);
+  return await createMasterItem();
+}
+
+// ===================== Transfer helpers (search + info) =====================
+function currentTransferItem() {
+  const id = moveItemSelect?.value || "";
+  return items.find((x) => x.id === id) || null;
+}
+
+function updateMoveInfo() {
+  if (!moveInfo) return;
+  const it = currentTransferItem();
+  const qtyPack = Number(moveQty?.value || 0);
+
+  if (!it) {
+    moveInfo.textContent = "";
+    return;
+  }
+
+  const packQty = Number(it.packQty || 0);
+  const unitBig = it.unitBig || "dus";
+  const unitSmall = it.unitSmall || "pcs";
+
+  const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
+  moveInfo.textContent =
+    packQty > 0
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0}`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
+}
+
+// ✅ FIX: dropdown transfer menampilkan semua item, stok 0 -> disabled
+function fillMoveSelect(keyword = "") {
+  if (!moveItemSelect) return;
+
+  const kw = (keyword || "").trim().toLowerCase();
+  moveItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
+
+  items.forEach((it) => {
+    if (kw) {
+      const s = (it.name || "").toLowerCase();
+      if (!s.includes(kw)) return;
+    }
+
+    const s1 = Number(it.stockW1 || 0);
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = `${it.name} (W1: ${s1})`;
+    if (s1 <= 0) opt.disabled = true; // tetap terlihat tapi gak bisa dipilih
+    moveItemSelect.appendChild(opt);
+  });
+
+  updateMoveInfo();
+}
+
+// ===================== Opname filters =====================
+function applyExpiryFilter(list) {
+  if (!whExpiryFilter) return list;
+  return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
+}
+function applyStockFilter(list) {
+  if (!whStockFilter) return list;
+  const { gudang, bucket } = whStockFilter;
+  return (list || []).filter((it) => {
+    const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
+    return stockBucketCount(stock) === bucket;
+  });
+}
+
+/**
+ * ✅ FIX:
+ * - Gudang 1: tampilkan semua master item (meski stok 0)
+ * - Gudang 2: hanya item hasil transfer (stockW2 > 0)
+ */
+function applyGudangVisibility(list, gudang) {
+  if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
+  return (list || []);
+}
+
+// ===================== Opname Table =====================
+function renderOpnameTable() {
+  if (!whOpnameTableBody || !whOpnameGudang) return;
+
+  const gudang = whOpnameGudang.value || "w1";
+  const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
+
+  let list = [...items];
+
+  if (keyword) {
+    list = list.filter(
+      (it) =>
+        (it.name || "").toLowerCase().includes(keyword) ||
+        (it.supplier || "").toLowerCase().includes(keyword) ||
+        (it.unitBig || "").toLowerCase().includes(keyword) ||
+        (it.unitSmall || "").toLowerCase().includes(keyword)
+    );
+  }
+
+  list = applyGudangVisibility(list, gudang);
+  list = applyExpiryFilter(list);
+  list = applyStockFilter(list);
+
+  whOpnameTableBody.innerHTML = "";
+  if (!list.length) {
+    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item untuk ${gudang.toUpperCase()}.</td></tr>`;
+    return;
+  }
+
+  list.forEach((it) => {
+    // ✅ stok sistem = unit besar (dus)
+    const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+
+    const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
+
+    const expStr = it.expDate || "-";
+    const expStatus = getExpStatus(it.expDate || "");
+    const expBadge =
+      expStatus === "expired"
+        ? `<span class="status-badge red">EXPIRED</span>`
+        : expStatus === "soon"
+        ? `<span class="status-badge yellow">SOON</span>`
+        : `<span class="status-badge green">OK</span>`;
+
+    const tr = document.createElement("tr");
+    tr.dataset.itemId = it.id;
+
+    tr.innerHTML = `
+      <td>${escapeHtml(it.name || "-")}</td>
+      <td>
+        ${escapeHtml(unitText)}
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>
+      </td>
+      <td>
+        ${escapeHtml(expStr)}
+        <div style="margin-top:6px;">${expBadge}</div>
+      </td>
+      <td>${escapeHtml(it.info || "-")}</td>
+      <td>${escapeHtml(it.receivedAt || "-")}</td>
+      <td>${escapeHtml(it.supplier || "-")}</td>
+      <td>${systemStock}</td>
+      <td>
+        <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
+      </td>
+      <td style="text-align:right;">
+        <div class="table-actions">
+          <span data-ibtn="saveOpname">${iconBtn('<i class="lucide-save"></i>', "Simpan Opname")}</span>
+          <span data-ibtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit (muncul di form master)")}</span>
+          <span data-ibtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus Item", "danger")}</span>
+        </div>
+      </td>
+    `;
+
+    const bind = (key, fn) => {
+      const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
+      if (el) el.addEventListener("click", fn);
+    };
+
+    bind("saveOpname", async () => await saveOpname(it.id));
+    bind("edit", () => {
+      editingMasterId = it.id;
+      fillMasterForm(it);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    bind("delete", async () => await deleteItem(it.id));
+
+    whOpnameTableBody.appendChild(tr);
+  });
+}
+
+// ✅ stok fisik > stok sistem => ERROR
+async function saveOpname(itemId) {
+  if (!currentUser) return showToast("Harus login", "error");
+
+  const gudang = whOpnameGudang?.value || "w1";
+  const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
+  if (!inp) return;
+
+  const physical = Number(inp.value || 0);
+  if (physical < 0) return showToast("Stok fisik tidak valid", "error");
+
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return showToast("Item tidak ditemukan", "error");
+
+  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+
+  if (physical > systemStock) {
+    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
+  }
+
+  const payload = { updatedAt: serverTimestamp() };
+  if (gudang === "w1") payload.stockW1 = physical;
+  else payload.stockW2 = physical;
+
+  try {
+    await updateDoc(doc(db, "wh_items", itemId), payload);
+    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
+
+    await loadWhItems();
+    fillMoveSelect(moveSearch?.value || "");
+    renderOpnameTable();
+    updateDashboard();
+    updateMoveInfo();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal simpan opname", "error");
+  }
+}
+
+// ===================== Delete Item =====================
 async function deleteItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
   const it = items.find((x) => x.id === id);
@@ -724,19 +764,21 @@ async function deleteItem(id) {
   try {
     await deleteDoc(doc(db, "wh_items", id));
     showToast("Item dihapus", "success");
-    if (editingItemId === id) editingItemId = null;
+
+    if (editingMasterId === id) resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal hapus item", "error");
   }
 }
 
-// ===== Transfer W1 → W2 (persist)
+// ===================== Transfer W1 → W2 (persist) =====================
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -767,13 +809,14 @@ async function transferW1toW2() {
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal transfer", "error");
   }
 }
 
-// ===== Waste
+// ===================== Waste =====================
 function ensureWasteDefaults() {
   const today = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -1009,8 +1052,8 @@ async function deleteWaste(id) {
   }
 }
 
-// ===== Events
-btnSaveItem?.addEventListener("click", saveMasterItem);
+// ===================== Events =====================
+btnSaveItem?.addEventListener("click", saveOrUpdateMasterItem);
 
 btnMove?.addEventListener("click", transferW1toW2);
 moveSearch?.addEventListener("input", () => fillMoveSelect(moveSearch.value || ""));
@@ -1045,7 +1088,7 @@ wasteSortDirBtn?.addEventListener("click", () => {
   renderWasteHistory();
 });
 
-// ===== Boot
+// ===================== Boot =====================
 async function bootWarehouse() {
   ensureWasteDefaults();
   fillWasteSelectPreset();
