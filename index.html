@@ -198,7 +198,6 @@
               </div>
             </div>
 
-            <!-- ✅ Isi per Dus + Stok Awal Gudang 1 -->
             <div class="grid-2" style="gap:10px;">
               <div>
                 <label>Isi per Dus</label>
@@ -210,7 +209,6 @@
               </div>
             </div>
 
-            <!-- legacy agar tidak error kalau masih ada -->
             <input id="whItemUnit" type="hidden">
 
             <div class="grid-2" style="gap:10px;">
@@ -386,7 +384,10 @@
             </div>
           </div>
 
-          <button id="btnWhReport" class="btn-secondary" type="button" style="margin-top:10px;">Generate</button>
+          <div class="grid-2" style="gap:10px; margin-top:10px;">
+            <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
+            <button id="btnWhReportCsv" class="btn-secondary" type="button">Download CSV</button>
+          </div>
         </div>
 
         <div class="card glass" style="padding:12px; margin-top:12px;">
@@ -399,7 +400,7 @@
         </div>
       </section>
 
-      <!-- SECTION LAMA (tetap ada biar script.js nggak error) -->
+      <!-- SECTION LAMA -->
       <section id="salesSection" class="section hidden"></section>
       <section id="inventorySection" class="section hidden"></section>
       <section id="recipeSection" class="section hidden"></section>
