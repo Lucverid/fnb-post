@@ -1,78 +1,104 @@
 // warehouse.js
 // =====================================================
-// WAREHOUSE MODULE (standalone navigation + section show)
+// WAREHOUSE NAVIGATION CONTROLLER (FIXED FOR YOUR HTML)
 // =====================================================
-//
-// ✅ Pastikan tombol Warehouse di sidebar seperti ini:
-//
-// <button id="navWarehouse" class="side-item" data-wh-nav="1" type="button">
-//   Warehouse
-// </button>
-//
-// ✅ Pastikan section warehouse ada:
-//
-// <section id="warehouseSection" class="hidden"> ... </section>
-//
-// NOTE:
-// - script.js sudah dipatch untuk skip element yang punya data-wh-nav="1"
-// - jadi klik Warehouse tidak akan di-handle script.js
 
-(function () {
+(() => {
   const $ = (id) => document.getElementById(id);
 
-  const navWarehouse = $("navWarehouse");
-  const warehouseSection = $("warehouseSection");
+  /* =======================
+     NAV BUTTONS (SIDEBAR)
+     ======================= */
+  const navs = {
+    dashboard: $("navWhDashboard"),
+    opname: $("navWhOpname"),
+    waste: $("navWhWaste"),
+    report: $("navWhReport"),
+  };
+
+  /* =======================
+     SECTIONS (MAIN)
+     ======================= */
+  const sections = {
+    dashboard: $("whDashboardSection"),
+    opname: $("whOpnameSection"),
+    waste: $("whWasteSection"),
+    report: $("whReportSection"),
+  };
+
   const sidebar = $("sidebar");
 
-  // daftar section app yang mau kita hide kalau masuk warehouse
-  const knownSections = [
+  /* =======================
+     ALL MAIN SECTIONS
+     (biar section lama ikut ke-hide)
+     ======================= */
+  const ALL_SECTION_IDS = [
+    // warehouse
+    "whDashboardSection",
+    "whOpnameSection",
+    "whWasteSection",
+    "whReportSection",
+
+    // legacy (script.js)
     "salesSection",
     "inventorySection",
     "recipeSection",
     "dashboardSection",
     "opnameSection",
     "reportsSection",
-    "warehouseSection",
   ];
 
-  function hideAllMainSections() {
-    knownSections.forEach((id) => {
+  function hideAllSections() {
+    ALL_SECTION_IDS.forEach((id) => {
       const el = $(id);
       if (el) el.classList.add("hidden");
     });
   }
 
-  function openWarehouse() {
-    hideAllMainSections();
-    if (warehouseSection) warehouseSection.classList.remove("hidden");
-
-    // reset active state semua menu internal (opsional)
-    document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
-    if (navWarehouse) navWarehouse.classList.add("active");
-
-    // auto close sidebar di mobile
-    if (window.innerWidth <= 900 && sidebar) sidebar.classList.remove("open");
-
-    // scroll halus
-    if (warehouseSection) warehouseSection.scrollIntoView({ behavior: "smooth" });
+  function clearActiveMenu() {
+    document.querySelectorAll(".side-item").forEach((btn) => {
+      btn.classList.remove("active");
+    });
   }
 
-  // kalau section warehouse belum ada, jangan error
-  if (!navWarehouse) {
-    console.warn("[warehouse.js] tombol #navWarehouse tidak ditemukan.");
-    return;
-  }
-  if (!warehouseSection) {
-    console.warn("[warehouse.js] section #warehouseSection tidak ditemukan.");
+  function openSection(key) {
+    hideAllSections();
+    clearActiveMenu();
+
+    if (sections[key]) sections[key].classList.remove("hidden");
+    if (navs[key]) navs[key].classList.add("active");
+
+    // auto close sidebar mobile
+    if (window.innerWidth <= 900 && sidebar) {
+      sidebar.classList.remove("open");
+    }
   }
 
-  navWarehouse.addEventListener("click", (e) => {
-    // amanin supaya event tidak "nyasar"
-    e.preventDefault();
-    e.stopPropagation();
-    openWarehouse();
+  /* =======================
+     BIND EVENTS
+     ======================= */
+  Object.entries(navs).forEach(([key, btn]) => {
+    if (!btn) return;
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSection(key);
+    });
   });
 
-  // expose global (kalau butuh dipanggil dari tempat lain)
-  window.openWarehouse = openWarehouse;
+  /* =======================
+     DEFAULT OPEN
+     ======================= */
+  // buka dashboard warehouse pertama kali
+  if (sections.dashboard) {
+    hideAllSections();
+    sections.dashboard.classList.remove("hidden");
+    navs.dashboard?.classList.add("active");
+  }
+
+  /* =======================
+     DEBUG (opsional)
+     ======================= */
+  console.log("[warehouse.js] Warehouse navigation ready");
 })();
