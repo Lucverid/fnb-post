@@ -192,8 +192,8 @@ let wasteSortDirState = "asc";
 
 const WASTE_PRESET_ITEMS = [
   "Milktea","Teh Hijau","Teh Hitam","Teh Blooming","Teh oolong",
-  "boba","susu","pudding","kopi","crystal jelly",
-  "Eskrim original","eskrim yoghurt","pendamping lemon",
+  "Boba","Susu","Pudding","Kopi","Crystal jelly",
+  "Eskrim vanila","Eskrim yoghurt","Pendamping lemon",
 ];
 
 // ✅ Last report cache (for download)
