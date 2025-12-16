@@ -1623,7 +1623,6 @@ select{
 input[type="date"]{
   color-scheme: dark;
 }
-body { outline: 8px solid lime !important; }
 
 /* Waste history action column */
 #wasteHistoryBody .table-actions{
@@ -1658,4 +1657,52 @@ body { outline: 8px solid lime !important; }
   gap:8px;
   justify-content:flex-end;
   align-items:center;
+}
+/* ==================================================
+   FIX LIGHT MODE VISIBILITY (override dark hardcode)
+   Tempel paling bawah
+================================================== */
+@media (prefers-color-scheme: light) {
+  label{
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  input, select, textarea{
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text);
+  }
+
+  input::placeholder, textarea::placeholder{
+    color: rgba(15, 23, 42, .45);
+  }
+
+  input:focus, select:focus, textarea:focus{
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79,70,229,.15);
+    background: #fff;
+  }
+
+  /* select arrow versi light */
+  select{
+    background-image:
+      linear-gradient(45deg, transparent 50%, rgba(15,23,42,.55) 50%),
+      linear-gradient(135deg, rgba(15,23,42,.55) 50%, transparent 50%);
+  }
+
+  /* date picker ikut light */
+  input[type="date"]{
+    color-scheme: light;
+  }
+
+  /* elemen yang kamu bikin semi-transparan */
+  .btn-icon-mini{
+    background: #fff;
+  }
+}
+
+/* Dark mode tetap pakai yang sekarang, tapi date ikut dark */
+@media (prefers-color-scheme: dark){
+  input[type="date"]{ color-scheme: dark; }
 }
