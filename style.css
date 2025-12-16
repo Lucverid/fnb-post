@@ -1624,3 +1624,8 @@ input[type="date"]{
   color-scheme: dark;
 }
 body { outline: 8px solid lime !important; }
+
+/* Waste history action column */
+#wasteHistoryBody .table-actions{
+  justify-content: flex-end;
+}
