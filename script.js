@@ -203,6 +203,7 @@ const dashboardSection = $("dashboardSection");
 const opnameSection = $("opnameSection");
 const reportsSection = $("reportsSection");
 
+// (warehouseSection ditangani di warehouse.js)
 const sidebar = $("sidebar");
 const burgerBtn = $("burgerBtn");
 const notifBtn = $("notifBtn");
@@ -338,8 +339,16 @@ function isEnabled(section) {
   return FEATURES[section] === true;
 }
 
+/**
+ * ✅ PATCH: skip tombol warehouse (yang punya data-wh-nav="1")
+ * supaya:
+ * - tidak ikut disabled
+ * - tidak ikut event .side-item internal
+ */
 function applyDisabledSidebarUI() {
   document.querySelectorAll(".side-item").forEach((btn) => {
+    if (btn.matches("[data-wh-nav='1']")) return; // ✅ PATCH: skip warehouse
+
     const section = btn.dataset.section;
     if (!section) return;
 
@@ -499,8 +508,10 @@ function showSection(name) {
   if (name === "reports" && reportsSection) reportsSection.classList.remove("hidden");
 }
 
-// klik menu sidebar
-document.querySelectorAll(".side-item").forEach((btn) => {
+/**
+ * ✅ PATCH: nav internal hanya untuk side-item yang BUKAN warehouse (data-wh-nav="1")
+ */
+document.querySelectorAll(".side-item:not([data-wh-nav='1'])").forEach((btn) => {
   btn.addEventListener("click", () => {
     const section = btn.dataset.section;
     if (!section) return;
@@ -510,7 +521,7 @@ document.querySelectorAll(".side-item").forEach((btn) => {
       return;
     }
 
-    document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".side-item:not([data-wh-nav='1'])").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
 
     if (section === "opname") {
