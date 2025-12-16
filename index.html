@@ -361,45 +361,50 @@
         </div>
       </section>
 
-      <!-- WAREHOUSE: REPORT -->
-      <section id="whReportSection" class="section hidden">
-  <label>Catatan (opsional)</label>
-<textarea id="whReportNote" rows="3" placeholder="Contoh: Laporan stok untuk audit, ada selisih di item A..."></textarea>
-      <h2>Laporan Warehouse</h2>
-        <div class="card glass" style="padding:12px; max-width:760px;">
-          <label>Tipe Laporan</label>
-          <select id="whReportType">
-            <option value="opname_w1">Opname Gudang 1</option>
-            <option value="opname_w2">Opname Gudang 2</option>
-            <option value="waste">Waste</option>
-          </select>
+     <!-- WAREHOUSE: REPORT -->
+<section id="whReportSection" class="section hidden">
+  <h2>Laporan Warehouse</h2>
 
-          <div class="grid-2" style="gap:10px;">
-            <div>
-              <label>Tanggal Mulai</label>
-              <input id="whReportStart" type="date">
-            </div>
-            <div>
-              <label>Tanggal Akhir</label>
-              <input id="whReportEnd" type="date">
-            </div>
-          </div>
+  <div class="card glass" style="padding:12px; max-width:760px;">
+    <label>Tipe Laporan</label>
+    <select id="whReportType">
+      <option value="opname_w1">Opname Gudang 1</option>
+      <option value="opname_w2">Opname Gudang 2</option>
+      <option value="waste">Waste</option>
+    </select>
 
-          <div class="grid-2" style="gap:10px; margin-top:10px;">
-            <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
-            <button id="btnWhReportCsv" class="btn-secondary" type="button">Download CSV</button>
-          </div>
-        </div>
+    <div class="grid-2" style="gap:10px;">
+      <div>
+        <label>Tanggal Mulai</label>
+        <input id="whReportStart" type="date">
+      </div>
+      <div>
+        <label>Tanggal Akhir</label>
+        <input id="whReportEnd" type="date">
+      </div>
+    </div>
 
-        <div class="card glass" style="padding:12px; margin-top:12px;">
-          <div style="overflow:auto;">
-            <table class="table">
-              <thead id="whReportHead"></thead>
-              <tbody id="whReportBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+    <label style="margin-top:10px;">Catatan (opsional)</label>
+    <textarea id="whReportNote" rows="3"
+      placeholder="Contoh: Laporan stok untuk audit, ada selisih di item A..."></textarea>
+
+    <div class="grid-2" style="gap:10px; margin-top:10px;">
+      <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
+      <button id="btnWhReportDownload" class="btn-secondary" type="button">Download CSV</button>
+    </div>
+  </div>
+
+  <div class="card glass" style="padding:12px; margin-top:12px;">
+    <div style="overflow:auto;">
+      <table class="table">
+        <thead>
+          <tr id="whReportHead"></tr>
+        </thead>
+        <tbody id="whReportBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
       <!-- SECTION LAMA -->
       <section id="salesSection" class="section hidden"></section>
