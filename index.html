@@ -282,36 +282,74 @@
       </section>
 
       <!-- WAREHOUSE: WASTE -->
-      <section id="whWasteSection" class="section hidden">
-        <h2>Waste</h2>
+<section id="whWasteSection" class="section hidden">
+  <h2>Waste</h2>
 
-        <div class="card glass" style="padding:12px; max-width:640px;">
-          <label>Cari Item</label>
-          <input id="wasteItemSearch" type="text" placeholder="ketik nama item...">
+  <!-- FORM INPUT WASTE -->
+  <div class="card glass" style="padding:12px; max-width:640px;">
+    <label>Cari Item</label>
+    <input id="wasteItemSearch" type="text" placeholder="ketik nama item...">
 
-          <label>Pilih Item</label>
-          <select id="wasteItemSelect"></select>
+    <label>Pilih Item</label>
+    <select id="wasteItemSelect"></select>
 
-          <div class="grid-2" style="gap:10px;">
-            <div>
-              <label>Tanggal</label>
-              <input id="wasteDate" type="date">
-            </div>
-            <div>
-              <label>Satuan</label>
-              <select id="wasteUnit"></select>
-            </div>
-          </div>
+    <div class="grid-2" style="gap:10px;">
+      <div>
+        <label>Tanggal</label>
+        <input id="wasteDate" type="date">
+      </div>
+      <div>
+        <label>Satuan</label>
+        <select id="wasteUnit"></select>
+      </div>
+    </div>
 
-          <label>Qty (gram/ml)</label>
-          <input id="wasteQty" type="number" min="0" step="1" placeholder="contoh: 250">
+    <label>Qty (gram/ml)</label>
+    <input id="wasteQty" type="number" min="0" step="1" placeholder="contoh: 250">
 
-          <label>Catatan</label>
-          <textarea id="wasteNote" rows="3" placeholder="Alasan waste..."></textarea>
+    <label>Catatan</label>
+    <textarea id="wasteNote" rows="3" placeholder="Alasan waste..."></textarea>
 
-          <button id="btnSaveWaste" class="btn-primary" type="button" style="margin-top:10px;">Simpan Waste</button>
-        </div>
-      </section>
+    <button id="btnSaveWaste" class="btn-primary" type="button" style="margin-top:10px;">
+      Simpan Waste
+    </button>
+  </div>
+
+  <!-- HISTORY WASTE -->
+  <div class="card glass" style="padding:12px; margin-top:12px;">
+    <h3 style="margin:0 0 10px;">History Waste</h3>
+
+    <div class="grid-2" style="gap:10px;">
+      <div>
+        <label>Tanggal Mulai</label>
+        <input id="wasteFilterStart" type="date">
+      </div>
+      <div>
+        <label>Tanggal Akhir</label>
+        <input id="wasteFilterEnd" type="date">
+      </div>
+    </div>
+
+    <label>Cari (item / catatan / user)</label>
+    <input id="wasteHistorySearch" type="text" placeholder="ketik untuk cari...">
+
+    <div style="overflow:auto; margin-top:10px;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Satuan</th>
+            <th>Catatan</th>
+            <th>User</th>
+          </tr>
+        </thead>
+        <tbody id="wasteHistoryBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
 
       <!-- WAREHOUSE: REPORT -->
       <section id="whReportSection" class="section hidden">
