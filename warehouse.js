@@ -1163,6 +1163,14 @@ function validateReportRange(startKey, endKey) {
   return null;
 }
 
+/* ✅✅✅ TAMBAHAN MINIMAL: filter receivedAt untuk laporan gudang */
+function isReceivedAtInRange(receivedAt, startKey, endKey) {
+  if (!receivedAt) return false;
+  if (startKey && receivedAt < startKey) return false;
+  if (endKey && receivedAt > endKey) return false;
+  return true;
+}
+
 async function generateWarehouseReport() {
   if (!currentUser) return showToast("Harus login", "error");
   if (!whReportType) return showToast("Elemen laporan tidak lengkap (whReportType).", "error");
@@ -1199,14 +1207,15 @@ async function generateWarehouseReport() {
           w.createdBy || "",
         ]);
     } else if (type === "opname_w1" || type === "opname_w2") {
-      // Opname report adalah snapshot stok saat ini (tidak pakai history tanggal)
-      // Range tetap dipakai sebagai "metadata laporan" (biar user konsisten)
+      // Opname report adalah snapshot stok saat ini
+      // ✅ Range dipakai untuk filter berdasarkan receivedAt
       const gudang = type === "opname_w1" ? "W1" : "W2";
 
       header = ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", `Stok ${gudang}`];
       rows = items
         .slice()
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .filter((it) => isReceivedAtInRange(it.receivedAt || "", startKey, endKey)) // ✅ FILTER KALENDER (receivedAt)
         .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
         .map((it) => [
           it.name || "",
