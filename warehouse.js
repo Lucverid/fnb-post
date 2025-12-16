@@ -1,4 +1,4 @@
-// warehouse.js (Firestore-ready) — Warehouse: Master Item, Opname, Transfer, Waste + History + Expiry Dashboard + Click Filter
+// warehouse.js (Firestore-ready) — Warehouse: Master Item, Opname, Transfer, Waste + History (CRUD icon) + Expiry Dashboard + Click Filter
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -16,15 +16,14 @@ import {
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// ========== Reuse Firebase App from script.js ==========
+// ========== Firebase ==========
 const app = getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ========== DOM Helpers ==========
+// ========== Helpers ==========
 const $ = (id) => document.getElementById(id);
 
-// Reuse toast from script.js if exists
 function showToast(msg, type = "info", time = 3000) {
   const container = $("toast-container");
   if (!container) return alert(msg);
@@ -49,7 +48,6 @@ function parseDateOnly(value) {
 }
 
 function daysDiff(a, b) {
-  // a - b in days
   const ms = 1000 * 60 * 60 * 24;
   return Math.floor((a.getTime() - b.getTime()) / ms);
 }
@@ -59,11 +57,23 @@ function clampInt(v, fallback = 0) {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-// ========== Collections ==========
-const colWhItems = collection(db, "wh_items"); // master + stok
-const colWhWaste = collection(db, "wh_waste"); // waste logs
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+function escapeHtmlAttr(str) {
+  return escapeHtml(str).replaceAll("\n", " ");
+}
 
-// ========== Elements ==========
+// ========== Collections ==========
+const colWhItems = collection(db, "wh_items");
+const colWhWaste = collection(db, "wh_waste");
+
+// ========== DOM ==========
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
 const whWasteSection = $("whWasteSection");
@@ -74,7 +84,7 @@ const navWhOpname = $("navWhOpname");
 const navWhWaste = $("navWhWaste");
 const navWhReport = $("navWhReport");
 
-// Dashboard cards (existing stok status cards)
+// Dashboard stock cards
 const w1Habis = $("w1Habis");
 const w1Lumayan = $("w1Lumayan");
 const w1Banyak = $("w1Banyak");
@@ -82,15 +92,15 @@ const w2Habis = $("w2Habis");
 const w2Lumayan = $("w2Lumayan");
 const w2Banyak = $("w2Banyak");
 
-// ✅ NEW: expiry indicators (we'll inject cards if not exist)
+// Expiry cards wrapper
 const dashboardExpiryWrapId = "whExpiryWrap";
 
-// Opname form
+// Opname
 const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemPricePerPack = $("whItemPricePerPack"); // optional (not used in opname)
+const whItemPricePerPack = $("whItemPricePerPack"); // optional
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -105,8 +115,7 @@ const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 
-// Waste (Search will be disabled/hidden)
-const wasteItemSearch = $("wasteItemSearch");
+// Waste
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
 const wasteUnit = $("wasteUnit");
@@ -114,34 +123,33 @@ const wasteQty = $("wasteQty");
 const wasteNote = $("wasteNote");
 const btnSaveWaste = $("btnSaveWaste");
 
-// Waste history
+// Waste history + filter
 const wasteFilterStart = $("wasteFilterStart");
 const wasteFilterEnd = $("wasteFilterEnd");
 const wasteHistorySearch = $("wasteHistorySearch");
 const wasteHistoryBody = $("wasteHistoryBody");
+const wasteSortBy = $("wasteSortBy");
+const wasteSortDirBtn = $("wasteSortDir");
 
-// Notif (reuse existing top notif UI)
+// Notif UI
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
 // ========== State ==========
 let currentUser = null;
-let items = []; // wh_items cache
-let wasteLogs = []; // wh_waste cache
+let items = [];
+let wasteLogs = [];
 
-// thresholds
 const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
 
-// Opname filter by expiry via dashboard click
 let whExpiryFilter = null; // null | "ok" | "soon" | "expired"
-
-// Waste CRUD edit state
 let editingWasteId = null;
-let editingWasteSnapshot = null;
 
-// Waste preset items (NOT from opname/master)
+let wasteSortByState = "dateKey"; // dateKey | itemName
+let wasteSortDirState = "asc"; // asc | desc
+
 const WASTE_PRESET_ITEMS = [
   "Milktea",
   "Teh Hijau",
@@ -184,7 +192,6 @@ if (navWhDashboard)
 
 if (navWhOpname)
   navWhOpname.addEventListener("click", () => {
-    // masuk opname biasa = reset filter expiry
     whExpiryFilter = null;
     setActiveNav(navWhOpname);
     showWhSection("opname");
@@ -203,7 +210,7 @@ if (navWhReport)
     showWhSection("report");
   });
 
-// ========== Load Data ==========
+// ========== Load ==========
 async function loadWhItems() {
   const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
   items = [];
@@ -211,7 +218,6 @@ async function loadWhItems() {
 }
 
 async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
-  // Load last 200 then filter client
   const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(200)));
   wasteLogs = [];
   snap.forEach((d) => wasteLogs.push({ id: d.id, ...d.data() }));
@@ -223,22 +229,20 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   }
 }
 
-// ========== Expiry Helpers ==========
+// ========== Expiry ==========
 function getExpStatus(expStr) {
-  // expStr: "YYYY-MM-DD" or ""
-  // Rule: empty exp = ok (Belum Expired)
   if (!expStr) return "ok";
   const now = new Date();
   const exp = parseDateOnly(expStr);
   if (!exp) return "ok";
 
-  const left = daysDiff(exp, now); // exp - now
+  const left = daysDiff(exp, now);
   if (left < 0) return "expired";
   if (left <= EXP_SOON_DAYS) return "soon";
   return "ok";
 }
 
-// ========== Dashboard: Stock Metrics + Expiry + Notif ==========
+// ========== Dashboard ==========
 function stockBucketCount(stock) {
   const n = Number(stock || 0);
   if (n <= 0) return "habis";
@@ -274,7 +278,6 @@ function ensureExpiryCards() {
   `;
   whDashboardSection.appendChild(wrap);
 
-  // click-to-filter
   const cardExpOk = $("cardExpOk");
   const cardExpSoon = $("cardExpSoon");
   const cardExpBad = $("cardExpBad");
@@ -285,7 +288,7 @@ function ensureExpiryCards() {
 }
 
 function gotoOpnameWithExpiryFilter(type) {
-  whExpiryFilter = type; // "ok" | "soon" | "expired"
+  whExpiryFilter = type;
   setActiveNav(navWhOpname);
   showWhSection("opname");
 
@@ -300,63 +303,13 @@ function gotoOpnameWithExpiryFilter(type) {
   renderOpnameTable();
 }
 
-function updateDashboard() {
-  // stock per gudang
-  let w1 = { habis: 0, low: 0, high: 0 };
-  let w2 = { habis: 0, low: 0, high: 0 };
-
-  items.forEach((it) => {
-    const s1 = stockBucketCount(it.stockW1 || 0);
-    const s2 = stockBucketCount(it.stockW2 || 0);
-    if (s1 === "habis") w1.habis++;
-    if (s1 === "low") w1.low++;
-    if (s1 === "high") w1.high++;
-
-    if (s2 === "habis") w2.habis++;
-    if (s2 === "low") w2.low++;
-    if (s2 === "high") w2.high++;
-  });
-
-  if (w1Habis) w1Habis.textContent = w1.habis;
-  if (w1Lumayan) w1Lumayan.textContent = w1.low;
-  if (w1Banyak) w1Banyak.textContent = w1.high;
-  if (w2Habis) w2Habis.textContent = w2.habis;
-  if (w2Lumayan) w2Lumayan.textContent = w2.low;
-  if (w2Banyak) w2Banyak.textContent = w2.high;
-
-  // expiry
-  ensureExpiryCards();
-  let expOk = 0,
-    expSoon = 0,
-    expBad = 0;
-
-  items.forEach((it) => {
-    const st = getExpStatus(it.expDate || "");
-    if (st === "ok") expOk++;
-    else if (st === "soon") expSoon++;
-    else expBad++;
-  });
-
-  const expOkCount = $("expOkCount");
-  const expSoonCount = $("expSoonCount");
-  const expBadCount = $("expBadCount");
-  if (expOkCount) expOkCount.textContent = expOk;
-  if (expSoonCount) expSoonCount.textContent = expSoon;
-  if (expBadCount) expBadCount.textContent = expBad;
-
-  // notif
-  updateWarehouseNotif();
-}
-
 function updateWarehouseNotif() {
   if (!notifList || !notifBadge) return;
 
   notifList.innerHTML = "";
   let count = 0;
-
   const now = new Date();
 
-  // expired
   const expiredItems = items
     .filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || ""))
     .slice(0, 10);
@@ -368,7 +321,6 @@ function updateWarehouseNotif() {
     count++;
   });
 
-  // exp soon
   const expSoonItems = items
     .filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || ""))
     .slice(0, 10);
@@ -382,7 +334,6 @@ function updateWarehouseNotif() {
     count++;
   });
 
-  // low stock
   const lowStock = items
     .filter(
       (it) =>
@@ -407,6 +358,53 @@ function updateWarehouseNotif() {
   notifBadge.textContent = String(count);
 }
 
+function updateDashboard() {
+  let w1 = { habis: 0, low: 0, high: 0 };
+  let w2 = { habis: 0, low: 0, high: 0 };
+
+  items.forEach((it) => {
+    const s1 = stockBucketCount(it.stockW1 || 0);
+    const s2 = stockBucketCount(it.stockW2 || 0);
+
+    if (s1 === "habis") w1.habis++;
+    if (s1 === "low") w1.low++;
+    if (s1 === "high") w1.high++;
+
+    if (s2 === "habis") w2.habis++;
+    if (s2 === "low") w2.low++;
+    if (s2 === "high") w2.high++;
+  });
+
+  if (w1Habis) w1Habis.textContent = w1.habis;
+  if (w1Lumayan) w1Lumayan.textContent = w1.low;
+  if (w1Banyak) w1Banyak.textContent = w1.high;
+  if (w2Habis) w2Habis.textContent = w2.habis;
+  if (w2Lumayan) w2Lumayan.textContent = w2.low;
+  if (w2Banyak) w2Banyak.textContent = w2.high;
+
+  ensureExpiryCards();
+
+  let expOk = 0,
+    expSoon = 0,
+    expBad = 0;
+
+  items.forEach((it) => {
+    const st = getExpStatus(it.expDate || "");
+    if (st === "ok") expOk++;
+    else if (st === "soon") expSoon++;
+    else expBad++;
+  });
+
+  const expOkCount = $("expOkCount");
+  const expSoonCount = $("expSoonCount");
+  const expBadCount = $("expBadCount");
+  if (expOkCount) expOkCount.textContent = expOk;
+  if (expSoonCount) expSoonCount.textContent = expSoon;
+  if (expBadCount) expBadCount.textContent = expBad;
+
+  updateWarehouseNotif();
+}
+
 // ========== Dropdowns ==========
 function fillMoveSelect() {
   if (!moveItemSelect) return;
@@ -419,7 +417,6 @@ function fillMoveSelect() {
   });
 }
 
-// Waste dropdown (PRESET, not from items)
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
@@ -431,7 +428,6 @@ function fillWasteSelectPreset() {
   });
 }
 
-// Waste unit options (standalone)
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
   const units = ["gram", "ml", "pcs", "unit"];
@@ -444,14 +440,10 @@ function fillWasteUnitOptions() {
   });
 }
 
-// ========== Opname Table (with expiry filter) ==========
+// ========== Opname ==========
 function applyExpiryFilter(list) {
   if (!whExpiryFilter) return list;
-
-  return (list || []).filter((it) => {
-    const st = getExpStatus(it.expDate || "");
-    return st === whExpiryFilter;
-  });
+  return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
 }
 
 function renderOpnameTable() {
@@ -472,7 +464,6 @@ function renderOpnameTable() {
     );
   }
 
-  // APPLY expiry filter from dashboard click
   list = applyExpiryFilter(list);
 
   whOpnameTableBody.innerHTML = "";
@@ -509,7 +500,6 @@ function renderOpnameTable() {
           min="0"
           step="1"
           data-id="${it.id}"
-          data-system="${systemStock}"
           value="${systemStock}"
           style="min-width:110px;"
         />
@@ -539,17 +529,13 @@ async function saveOpname(itemId) {
   const physical = Number(inp.value || 0);
   if (physical < 0) return showToast("Stok fisik tidak valid", "error");
 
-  const it = items.find((x) => x.id === itemId);
-  if (!it) return;
-
   const payload = { updatedAt: serverTimestamp() };
   if (gudang === "w1") payload.stockW1 = physical;
   else payload.stockW2 = physical;
 
   try {
     await updateDoc(doc(db, "wh_items", itemId), payload);
-    showToast(`Opname tersimpan: ${it.name} (${gudang.toUpperCase()})`, "success");
-
+    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
     await loadWhItems();
     fillMoveSelect();
     renderOpnameTable();
@@ -560,7 +546,7 @@ async function saveOpname(itemId) {
   }
 }
 
-// ========== Master Item Save ==========
+// ========== Master Item ==========
 async function saveMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -578,7 +564,6 @@ async function saveMasterItem() {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
-  // Harga tidak dipakai di Opname. Tetap disimpan optional (kalau nanti perlu laporan pembelian)
   const pricePerPack = Number(whItemPricePerPack?.value || 0) || 0;
 
   const docData = {
@@ -587,7 +572,7 @@ async function saveMasterItem() {
     unitSmall,
     packQty,
     pricePerPack, // optional
-    expDate: exp, // YYYY-MM-DD
+    expDate: exp,
     receivedAt,
     supplier,
     info,
@@ -602,7 +587,6 @@ async function saveMasterItem() {
     await addDoc(colWhItems, docData);
     showToast("Master item tersimpan", "success");
 
-    // reset
     if (whItemName) whItemName.value = "";
     if (whItemUnitBig) whItemUnitBig.value = "";
     if (whItemUnitSmall) whItemUnitSmall.value = "";
@@ -623,7 +607,7 @@ async function saveMasterItem() {
   }
 }
 
-// ========== Transfer W1 -> W2 ==========
+// ========== Transfer ==========
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -647,7 +631,6 @@ async function transferW1toW2() {
     });
     showToast("Transfer berhasil", "success");
     if (moveQty) moveQty.value = "";
-
     await loadWhItems();
     renderOpnameTable();
     updateDashboard();
@@ -657,7 +640,7 @@ async function transferW1toW2() {
   }
 }
 
-// ========== Waste Save + History (CRUD) ==========
+// ========== Waste + History (CRUD icon + Sort) ==========
 function ensureWasteDefaults() {
   const today = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -665,21 +648,6 @@ function ensureWasteDefaults() {
   if (wasteDate && !wasteDate.value) wasteDate.value = val;
   if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
   if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
-}
-
-function disableWasteSearchUI() {
-  // request: hapus cari item => hide if still exists
-  if (wasteItemSearch) {
-    const wrap = wasteItemSearch.closest(".card") || wasteItemSearch.parentElement;
-    wasteItemSearch.value = "";
-    wasteItemSearch.disabled = true;
-    wasteItemSearch.style.display = "none";
-    // kalau label-nya tepat sebelum input
-    const prev = wasteItemSearch.previousElementSibling;
-    if (prev && prev.tagName === "LABEL") prev.style.display = "none";
-    // biar ada jarak rapi (optional)
-    if (wrap) wrap.style.gap = "10px";
-  }
 }
 
 async function saveWaste() {
@@ -712,13 +680,11 @@ async function saveWaste() {
   try {
     await addDoc(colWhWaste, log);
     showToast("Waste tersimpan", "success");
-
     if (wasteQty) wasteQty.value = "";
     if (wasteNote) wasteNote.value = "";
 
     await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
     renderWasteHistory();
-    updateDashboard();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan waste", "error");
@@ -732,145 +698,21 @@ function getWasteFilterEnd() {
   return parseDateOnly(wasteFilterEnd?.value || "") || null;
 }
 
-function renderWasteHistory() {
-  if (!wasteHistoryBody) return;
+function sortWasteList(list) {
+  const by = wasteSortByState;
+  const dir = wasteSortDirState;
 
-  const keyword = (wasteHistorySearch?.value || "").trim().toLowerCase();
-  let list = [...wasteLogs];
+  const sorted = [...list].sort((a, b) => {
+    const av = (a?.[by] ?? "").toString().toLowerCase();
+    const bv = (b?.[by] ?? "").toString().toLowerCase();
 
-  if (keyword) {
-    list = list.filter((w) => {
-      const a = (w.itemName || "").toLowerCase();
-      const b = (w.note || "").toLowerCase();
-      const c = (w.createdBy || "").toLowerCase();
-      return a.includes(keyword) || b.includes(keyword) || c.includes(keyword);
-    });
-  }
-
-  wasteHistoryBody.innerHTML = "";
-
-  if (!list.length) {
-    wasteHistoryBody.innerHTML = `<tr><td colspan="7">Belum ada data waste.</td></tr>`;
-    return;
-  }
-
-  list.forEach((w) => {
-    const isEditing = editingWasteId === w.id;
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${isEditing ? `<input type="date" data-wedit="dateKey" value="${w.dateKey || ""}" />` : (w.dateKey || "-")}</td>
-      <td>${isEditing ? buildWasteItemSelectHTML(w.itemName || "") : (w.itemName || "-")}</td>
-      <td>${isEditing ? `<input type="number" min="0" step="1" data-wedit="qty" value="${clampInt(w.qty, 0)}" style="max-width:110px;" />` : clampInt(w.qty, 0)}</td>
-      <td>${isEditing ? buildWasteUnitSelectHTML(w.unit || "unit") : (w.unit || "-")}</td>
-      <td>${isEditing ? `<input type="text" data-wedit="note" value="${escapeHtml(w.note || "")}" />` : (w.note || "-")}</td>
-      <td>${w.createdBy || "-"}</td>
-      <td>
-        <div class="table-actions" style="justify-content:flex-end;">
-          ${
-            isEditing
-              ? `
-                <button class="btn-table btn-table-edit small" data-wact="save" data-id="${w.id}">Save</button>
-                <button class="btn-table small" data-wact="cancel" data-id="${w.id}">Cancel</button>
-              `
-              : `
-                <button class="btn-table btn-table-edit small" data-wact="edit" data-id="${w.id}">Edit</button>
-                <button class="btn-table btn-table-delete small" data-wact="delete" data-id="${w.id}">Hapus</button>
-              `
-          }
-        </div>
-      </td>
-    `;
-    wasteHistoryBody.appendChild(tr);
-
-    // attach events
-    tr.querySelectorAll("button[data-wact]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const act = btn.getAttribute("data-wact");
-        const id = btn.getAttribute("data-id");
-        if (act === "edit") startEditWaste(id);
-        if (act === "cancel") cancelEditWaste();
-        if (act === "save") await saveEditWaste(id);
-        if (act === "delete") await deleteWaste(id);
-      });
-    });
+    // dateKey format YYYY-MM-DD => string sort aman
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+    return 0;
   });
-}
 
-function startEditWaste(id) {
-  const w = wasteLogs.find((x) => x.id === id);
-  if (!w) return;
-  editingWasteId = id;
-  editingWasteSnapshot = { ...w };
-  renderWasteHistory();
-}
-
-function cancelEditWaste() {
-  editingWasteId = null;
-  editingWasteSnapshot = null;
-  renderWasteHistory();
-}
-
-async function saveEditWaste(id) {
-  if (!currentUser) return showToast("Harus login", "error");
-  if (!wasteHistoryBody) return;
-
-  const row = wasteHistoryBody.querySelector(`button[data-wact="save"][data-id="${id}"]`)?.closest("tr");
-  if (!row) return;
-
-  const dateKey = row.querySelector(`input[data-wedit="dateKey"]`)?.value || "";
-  const itemName = row.querySelector(`select[data-wedit="itemName"]`)?.value || "";
-  const qty = Number(row.querySelector(`input[data-wedit="qty"]`)?.value || 0);
-  const unit = row.querySelector(`select[data-wedit="unit"]`)?.value || "unit";
-  const note = row.querySelector(`input[data-wedit="note"]`)?.value || "";
-
-  if (!dateKey) return showToast("Tanggal wajib diisi", "error");
-  if (!itemName) return showToast("Item wajib dipilih", "error");
-  if (!qty || qty <= 0) return showToast("Qty harus > 0", "error");
-
-  try {
-    await updateDoc(doc(db, "wh_waste", id), {
-      dateKey,
-      itemId: `preset:${itemName}`,
-      itemName,
-      qty,
-      unit,
-      note,
-      updatedAt: serverTimestamp(),
-    });
-
-    showToast("Waste updated", "success");
-    editingWasteId = null;
-    editingWasteSnapshot = null;
-
-    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-    renderWasteHistory();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal update waste", "error");
-  }
-}
-
-async function deleteWaste(id) {
-  if (!currentUser) return showToast("Harus login", "error");
-  const ok = confirm("Hapus data waste ini?");
-  if (!ok) return;
-
-  try {
-    await deleteDoc(doc(db, "wh_waste", id));
-    showToast("Waste dihapus", "success");
-
-    if (editingWasteId === id) {
-      editingWasteId = null;
-      editingWasteSnapshot = null;
-    }
-
-    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-    renderWasteHistory();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal hapus waste", "error");
-  }
+  return dir === "asc" ? sorted : sorted.reverse();
 }
 
 function buildWasteItemSelectHTML(current) {
@@ -892,22 +734,157 @@ function buildWasteUnitSelectHTML(current) {
   return `<select data-wedit="unit">${opts}</select>`;
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function iconBtn(html, title, extraClass = "") {
+  return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(title)}">${html}</button>`;
 }
-function escapeHtmlAttr(str) {
-  return escapeHtml(str).replaceAll("\n", " ");
+
+function renderWasteHistory() {
+  if (!wasteHistoryBody) return;
+
+  const keyword = (wasteHistorySearch?.value || "").trim().toLowerCase();
+  let list = [...wasteLogs];
+
+  if (keyword) {
+    list = list.filter((w) => {
+      const a = (w.itemName || "").toLowerCase();
+      const b = (w.note || "").toLowerCase();
+      const c = (w.createdBy || "").toLowerCase();
+      return a.includes(keyword) || b.includes(keyword) || c.includes(keyword);
+    });
+  }
+
+  list = sortWasteList(list);
+
+  wasteHistoryBody.innerHTML = "";
+
+  if (!list.length) {
+    wasteHistoryBody.innerHTML = `<tr><td colspan="7">Belum ada data waste.</td></tr>`;
+    return;
+  }
+
+  list.forEach((w) => {
+    const isEditing = editingWasteId === w.id;
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${isEditing ? `<input type="date" data-wedit="dateKey" value="${w.dateKey || ""}" />` : (w.dateKey || "-")}</td>
+      <td>${isEditing ? buildWasteItemSelectHTML(w.itemName || "") : (w.itemName || "-")}</td>
+      <td>${isEditing ? `<input type="number" min="0" step="1" data-wedit="qty" value="${clampInt(w.qty, 0)}" style="max-width:110px;" />` : clampInt(w.qty, 0)}</td>
+      <td>${isEditing ? buildWasteUnitSelectHTML(w.unit || "unit") : (w.unit || "-")}</td>
+      <td>${isEditing ? `<input type="text" data-wedit="note" value="${escapeHtmlAttr(w.note || "")}" />` : (w.note || "-")}</td>
+      <td>${w.createdBy || "-"}</td>
+      <td style="text-align:right;">
+        <div class="table-actions">
+          ${
+            isEditing
+              ? `
+                <span data-wbtn="save">${iconBtn('<i class="lucide-check"></i>', "Save")}</span>
+                <span data-wbtn="cancel">${iconBtn('<i class="lucide-x"></i>', "Cancel")}</span>
+              `
+              : `
+                <span data-wbtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit")}</span>
+                <span data-wbtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus", "danger")}</span>
+              `
+          }
+        </div>
+      </td>
+    `;
+
+    // Bind actions
+    const bind = (key, fn) => {
+      const el = tr.querySelector(`span[data-wbtn="${key}"] > button`);
+      if (el) el.addEventListener("click", fn);
+    };
+
+    bind("edit", () => startEditWaste(w.id));
+    bind("cancel", () => cancelEditWaste());
+    bind("save", async () => await saveEditWaste(w.id));
+    bind("delete", async () => await deleteWaste(w.id));
+
+    wasteHistoryBody.appendChild(tr);
+  });
+}
+
+function startEditWaste(id) {
+  const w = wasteLogs.find((x) => x.id === id);
+  if (!w) return;
+  editingWasteId = id;
+  renderWasteHistory();
+}
+
+function cancelEditWaste() {
+  editingWasteId = null;
+  renderWasteHistory();
+}
+
+async function saveEditWaste(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  if (!wasteHistoryBody) return;
+
+  const row = wasteHistoryBody.querySelector(`span[data-wbtn="save"]`)?.closest("tr");
+  // NOTE: kalau ada banyak row edit (harusnya nggak), ini tetap aman karena editingWasteId cuma 1
+  const rows = wasteHistoryBody.querySelectorAll("tr");
+  let target = null;
+  rows.forEach((r) => {
+    const has = r.querySelector(`input[data-wedit="dateKey"]`);
+    if (has) target = r;
+  });
+  if (!target) return;
+
+  const dateKey = target.querySelector(`input[data-wedit="dateKey"]`)?.value || "";
+  const itemName = target.querySelector(`select[data-wedit="itemName"]`)?.value || "";
+  const qty = Number(target.querySelector(`input[data-wedit="qty"]`)?.value || 0);
+  const unit = target.querySelector(`select[data-wedit="unit"]`)?.value || "unit";
+  const note = target.querySelector(`input[data-wedit="note"]`)?.value || "";
+
+  if (!dateKey) return showToast("Tanggal wajib diisi", "error");
+  if (!itemName) return showToast("Item wajib dipilih", "error");
+  if (!qty || qty <= 0) return showToast("Qty harus > 0", "error");
+
+  try {
+    await updateDoc(doc(db, "wh_waste", id), {
+      dateKey,
+      itemId: `preset:${itemName}`,
+      itemName,
+      qty,
+      unit,
+      note,
+      updatedAt: serverTimestamp(),
+    });
+
+    showToast("Waste updated", "success");
+    editingWasteId = null;
+
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal update waste", "error");
+  }
+}
+
+async function deleteWaste(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  const ok = confirm("Hapus data waste ini?");
+  if (!ok) return;
+
+  try {
+    await deleteDoc(doc(db, "wh_waste", id));
+    showToast("Waste dihapus", "success");
+
+    if (editingWasteId === id) editingWasteId = null;
+
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal hapus waste", "error");
+  }
 }
 
 // ========== Events ==========
 if (btnSaveItem) btnSaveItem.addEventListener("click", saveMasterItem);
 if (btnMove) btnMove.addEventListener("click", transferW1toW2);
-
 if (whOpnameGudang) whOpnameGudang.addEventListener("change", renderOpnameTable);
 if (whOpnameSearch) whOpnameSearch.addEventListener("input", renderOpnameTable);
 
@@ -925,14 +902,29 @@ if (wasteFilterEnd)
   });
 if (wasteHistorySearch) wasteHistorySearch.addEventListener("input", renderWasteHistory);
 
+// Sort events
+if (wasteSortBy)
+  wasteSortBy.addEventListener("change", () => {
+    wasteSortByState = wasteSortBy.value || "dateKey";
+    renderWasteHistory();
+  });
+
+if (wasteSortDirBtn)
+  wasteSortDirBtn.addEventListener("click", () => {
+    wasteSortDirState = wasteSortDirState === "asc" ? "desc" : "asc";
+    wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
+    renderWasteHistory();
+  });
+
 // ========== Boot ==========
 async function bootWarehouse() {
   ensureWasteDefaults();
 
-  // Waste UI changes
-  disableWasteSearchUI();
   fillWasteSelectPreset();
   fillWasteUnitOptions();
+
+  if (wasteSortBy) wasteSortBy.value = wasteSortByState;
+  if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
 
   await loadWhItems();
   fillMoveSelect();
@@ -947,7 +939,7 @@ async function bootWarehouse() {
 
 onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
-  if (!currentUser) return; // script.js handles login UI
+  if (!currentUser) return;
 
   try {
     await bootWarehouse();
