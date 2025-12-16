@@ -101,7 +101,7 @@ const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemInitStockW1 = $("whItemInitStockW1"); // ✅ NEW
+const whItemInitStockW1 = $("whItemInitStockW1"); // optional (kalau ada di HTML)
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -109,10 +109,10 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch");     // ✅ NEW
+const moveSearch = $("moveSearch"); // optional (kalau ada di HTML)
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo");         // ✅ NEW
+const moveInfo = $("moveInfo"); // optional (kalau ada di HTML)
 const btnMove = $("btnMove");
 
 // Opname
@@ -180,31 +180,24 @@ function resetOpnameFilters() {
   whStockFilter = null;
 }
 
-if (navWhDashboard)
-  navWhDashboard.addEventListener("click", () => {
-    resetOpnameFilters();
-    setActiveNav(navWhDashboard);
-    showWhSection("dashboard");
-  });
-
-if (navWhOpname)
-  navWhOpname.addEventListener("click", () => {
-    setActiveNav(navWhOpname);
-    showWhSection("opname");
-    renderOpnameTable();
-  });
-
-if (navWhWaste)
-  navWhWaste.addEventListener("click", () => {
-    setActiveNav(navWhWaste);
-    showWhSection("waste");
-  });
-
-if (navWhReport)
-  navWhReport.addEventListener("click", () => {
-    setActiveNav(navWhReport);
-    showWhSection("report");
-  });
+navWhDashboard?.addEventListener("click", () => {
+  resetOpnameFilters();
+  setActiveNav(navWhDashboard);
+  showWhSection("dashboard");
+});
+navWhOpname?.addEventListener("click", () => {
+  setActiveNav(navWhOpname);
+  showWhSection("opname");
+  renderOpnameTable();
+});
+navWhWaste?.addEventListener("click", () => {
+  setActiveNav(navWhWaste);
+  showWhSection("waste");
+});
+navWhReport?.addEventListener("click", () => {
+  setActiveNav(navWhReport);
+  showWhSection("report");
+});
 
 // ===== Load
 async function loadWhItems() {
@@ -427,9 +420,10 @@ function updateMoveInfo() {
   const unitSmall = it.unitSmall || "pcs";
 
   const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
-  moveInfo.textContent = packQty > 0
-    ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/dus: ${packQty})`
-    : `Isi per ${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
+  moveInfo.textContent =
+    packQty > 0
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty})`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
 }
 
 function fillMoveSelect(keyword = "") {
@@ -470,10 +464,14 @@ function applyStockFilter(list) {
   });
 }
 
-// ✅ Gudang 2 hanya item yg punya stokW2
+/**
+ * ✅ FIX UTAMA:
+ * - Gudang 1: tampilkan semua master item (biar item baru tetap muncul walau stok 0)
+ * - Gudang 2: tampilkan hanya item yg punya stockW2 > 0 (hasil transfer)
+ */
 function applyGudangVisibility(list, gudang) {
   if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
-  return (list || []).filter((it) => Number(it.stockW1 || 0) > 0);
+  return (list || []); // ✅ W1 tampilkan semua
 }
 
 // ===== Opname CRUD
@@ -520,32 +518,27 @@ function renderOpnameTable() {
         : `<span class="status-badge green">OK</span>`;
 
     const tr = document.createElement("tr");
+    tr.dataset.itemId = it.id; // ✅ supaya edit row aman
+
     tr.innerHTML = `
       <td>${isEditing ? `<input data-iedit="name" value="${escapeHtmlAttr(it.name || "")}"/>` : (it.name || "-")}</td>
-      <td>${isEditing
-        ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <input data-iedit="unitBig" style="max-width:110px" value="${escapeHtmlAttr(it.unitBig || "")}" placeholder="unit besar"/>
-            <input data-iedit="unitSmall" style="max-width:110px" value="${escapeHtmlAttr(it.unitSmall || "")}" placeholder="unit isi"/>
-            <input data-iedit="packQty" type="number" min="1" step="1" style="max-width:110px" value="${clampInt(it.packQty || 0, 0)}" placeholder="isi/dus"/>
-          </div>`
-        : `${unitText}<div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>`
+      <td>${
+        isEditing
+          ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <input data-iedit="unitBig" style="max-width:110px" value="${escapeHtmlAttr(it.unitBig || "")}" placeholder="unit besar"/>
+              <input data-iedit="unitSmall" style="max-width:110px" value="${escapeHtmlAttr(it.unitSmall || "")}" placeholder="unit isi"/>
+              <input data-iedit="packQty" type="number" min="1" step="1" style="max-width:110px" value="${clampInt(it.packQty || 0, 0)}" placeholder="isi/dus"/>
+            </div>`
+          : `${unitText}<div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>`
       }</td>
-      <td>${isEditing
-        ? `<input data-iedit="expDate" type="date" value="${escapeHtmlAttr(it.expDate || "")}" />`
-        : `${expStr}<div style="margin-top:6px;">${expBadge}</div>`
+      <td>${
+        isEditing
+          ? `<input data-iedit="expDate" type="date" value="${escapeHtmlAttr(it.expDate || "")}" />`
+          : `${expStr}<div style="margin-top:6px;">${expBadge}</div>`
       }</td>
-      <td>${isEditing
-        ? `<input data-iedit="info" value="${escapeHtmlAttr(it.info || "")}" />`
-        : (it.info || "-")
-      }</td>
-      <td>${isEditing
-        ? `<input data-iedit="receivedAt" type="date" value="${escapeHtmlAttr(it.receivedAt || "")}" />`
-        : (it.receivedAt || "-")
-      }</td>
-      <td>${isEditing
-        ? `<input data-iedit="supplier" value="${escapeHtmlAttr(it.supplier || "")}" />`
-        : (it.supplier || "-")
-      }</td>
+      <td>${isEditing ? `<input data-iedit="info" value="${escapeHtmlAttr(it.info || "")}" />` : (it.info || "-")}</td>
+      <td>${isEditing ? `<input data-iedit="receivedAt" type="date" value="${escapeHtmlAttr(it.receivedAt || "")}" />` : (it.receivedAt || "-")}</td>
+      <td>${isEditing ? `<input data-iedit="supplier" value="${escapeHtmlAttr(it.supplier || "")}" />` : (it.supplier || "-")}</td>
       <td>${systemStock}</td>
       <td>
         <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
@@ -583,7 +576,7 @@ function renderOpnameTable() {
   });
 }
 
-// ✅ stok fisik > stok sistem => ERROR (sesuai request)
+// ✅ stok fisik > stok sistem => ERROR
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -598,7 +591,6 @@ async function saveOpname(itemId) {
   if (!it) return showToast("Item tidak ditemukan", "error");
 
   const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-
   if (physical > systemStock) {
     return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
   }
@@ -620,7 +612,7 @@ async function saveOpname(itemId) {
   }
 }
 
-// ===== Master item + Stock In (init stok W1)
+// ===== Master item (stok awal W1 optional)
 async function saveMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -629,7 +621,7 @@ async function saveMasterItem() {
   const unitSmall = (whItemUnitSmall?.value || "").trim();
   const packQty = Number(whItemPackQty?.value || 0);
 
-  const initStockW1 = Number(whItemInitStockW1?.value || 0); // ✅ NEW
+  const initStockW1 = Number(whItemInitStockW1?.value || 0);
   const safeInit = Number.isFinite(initStockW1) && initStockW1 > 0 ? Math.trunc(initStockW1) : 0;
 
   const exp = whItemExp?.value || "";
@@ -651,7 +643,7 @@ async function saveMasterItem() {
     receivedAt,
     supplier,
     info,
-    stockW1: safeInit, // ✅ stok awal masuk ke stok sistem
+    stockW1: safeInit,
     stockW2: 0,
     createdBy: currentUser.email || "-",
     createdAt: serverTimestamp(),
@@ -662,15 +654,15 @@ async function saveMasterItem() {
     await addDoc(colWhItems, docData);
     showToast("Master item tersimpan", "success");
 
-    whItemName && (whItemName.value = "");
-    whItemUnitBig && (whItemUnitBig.value = "");
-    whItemUnitSmall && (whItemUnitSmall.value = "");
-    whItemPackQty && (whItemPackQty.value = "");
-    whItemInitStockW1 && (whItemInitStockW1.value = ""); // ✅ NEW
-    whItemExp && (whItemExp.value = "");
-    whItemReceivedAt && (whItemReceivedAt.value = "");
-    whItemSupplier && (whItemSupplier.value = "");
-    whItemInfo && (whItemInfo.value = "");
+    if (whItemName) whItemName.value = "";
+    if (whItemUnitBig) whItemUnitBig.value = "";
+    if (whItemUnitSmall) whItemUnitSmall.value = "";
+    if (whItemPackQty) whItemPackQty.value = "";
+    if (whItemInitStockW1) whItemInitStockW1.value = "";
+    if (whItemExp) whItemExp.value = "";
+    if (whItemReceivedAt) whItemReceivedAt.value = "";
+    if (whItemSupplier) whItemSupplier.value = "";
+    if (whItemInfo) whItemInfo.value = "";
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
@@ -687,12 +679,8 @@ async function saveEditItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!whOpnameTableBody) return;
 
-  const rows = whOpnameTableBody.querySelectorAll("tr");
-  let target = null;
-  rows.forEach((r) => {
-    if (r.querySelector(`input[data-iedit="name"]`)) target = r;
-  });
-  if (!target) return;
+  const target = whOpnameTableBody.querySelector(`tr[data-item-id="${id}"]`);
+  if (!target) return showToast("Row edit tidak ditemukan", "error");
 
   const name = (target.querySelector(`input[data-iedit="name"]`)?.value || "").trim();
   const unitBig = (target.querySelector(`input[data-iedit="unitBig"]`)?.value || "").trim();
@@ -924,6 +912,7 @@ function renderWasteHistory() {
   list.forEach((w) => {
     const isEditing = editingWasteId === w.id;
     const tr = document.createElement("tr");
+    tr.dataset.wasteId = w.id;
 
     tr.innerHTML = `
       <td>${isEditing ? `<input type="date" data-wedit="dateKey" value="${w.dateKey || ""}" />` : (w.dateKey || "-")}</td>
@@ -967,12 +956,8 @@ async function saveEditWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!wasteHistoryBody) return;
 
-  const rows = wasteHistoryBody.querySelectorAll("tr");
-  let target = null;
-  rows.forEach((r) => {
-    if (r.querySelector(`input[data-wedit="dateKey"]`)) target = r;
-  });
-  if (!target) return;
+  const target = wasteHistoryBody.querySelector(`tr[data-waste-id="${id}"]`);
+  if (!target) return showToast("Row waste tidak ditemukan", "error");
 
   const dateKey = target.querySelector(`input[data-wedit="dateKey"]`)?.value || "";
   const itemName = target.querySelector(`select[data-wedit="itemName"]`)?.value || "";
