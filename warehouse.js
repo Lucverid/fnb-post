@@ -1206,26 +1206,36 @@ async function generateWarehouseReport() {
           w.note || "",
           w.createdBy || "",
         ]);
-    } else if (type === "opname_w1" || type === "opname_w2") {
-      // Opname report adalah snapshot stok saat ini
-      // ✅ Range dipakai untuk filter berdasarkan receivedAt
-      const gudang = type === "opname_w1" ? "W1" : "W2";
+  } else if (type === "opname_w1" || type === "opname_w2") {
+  const gudang = type === "opname_w1" ? "W1" : "W2";
 
-      header = ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", `Stok ${gudang}`];
-      rows = items
-        .slice()
-        .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-        .filter((it) => isReceivedAtInRange(it.receivedAt || "", startKey, endKey)) // ✅ FILTER KALENDER (receivedAt)
-        .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
-        .map((it) => [
-          it.name || "",
-          it.supplier || "",
-          it.unitBig || "",
-          it.unitSmall || "",
-          String(clampInt(it.packQty, 0)),
-          String(clampInt(type === "opname_w1" ? it.stockW1 : it.stockW2, 0)),
-        ]);
-    } else {
+  // ✅ header
+  header =
+    type === "opname_w2"
+      ? ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1", "Stok W2"]
+      : ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1"];
+
+  // ✅ rows
+  rows = items
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .filter((it) => isReceivedAtInRange(it.receivedAt || "", startKey, endKey)) // filter receivedAt
+    .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
+    .map((it) => {
+      const stokW1 = String(clampInt(it.stockW1, 0));
+      const stokW2 = String(clampInt(it.stockW2, 0));
+      const base = [
+        it.name || "",
+        it.supplier || "",
+        it.unitBig || "",
+        it.unitSmall || "",
+        String(clampInt(it.packQty, 0)),
+      ];
+
+      if (type === "opname_w2") return [...base, stokW1, stokW2];
+      return [...base, stokW1]; // opname_w1
+    });
+} else {
       return showToast("Tipe laporan tidak dikenali.", "error");
     }
 
