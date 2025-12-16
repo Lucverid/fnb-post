@@ -1294,8 +1294,6 @@ async function bootWarehouse() {
   fillWasteUnitOptions();
   setWasteButtonModeUpdate(false);
 
-  ensureDownloadReportButton(); // tombol download siap, masih disabled sampai generate
-
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
   if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
 
