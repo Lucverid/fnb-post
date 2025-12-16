@@ -88,6 +88,15 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
+// ✅ NEW: penerimaan barang (riwayat masuk)
+const colWhBatches = collection(db, "wh_batches");
+
+// ✅ NEW: log pergerakan stok (audit trail: IN / TRANSFER / ADJUST)
+const colWhTx = collection(db, "wh_tx");
+
+// ✅ NEW: histori opname (PER ITEM DETAIL) — untuk laporan opname mingguan
+const colWhOpname = collection(db, "wh_opname_logs");
+
 // ===================== DOM =====================
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
@@ -121,7 +130,10 @@ const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemInitStockW1 = $("whItemInitStockW1"); // optional
+
+// ✅ sekarang: saat EDIT item, field ini dianggap "Tambah stok W1 (dus)" (bukan overwrite)
+const whItemInitStockW1 = $("whItemInitStockW1");
+
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -129,10 +141,10 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch"); // optional
+const moveSearch = $("moveSearch");
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo"); // optional
+const moveInfo = $("moveInfo");
 const btnMove = $("btnMove");
 
 // Opname
@@ -158,13 +170,12 @@ const wasteSortDirBtn = $("wasteSortDir");
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
-// ===== Report DOM (Warehouse Report)
+// Report
 const whReportType = $("whReportType");
 const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
-const whReportNote = $("whReportNote"); // ✅ catatan opsional
+const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
-// ✅ FIX: tombol download pakai id HTML kamu => btnWhReportCsv
 const btnWhReportDownload = $("btnWhReportCsv");
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
@@ -173,33 +184,45 @@ const whReportBody = $("whReportBody");
 let currentUser = null;
 let items = [];
 let wasteLogs = [];
+let batchLogs = [];
+let opnameLogs = []; // ✅ histori opname cache
 
 const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
-let whStockFilter = null;  // null | { gudang, bucket }
+let whStockFilter = null; // null | { gudang, bucket }
 
-// ✅ Master edit mode (via form)
+// Master edit mode
 let editingMasterId = null;
 
-// ✅ Waste edit mode (via form)
+// Waste edit mode
 let editingWasteFormId = null;
 
 let wasteSortByState = "dateKey";
 let wasteSortDirState = "asc";
 
 const WASTE_PRESET_ITEMS = [
-  "Milktea","Teh Hijau","Teh Hitam","Teh Blooming","Teh oolong",
-  "Boba","Susu","Pudding","Kopi","Crystal jelly",
-  "Eskrim vanila","Eskrim yoghurt","Pendamping lemon",
+  "Milktea",
+  "Teh Hijau",
+  "Teh Hitam",
+  "Teh Blooming",
+  "Teh oolong",
+  "Boba",
+  "Susu",
+  "Pudding",
+  "Kopi",
+  "Crystal jelly",
+  "Eskrim vanila",
+  "Eskrim yoghurt",
+  "Pendamping lemon",
 ];
 
-// ✅ Last report cache (for download)
-let lastReportMeta = null;   // { type, startKey, endKey, note, generatedAt }
-let lastReportHeader = [];   // ["col1","col2",...]
-let lastReportRows = [];     // array of arrays
+// Last report cache (for download)
+let lastReportMeta = null;
+let lastReportHeader = [];
+let lastReportRows = [];
 
 // ===================== Navigation =====================
 function setActiveNav(btn) {
@@ -255,6 +278,35 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
     wasteLogs = wasteLogs.filter((w) => (w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey);
+  }
+}
+
+async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
+  const snap = await getDocs(query(colWhBatches, orderBy("receivedAt", "desc"), limit(500)));
+  batchLogs = [];
+  snap.forEach((d) => batchLogs.push({ id: d.id, ...d.data() }));
+
+  if (rangeStart && rangeEnd) {
+    const sKey = todayKey(rangeStart);
+    const eKey = todayKey(rangeEnd);
+    batchLogs = batchLogs.filter(
+      (b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey
+    );
+  }
+}
+
+// ✅ NEW: load histori opname (client-side filter)
+async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
+  const snap = await getDocs(query(colWhOpname, orderBy("opnameDateKey", "desc"), limit(2000)));
+  opnameLogs = [];
+  snap.forEach((d) => opnameLogs.push({ id: d.id, ...d.data() }));
+
+  if (rangeStart && rangeEnd) {
+    const sKey = todayKey(rangeStart);
+    const eKey = todayKey(rangeEnd);
+    opnameLogs = opnameLogs.filter(
+      (o) => (o.opnameDateKey || "") >= sKey && (o.opnameDateKey || "") <= eKey
+    );
   }
 }
 
@@ -333,7 +385,9 @@ function gotoOpnameWithStockFilter(gudang, bucket) {
 
 function bindStockCardClicks() {
   const setCursor = (el) => el && (el.style.cursor = "pointer");
-  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(setCursor);
+  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(
+    setCursor
+  );
 
   cardW1Habis?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "habis"));
   cardW1Lumayan?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "low"));
@@ -424,7 +478,9 @@ function updateDashboard() {
 
   ensureExpiryCards();
 
-  let expOk = 0, expSoon = 0, expBad = 0;
+  let expOk = 0,
+    expSoon = 0,
+    expBad = 0;
   items.forEach((it) => {
     const st = getExpStatus(it.expDate || "");
     if (st === "ok") expOk++;
@@ -439,6 +495,59 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
+// ===================== Stock Audit Helpers =====================
+async function logTx(payload) {
+  try {
+    await addDoc(colWhTx, {
+      ...payload,
+      createdAt: serverTimestamp(),
+      createdBy: currentUser?.email || "-",
+    });
+  } catch (e) {
+    console.warn("TX log gagal (tidak fatal):", e);
+  }
+}
+
+async function logBatchIn({ itemId, itemName, supplier, receivedAt, expDate, qtyPack, note }) {
+  try {
+    await addDoc(colWhBatches, {
+      itemId: itemId || "",
+      itemName: itemName || "",
+      supplier: supplier || "",
+      receivedAt: receivedAt || "",
+      expDate: expDate || "",
+      qtyPack: clampInt(qtyPack, 0),
+      note: note || "",
+      createdAt: serverTimestamp(),
+      createdBy: currentUser?.email || "-",
+    });
+  } catch (e) {
+    console.warn("Batch log gagal (tidak fatal):", e);
+  }
+}
+
+// ✅ NEW: histori opname per item (buat laporan mingguan)
+async function logOpnameItem({ gudang, itemId, itemName, systemStock, physicalStock, diffPack }) {
+  const opnameDateKey = todayKey();
+  const sessionKey = `${opnameDateKey}:${gudang}`; // grouping ringan (1 sesi per gudang per hari)
+  try {
+    await addDoc(colWhOpname, {
+      sessionKey,
+      opnameDateKey,
+      gudang,
+      itemId,
+      itemName,
+      systemStock: clampInt(systemStock, 0),
+      physicalStock: clampInt(physicalStock, 0),
+      diffPack: clampInt(diffPack, 0),
+      createdAt: serverTimestamp(),
+      createdBy: currentUser?.email || "-",
+    });
+  } catch (e) {
+    console.warn("Opname log gagal (tidak fatal):", e);
+  }
+}
+
 // ===================== Master Form helpers =====================
 function fillMasterForm(it) {
   if (!it) return;
@@ -446,7 +555,10 @@ function fillMasterForm(it) {
   if (whItemUnitBig) whItemUnitBig.value = it.unitBig || "";
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
-  if (whItemInitStockW1) whItemInitStockW1.value = String(clampInt(it.stockW1, 0));
+
+  // ✅ saat edit: field ini dipakai untuk tambah stok, kosongkan
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
+
   if (whItemExp) whItemExp.value = it.expDate || "";
   if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
   if (whItemSupplier) whItemSupplier.value = it.supplier || "";
@@ -493,8 +605,11 @@ async function createMasterItem() {
     unitBig,
     unitSmall,
     packQty,
+
+    // ini hanya "terakhir diinput" untuk UI, histori penerimaan ada di wh_batches
     expDate: exp,
     receivedAt,
+
     supplier,
     info,
     stockW1: safeInit,
@@ -505,7 +620,32 @@ async function createMasterItem() {
   };
 
   try {
-    await addDoc(colWhItems, docData);
+    const ref = await addDoc(colWhItems, docData);
+
+    if (safeInit > 0) {
+      await logBatchIn({
+        itemId: ref.id,
+        itemName: name,
+        supplier,
+        receivedAt: receivedAt || todayKey(),
+        expDate: exp || "",
+        qtyPack: safeInit,
+        note: "Stok awal",
+      });
+      await logTx({
+        type: "IN",
+        itemId: ref.id,
+        itemName: name,
+        qtyPack: safeInit,
+        gudang: "w1",
+        receivedAt: receivedAt || todayKey(),
+        expDate: exp || "",
+        supplier,
+        note: "Stok awal",
+        ref: `wh_items:${ref.id}`,
+      });
+    }
+
     showToast("Master item tersimpan", "success");
     resetMasterForm();
 
@@ -542,6 +682,9 @@ async function updateMasterItem(id) {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
+  const addQty = Number(whItemInitStockW1?.value || 0);
+  const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
+
   const payload = {
     name,
     unitBig,
@@ -554,14 +697,38 @@ async function updateMasterItem(id) {
     updatedAt: serverTimestamp(),
   };
 
-  if (whItemInitStockW1) {
-    const s = Number(whItemInitStockW1.value || 0);
-    payload.stockW1 = Number.isFinite(s) && s >= 0 ? Math.trunc(s) : (itOld.stockW1 || 0);
+  if (addPack > 0) {
+    payload.stockW1 = Number(itOld.stockW1 || 0) + addPack;
   }
 
   try {
     await updateDoc(doc(db, "wh_items", id), payload);
-    showToast("Master item diupdate", "success");
+
+    if (addPack > 0) {
+      await logBatchIn({
+        itemId: id,
+        itemName: name,
+        supplier,
+        receivedAt: receivedAt || todayKey(),
+        expDate: expDate || "",
+        qtyPack: addPack,
+        note: "Restock",
+      });
+      await logTx({
+        type: "IN",
+        itemId: id,
+        itemName: name,
+        qtyPack: addPack,
+        gudang: "w1",
+        receivedAt: receivedAt || todayKey(),
+        expDate: expDate || "",
+        supplier,
+        note: "Restock",
+        ref: `wh_items:${id}`,
+      });
+    }
+
+    showToast(addPack > 0 ? "Item diupdate + stok ditambah" : "Master item diupdate", "success");
     resetMasterForm();
 
     await loadWhItems();
@@ -603,7 +770,9 @@ function updateMoveInfo() {
   const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     packQty > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0}`
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${
+          it.stockW1 || 0
+        }`
       : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
 }
 
@@ -647,7 +816,7 @@ function applyStockFilter(list) {
 }
 function applyGudangVisibility(list, gudang) {
   if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
-  return (list || []);
+  return list || [];
 }
 
 // ===================== Opname table =====================
@@ -699,7 +868,10 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
         ${escapeHtml(unitText)}
-        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(
+          it.packQty || 0,
+          0
+        )}</div>
       </td>
       <td>
         ${escapeHtml(expStr)}
@@ -746,24 +918,49 @@ async function saveOpname(itemId) {
   if (!inp) return;
 
   const physical = Number(inp.value || 0);
-  if (physical < 0) return showToast("Stok fisik tidak valid", "error");
+  if (!Number.isFinite(physical) || physical < 0) return showToast("Stok fisik tidak valid", "error");
 
   const it = items.find((x) => x.id === itemId);
   if (!it) return showToast("Item tidak ditemukan", "error");
 
   const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-
-  if (physical > systemStock) {
-    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
-  }
+  const diff = Math.trunc(physical) - Math.trunc(systemStock);
 
   const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = physical;
-  else payload.stockW2 = physical;
+  if (gudang === "w1") payload.stockW1 = Math.trunc(physical);
+  else payload.stockW2 = Math.trunc(physical);
 
   try {
+    // 1) update stok saat ini
     await updateDoc(doc(db, "wh_items", itemId), payload);
-    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
+
+    // 2) audit ADJUST
+    await logTx({
+      type: "ADJUST",
+      itemId,
+      itemName: it.name || "",
+      gudang,
+      systemStock: Math.trunc(systemStock),
+      physicalStock: Math.trunc(physical),
+      diffPack: diff,
+      note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
+      ref: `opname:${todayKey()}`,
+    });
+
+    // 3) ✅ simpan HISTORI OPNAME per item (buat laporan mingguan)
+    await logOpnameItem({
+      gudang,
+      itemId,
+      itemName: it.name || "",
+      systemStock: Math.trunc(systemStock),
+      physicalStock: Math.trunc(physical),
+      diffPack: diff,
+    });
+
+    showToast(
+      diff === 0 ? `Opname tersimpan (${gudang.toUpperCase()})` : `Opname OK (selisih ${diff})`,
+      "success"
+    );
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
@@ -815,10 +1012,24 @@ async function transferW1toW2() {
   if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (stok: ${s1})`, "error");
 
   try {
+    const nextW1 = Math.trunc(s1 - qtyPack);
+    const nextW2 = Math.trunc(Number(it.stockW2 || 0) + qtyPack);
+
     await updateDoc(doc(db, "wh_items", itemId), {
-      stockW1: s1 - qtyPack,
-      stockW2: Number(it.stockW2 || 0) + qtyPack,
+      stockW1: nextW1,
+      stockW2: nextW2,
       updatedAt: serverTimestamp(),
+    });
+
+    await logTx({
+      type: "TRANSFER",
+      itemId,
+      itemName: it.name || "",
+      qtyPack: Math.trunc(qtyPack),
+      from: "w1",
+      to: "w2",
+      note: "Transfer W1 → W2",
+      ref: `wh_items:${itemId}`,
     });
 
     showToast("Transfer berhasil", "success");
@@ -1087,10 +1298,18 @@ async function deleteWaste(id) {
 }
 
 // ===================== REPORT (Generate + CSV Download) =====================
+// ✅ Kamu perlu pastikan <select id="whReportType"> di HTML ada opsi ini:
+// - <option value="opname_history_w1">Histori Opname W1</option>
+// - <option value="opname_history_w2">Histori Opname W2</option>
+// - <option value="receiving">Penerimaan Barang</option>
+
 function reportTypeLabel(type) {
-  if (type === "opname_w1") return "Opname Gudang 1";
-  if (type === "opname_w2") return "Opname Gudang 2";
+  if (type === "opname_w1") return "Opname Gudang 1 (Snapshot Stok Saat Ini)";
+  if (type === "opname_w2") return "Opname Gudang 2 (Snapshot Stok Saat Ini)";
+  if (type === "opname_history_w1") return "Histori Opname Gudang 1 (Per Item)";
+  if (type === "opname_history_w2") return "Histori Opname Gudang 2 (Per Item)";
   if (type === "waste") return "Waste";
+  if (type === "receiving") return "Penerimaan Barang (wh_batches)";
   return type || "-";
 }
 
@@ -1109,8 +1328,6 @@ function renderReportTable(header, rows) {
 
   const trh = document.createElement("tr");
   trh.innerHTML = header.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
-
-  // HTML kamu: <thead id="whReportHead"></thead>
   whReportHead.innerHTML = trh.innerHTML;
 
   if (!rows.length) {
@@ -1135,11 +1352,7 @@ function buildReportCSV(meta, header, rows) {
   lines.push("");
 
   lines.push(header.map(csvEscape).join(","));
-
-  for (const row of rows) {
-    lines.push(row.map(csvEscape).join(","));
-  }
-
+  for (const row of rows) lines.push(row.map(csvEscape).join(","));
   return lines.join("\n");
 }
 
@@ -1153,14 +1366,6 @@ function validateReportRange(startKey, endKey) {
   if (!startKey || !endKey) return "Tanggal mulai & akhir wajib diisi.";
   if (startKey > endKey) return "Tanggal mulai tidak boleh lebih besar dari tanggal akhir.";
   return null;
-}
-
-/* ✅ FILTER BERDASARKAN receivedAt (YYYY-MM-DD) */
-function isReceivedAtInRange(receivedAt, startKey, endKey) {
-  if (!receivedAt) return false;
-  if (startKey && receivedAt < startKey) return false;
-  if (endKey && receivedAt > endKey) return false;
-  return true;
 }
 
 async function generateWarehouseReport() {
@@ -1198,9 +1403,7 @@ async function generateWarehouseReport() {
           w.createdBy || "",
         ]);
     } else if (type === "opname_w1" || type === "opname_w2") {
-      // ✅ laporan gudang: terfilter berdasarkan receivedAt (tanggal barang diterima)
-      // ✅ laporan W2: tampilkan stok W1 juga
-
+      // snapshot stok saat ini
       header =
         type === "opname_w2"
           ? ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1", "Stok W2"]
@@ -1209,7 +1412,6 @@ async function generateWarehouseReport() {
       rows = items
         .slice()
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-        .filter((it) => isReceivedAtInRange(it.receivedAt || "", startKey, endKey))
         .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
         .map((it) => {
           const base = [
@@ -1221,10 +1423,62 @@ async function generateWarehouseReport() {
           ];
           const stokW1 = String(clampInt(it.stockW1, 0));
           const stokW2 = String(clampInt(it.stockW2, 0));
-
-          if (type === "opname_w2") return [...base, stokW1, stokW2];
-          return [...base, stokW1];
+          return type === "opname_w2" ? [...base, stokW1, stokW2] : [...base, stokW1];
         });
+    } else if (type === "receiving") {
+      const s = parseDateOnly(startKey);
+      const e = parseDateOnly(endKey);
+      await loadBatchLogs(s, e);
+
+      header = ["Tanggal Terima", "Item", "Supplier", "EXP", "Qty (Dus)", "Catatan", "User"];
+      rows = batchLogs
+        .slice()
+        .sort((a, b) => (a.receivedAt || "").localeCompare(b.receivedAt || ""))
+        .map((b) => [
+          b.receivedAt || "",
+          b.itemName || "",
+          b.supplier || "",
+          b.expDate || "",
+          String(clampInt(b.qtyPack, 0)),
+          b.note || "",
+          b.createdBy || "",
+        ]);
+    } else if (type === "opname_history_w1" || type === "opname_history_w2") {
+      // ✅ INI yang dipakai untuk opname mingguan: filter by tanggal opname
+      const s = parseDateOnly(startKey);
+      const e = parseDateOnly(endKey);
+      await loadOpnameLogs(s, e);
+
+      const gudang = type === "opname_history_w2" ? "w2" : "w1";
+
+      header = [
+        "Tanggal Opname",
+        "Gudang",
+        "Item",
+        "Stok Sistem",
+        "Stok Fisik",
+        "Selisih",
+        "User",
+      ];
+
+      rows = opnameLogs
+        .slice()
+        .filter((o) => (o.gudang || "") === gudang)
+        .sort((a, b) => {
+          const ak = a.opnameDateKey || "";
+          const bk = b.opnameDateKey || "";
+          if (ak !== bk) return ak.localeCompare(bk);
+          return (a.itemName || "").localeCompare(b.itemName || "");
+        })
+        .map((o) => [
+          o.opnameDateKey || "",
+          (o.gudang || "").toUpperCase(),
+          o.itemName || "",
+          String(clampInt(o.systemStock, 0)),
+          String(clampInt(o.physicalStock, 0)),
+          String(clampInt(o.diffPack, 0)),
+          o.createdBy || "",
+        ]);
     } else {
       return showToast("Tipe laporan tidak dikenali.", "error");
     }
@@ -1290,7 +1544,7 @@ wasteSortDirBtn?.addEventListener("click", () => {
   renderWasteHistory();
 });
 
-// ✅ Report buttons (pakai tombol existing)
+// Report buttons
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
@@ -1299,8 +1553,6 @@ async function bootWarehouse() {
   ensureWasteDefaults();
   fillWasteSelectPreset();
   fillWasteUnitOptions();
-  setWasteButtonModeUpdate(false);
-
   setReportDownloadEnabled(false);
 
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
