@@ -67,23 +67,14 @@ function iconBtn(html, title, extraClass = "") {
   )}">${html}</button>`;
 }
 
-// CSV helpers (Excel-friendly)
-function csvEscape(v) {
-  const s = (v ?? "").toString();
+function csvEscape(value) {
+  const s = String(value ?? "");
+  // RFC4180-ish escape
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
-function buildCsv(metaRows, headers, rows) {
-  const lines = [];
-  // UTF-8 BOM for Excel
-  lines.push("\ufeff" + metaRows.map((r) => r.map(csvEscape).join(",")).join("\n"));
-  lines.push(""); // blank line
-  lines.push(headers.map(csvEscape).join(","));
-  rows.forEach((r) => lines.push(r.map(csvEscape).join(",")));
-  return lines.join("\n");
-}
-function downloadTextFile(filename, content, mime = "text/csv;charset=utf-8") {
-  const blob = new Blob([content], { type: mime });
+function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -91,15 +82,7 @@ function downloadTextFile(filename, content, mime = "text/csv;charset=utf-8") {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
-function dateInRange(dateStr, startStr, endStr) {
-  if (!dateStr) return false;
-  if (!startStr && !endStr) return true;
-  const key = dateStr; // YYYY-MM-DD
-  const s = startStr || "0000-01-01";
-  const e = endStr || "9999-12-31";
-  return key >= s && key <= e;
+  URL.revokeObjectURL(url);
 }
 
 // ===================== Collections =====================
@@ -176,12 +159,13 @@ const wasteSortDirBtn = $("wasteSortDir");
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
-// Report
+// ===== Report DOM (Warehouse Report)
 const whReportType = $("whReportType");
 const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
-const whReportNote = $("whReportNote"); // ✅ textarea catatan (opsional)
+const whReportNote = $("whReportNote"); // ✅ catatan opsional
 const btnWhReport = $("btnWhReport");
+const btnWhReportDownload = $("btnWhReportDownload"); // ✅ tombol besar saja
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
@@ -211,6 +195,11 @@ const WASTE_PRESET_ITEMS = [
   "boba","susu","pudding","kopi","crystal jelly",
   "Eskrim original","eskrim yoghurt","pendamping lemon",
 ];
+
+// ✅ Last report cache (for download)
+let lastReportMeta = null;   // { type, startKey, endKey, note, generatedAt }
+let lastReportHeader = [];   // ["col1","col2",...]
+let lastReportRows = [];     // array of arrays
 
 // ===================== Navigation =====================
 function setActiveNav(btn) {
@@ -634,7 +623,10 @@ function fillMoveSelect(keyword = "") {
     const opt = document.createElement("option");
     opt.value = it.id;
     opt.textContent = `${it.name} (W1: ${s1})`;
-    if (s1 <= 0) opt.disabled = true; // tetap terlihat
+
+    // ✅ tetap terlihat tapi tidak bisa dipilih kalau stok 0
+    if (s1 <= 0) opt.disabled = true;
+
     moveItemSelect.appendChild(opt);
   });
 
@@ -967,6 +959,10 @@ function ensureWasteDefaults() {
   if (wasteDate && !wasteDate.value) wasteDate.value = val;
   if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
   if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
+
+  // report default dates
+  if (whReportStart && !whReportStart.value) whReportStart.value = val;
+  if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
 
 function fillWasteSelectPreset() {
@@ -1092,159 +1088,163 @@ async function deleteWaste(id) {
 }
 
 // ===================== REPORT (Generate + CSV Download) =====================
-let reportLast = null; // simpan data report terakhir untuk tombol Download CSV
-
-function ensureDownloadReportButton() {
-  if (!whReportSection) return null;
-
-  let btn = $("btnWhReportDownload");
-  if (btn) return btn;
-
-  // cari container card yang sama dengan tombol generate, kalau nggak ketemu: taruh di section
-  const anchor = btnWhReport?.parentElement || whReportSection;
-
-  btn = document.createElement("button");
-  btn.id = "btnWhReportDownload";
-  btn.type = "button";
-  btn.className = "btn-outline";
-  btn.textContent = "Download CSV";
-  btn.style.marginTop = "10px";
-  btn.disabled = true;
-
-  anchor.appendChild(btn);
-
-  btn.addEventListener("click", () => {
-    if (!reportLast) return showToast("Belum ada laporan. Klik Generate dulu.", "error");
-    const { type, start, end, note, headers, rows } = reportLast;
-
-    const meta = [
-      ["Report Type", type],
-      ["Start Date", start || "-"],
-      ["End Date", end || "-"],
-      ["Note", note || "-"],
-      ["Generated At", new Date().toISOString()],
-    ];
-
-    const csv = buildCsv(meta, headers, rows);
-    const safeStart = (start || "all").replaceAll(":", "-");
-    const safeEnd = (end || "all").replaceAll(":", "-");
-    const filename = `warehouse_report_${type}_${safeStart}_${safeEnd}.csv`;
-    downloadTextFile(filename, csv);
-  });
-
-  return btn;
+function reportTypeLabel(type) {
+  if (type === "opname_w1") return "Opname Gudang 1";
+  if (type === "opname_w2") return "Opname Gudang 2";
+  if (type === "waste") return "Waste";
+  return type || "-";
 }
 
-function renderReportTable(headers, rows) {
+function setReportDownloadEnabled(on) {
+  if (!btnWhReportDownload) return;
+  btnWhReportDownload.disabled = !on;
+  btnWhReportDownload.style.opacity = on ? "1" : "0.6";
+  btnWhReportDownload.style.pointerEvents = on ? "auto" : "none";
+}
+
+function renderReportTable(header, rows) {
   if (!whReportHead || !whReportBody) return;
 
-  whReportHead.innerHTML = `<tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
+  whReportHead.innerHTML = "";
   whReportBody.innerHTML = "";
 
+  const trh = document.createElement("tr");
+  trh.innerHTML = header.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
+  const thead = document.createElement("thead");
+  thead.appendChild(trh);
+
+  // karena HTML kamu pakai <thead id="whReportHead"></thead>
+  // kita isi langsung innerHTML-nya agar aman
+  whReportHead.innerHTML = trh.innerHTML;
+
   if (!rows.length) {
-    whReportBody.innerHTML = `<tr><td colspan="${headers.length}">Tidak ada data.</td></tr>`;
+    whReportBody.innerHTML = `<tr><td colspan="${header.length}">Tidak ada data untuk range tanggal ini.</td></tr>`;
     return;
   }
 
   rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = r.map((c) => `<td>${escapeHtml(c ?? "")}</td>`).join("");
+    tr.innerHTML = r.map((c) => `<td>${escapeHtml(c)}</td>`).join("");
     whReportBody.appendChild(tr);
   });
 }
 
+function buildReportCSV(meta, header, rows) {
+  const lines = [];
+
+  // Meta / catatan (tetap CSV-friendly)
+  lines.push(`${csvEscape("Report")},${csvEscape(reportTypeLabel(meta?.type))}`);
+  lines.push(`${csvEscape("Tanggal Mulai")},${csvEscape(meta?.startKey || "")}`);
+  lines.push(`${csvEscape("Tanggal Akhir")},${csvEscape(meta?.endKey || "")}`);
+  lines.push(`${csvEscape("Dibuat")},${csvEscape(meta?.generatedAt || "")}`);
+  lines.push(`${csvEscape("Catatan")},${csvEscape(meta?.note || "")}`);
+  lines.push(""); // blank line
+
+  // Header
+  lines.push(header.map(csvEscape).join(","));
+
+  // Rows
+  for (const row of rows) {
+    lines.push(row.map(csvEscape).join(","));
+  }
+
+  return lines.join("\n");
+}
+
+function getReportRangeKeys() {
+  const startKey = (whReportStart?.value || "").trim();
+  const endKey = (whReportEnd?.value || "").trim();
+  return { startKey, endKey };
+}
+
+function validateReportRange(startKey, endKey) {
+  if (!startKey || !endKey) return "Tanggal mulai & akhir wajib diisi.";
+  if (startKey > endKey) return "Tanggal mulai tidak boleh lebih besar dari tanggal akhir.";
+  return null;
+}
+
 async function generateWarehouseReport() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!whReportType) return showToast("Elemen laporan tidak lengkap (whReportType).", "error");
+  if (!whReportHead || !whReportBody) return showToast("Elemen tabel laporan belum ada.", "error");
 
-  const type = whReportType?.value || "opname_w1";
-  const start = whReportStart?.value || "";
-  const end = whReportEnd?.value || "";
+  const type = whReportType.value || "waste";
+  const { startKey, endKey } = getReportRangeKeys();
+  const err = validateReportRange(startKey, endKey);
+  if (err) return showToast(err, "error");
+
   const note = (whReportNote?.value || "").trim();
+  const generatedAt = new Date().toISOString();
 
-  const btnDownload = ensureDownloadReportButton();
-  if (btnDownload) btnDownload.disabled = true;
+  let header = [];
+  let rows = [];
 
   try {
     if (type === "waste") {
-      // waste berdasarkan dateKey
-      await loadWasteLogs(parseDateOnly(start), parseDateOnly(end));
-      const list = (wasteLogs || []).filter((w) => dateInRange(w.dateKey || "", start, end));
+      // ambil waste logs sesuai range
+      const s = parseDateOnly(startKey);
+      const e = parseDateOnly(endKey);
+      await loadWasteLogs(s, e);
 
-      const headers = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
-      const rows = list.map((w) => [
-        w.dateKey || "-",
-        w.itemName || "-",
-        String(clampInt(w.qty, 0)),
-        w.unit || "-",
-        w.note || "-",
-        w.createdBy || "-",
-      ]);
+      header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
+      rows = wasteLogs
+        .slice()
+        .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
+        .map((w) => [
+          w.dateKey || "",
+          w.itemName || "",
+          String(clampInt(w.qty, 0)),
+          w.unit || "",
+          w.note || "",
+          w.createdBy || "",
+        ]);
+    } else if (type === "opname_w1" || type === "opname_w2") {
+      // Opname report adalah snapshot stok saat ini (tidak pakai history tanggal)
+      // Range tetap dipakai sebagai "metadata laporan" (biar user konsisten)
+      const gudang = type === "opname_w1" ? "W1" : "W2";
 
-      renderReportTable(headers, rows);
-      reportLast = { type, start, end, note, headers, rows };
-      if (btnDownload) btnDownload.disabled = false;
-      showToast("Laporan waste berhasil dibuat", "success");
-      return;
+      header = ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", `Stok ${gudang}`];
+      rows = items
+        .slice()
+        .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
+        .map((it) => [
+          it.name || "",
+          it.supplier || "",
+          it.unitBig || "",
+          it.unitSmall || "",
+          String(clampInt(it.packQty, 0)),
+          String(clampInt(type === "opname_w1" ? it.stockW1 : it.stockW2, 0)),
+        ]);
+    } else {
+      return showToast("Tipe laporan tidak dikenali.", "error");
     }
 
-    // opname snapshot (filter optional berdasarkan receivedAt kalau kamu isi)
-    await loadWhItems();
+    // render table
+    renderReportTable(header, rows);
 
-    const gudang = type === "opname_w2" ? "w2" : "w1";
+    // cache untuk download
+    lastReportMeta = { type, startKey, endKey, note, generatedAt };
+    lastReportHeader = header;
+    lastReportRows = rows;
 
-    let list = [...items];
-
-    // kalau W2: sesuai rule kamu, hanya yang stockW2 > 0
-    if (gudang === "w2") list = list.filter((it) => Number(it.stockW2 || 0) > 0);
-
-    // filter tanggal terima optional (receivedAt format YYYY-MM-DD)
-    if (start || end) {
-      list = list.filter((it) => dateInRange(it.receivedAt || "", start, end));
-    }
-
-    const headers = [
-      "Nama Item",
-      "Gudang",
-      "Stok (Dus)",
-      "Unit Besar",
-      "Isi / Dus",
-      "Unit Isi",
-      "Total (PCS)",
-      "EXP",
-      "Terima",
-      "Supplier",
-      "Info",
-    ];
-
-    const rows = list.map((it) => {
-      const stockDus = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-      const packQty = Number(it.packQty || 0);
-      const totalPcs = stockDus > 0 && packQty > 0 ? stockDus * packQty : 0;
-
-      return [
-        it.name || "-",
-        gudang.toUpperCase(),
-        String(stockDus),
-        it.unitBig || "-",
-        String(clampInt(packQty, 0)),
-        it.unitSmall || "-",
-        String(clampInt(totalPcs, 0)),
-        it.expDate || "-",
-        it.receivedAt || "-",
-        it.supplier || "-",
-        it.info || "-",
-      ];
-    });
-
-    renderReportTable(headers, rows);
-    reportLast = { type, start, end, note, headers, rows };
-    if (btnDownload) btnDownload.disabled = false;
-
-    showToast("Laporan opname berhasil dibuat", "success");
+    setReportDownloadEnabled(true);
+    showToast("Laporan berhasil digenerate.", "success");
   } catch (e) {
     console.error(e);
-    showToast("Gagal generate laporan", "error");
+    showToast("Gagal generate laporan.", "error");
   }
+}
+
+function downloadLastReportCSV() {
+  if (!lastReportMeta || !lastReportHeader?.length) {
+    return showToast("Generate laporan dulu sebelum download.", "error");
+  }
+  const safeType = (lastReportMeta.type || "report").replaceAll(/[^\w-]+/g, "_");
+  const filename = `warehouse_${safeType}_${lastReportMeta.startKey || ""}_${lastReportMeta.endKey || ""}.csv`;
+  const csv = buildReportCSV(lastReportMeta, lastReportHeader, lastReportRows);
+  downloadText(filename, csv, "text/csv;charset=utf-8");
+  showToast("CSV didownload.", "success");
 }
 
 // ===================== Events =====================
@@ -1284,8 +1284,9 @@ wasteSortDirBtn?.addEventListener("click", () => {
   renderWasteHistory();
 });
 
-// ✅ Report
+// ✅ Report buttons (Tidak bikin tombol baru)
 btnWhReport?.addEventListener("click", generateWarehouseReport);
+btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
 // ===================== Boot =====================
 async function bootWarehouse() {
@@ -1293,6 +1294,9 @@ async function bootWarehouse() {
   fillWasteSelectPreset();
   fillWasteUnitOptions();
   setWasteButtonModeUpdate(false);
+
+  // report: download off dulu
+  setReportDownloadEnabled(false);
 
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
   if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
