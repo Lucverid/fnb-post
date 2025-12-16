@@ -1,4 +1,5 @@
-// warehouse.js (Firestore-ready) — Warehouse: Master Item, Opname, Transfer, Waste + History (CRUD icon) + Expiry Dashboard + Click Filter
+// warehouse.js — Warehouse: Master Item, Opname, Transfer, Waste + History (CRUD) + Expiry Dashboard + Click Filter
+// FIX: Gudang filter (W2 hanya item yg ada stok W2), opname validation, CRUD (edit/delete) di tabel opname.
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -16,12 +17,11 @@ import {
   deleteDoc,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-// ========== Firebase ==========
 const app = getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ========== Helpers ==========
+// ===== Helpers =====
 const $ = (id) => document.getElementById(id);
 
 function showToast(msg, type = "info", time = 3000) {
@@ -69,11 +69,11 @@ function escapeHtmlAttr(str) {
   return escapeHtml(str).replaceAll("\n", " ");
 }
 
-// ========== Collections ==========
+// ===== Collections =====
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
-// ========== DOM ==========
+// ===== DOM =====
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
 const whWasteSection = $("whWasteSection");
@@ -84,7 +84,7 @@ const navWhOpname = $("navWhOpname");
 const navWhWaste = $("navWhWaste");
 const navWhReport = $("navWhReport");
 
-// Dashboard stock cards (COUNTS)
+// Dashboard counts
 const w1Habis = $("w1Habis");
 const w1Lumayan = $("w1Lumayan");
 const w1Banyak = $("w1Banyak");
@@ -92,7 +92,7 @@ const w2Habis = $("w2Habis");
 const w2Lumayan = $("w2Lumayan");
 const w2Banyak = $("w2Banyak");
 
-// Dashboard stock card containers (CLICK)
+// Dashboard clickable cards
 const cardW1Habis = $("cardW1Habis");
 const cardW1Lumayan = $("cardW1Lumayan");
 const cardW1Banyak = $("cardW1Banyak");
@@ -100,10 +100,9 @@ const cardW2Habis = $("cardW2Habis");
 const cardW2Lumayan = $("cardW2Lumayan");
 const cardW2Banyak = $("cardW2Banyak");
 
-// Expiry cards wrapper
 const dashboardExpiryWrapId = "whExpiryWrap";
 
-// Opname
+// Master item form
 const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
@@ -114,10 +113,12 @@ const whItemSupplier = $("whItemSupplier");
 const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
+// Transfer
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
 const btnMove = $("btnMove");
 
+// Opname
 const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
@@ -130,7 +131,6 @@ const wasteQty = $("wasteQty");
 const wasteNote = $("wasteNote");
 const btnSaveWaste = $("btnSaveWaste");
 
-// Waste history + filter
 const wasteFilterStart = $("wasteFilterStart");
 const wasteFilterEnd = $("wasteFilterEnd");
 const wasteHistorySearch = $("wasteHistorySearch");
@@ -138,11 +138,10 @@ const wasteHistoryBody = $("wasteHistoryBody");
 const wasteSortBy = $("wasteSortBy");
 const wasteSortDirBtn = $("wasteSortDir");
 
-// Notif UI
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
-// ========== State ==========
+// ===== State =====
 let currentUser = null;
 let items = [];
 let wasteLogs = [];
@@ -151,30 +150,21 @@ const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
 
-let whExpiryFilter = null; // null | "ok" | "soon" | "expired"
-let whStockFilter = null;  // null | { gudang:"w1"|"w2", bucket:"habis"|"low"|"high" }
+let whExpiryFilter = null; // null | ok | soon | expired
+let whStockFilter = null;  // null | { gudang, bucket }
 let editingWasteId = null;
 
-let wasteSortByState = "dateKey"; // dateKey | itemName
-let wasteSortDirState = "asc"; // asc | desc
+let editingItemId = null; // CRUD opname table (edit master item)
+let wasteSortByState = "dateKey";
+let wasteSortDirState = "asc";
 
 const WASTE_PRESET_ITEMS = [
-  "Milktea",
-  "Teh Hijau",
-  "Teh Hitam",
-  "Teh Blooming",
-  "Teh oolong",
-  "boba",
-  "susu",
-  "pudding",
-  "kopi",
-  "crystal jelly",
-  "Eskrim original",
-  "eskrim yoghurt",
-  "pendamping lemon",
+  "Milktea","Teh Hijau","Teh Hitam","Teh Blooming","Teh oolong",
+  "boba","susu","pudding","kopi","crystal jelly",
+  "Eskrim original","eskrim yoghurt","pendamping lemon",
 ];
 
-// ========== Navigation ==========
+// ===== Navigation =====
 function setActiveNav(btn) {
   document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
@@ -184,7 +174,6 @@ function showWhSection(which) {
   [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((sec) => {
     if (sec) sec.classList.add("hidden");
   });
-
   if (which === "dashboard" && whDashboardSection) whDashboardSection.classList.remove("hidden");
   if (which === "opname" && whOpnameSection) whOpnameSection.classList.remove("hidden");
   if (which === "waste" && whWasteSection) whWasteSection.classList.remove("hidden");
@@ -205,8 +194,6 @@ if (navWhDashboard)
 
 if (navWhOpname)
   navWhOpname.addEventListener("click", () => {
-    // jangan auto reset filter saat masuk opname,
-    // biar filter dari dashboard tetap kepakai
     setActiveNav(navWhOpname);
     showWhSection("opname");
     renderOpnameTable();
@@ -224,7 +211,7 @@ if (navWhReport)
     showWhSection("report");
   });
 
-// ========== Load ==========
+// ===== Load =====
 async function loadWhItems() {
   const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
   items = [];
@@ -243,7 +230,7 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   }
 }
 
-// ========== Expiry ==========
+// ===== Expiry =====
 function getExpStatus(expStr) {
   if (!expStr) return "ok";
   const now = new Date();
@@ -256,7 +243,7 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ========== Dashboard ==========
+// ===== Stock bucket =====
 function stockBucketCount(stock) {
   const n = Number(stock || 0);
   if (n <= 0) return "habis";
@@ -265,6 +252,7 @@ function stockBucketCount(stock) {
   return "mid";
 }
 
+// ===== Dashboard =====
 function ensureExpiryCards() {
   if (!whDashboardSection) return;
 
@@ -303,53 +291,41 @@ function ensureExpiryCards() {
 
 function gotoOpnameWithExpiryFilter(type) {
   whExpiryFilter = type;
-  whStockFilter = null; // kalau klik expiry, kosongkan stock filter biar jelas
+  whStockFilter = null;
 
   setActiveNav(navWhOpname);
   showWhSection("opname");
 
   const label =
-    type === "ok"
-      ? "Filter: Belum Expired"
-      : type === "soon"
-      ? `Filter: Mau Exp (≤ ${EXP_SOON_DAYS} hari)`
-      : "Filter: Sudah Expired";
+    type === "ok" ? "Filter: Belum Expired" :
+    type === "soon" ? `Filter: Mau Exp (≤ ${EXP_SOON_DAYS} hari)` :
+    "Filter: Sudah Expired";
 
   showToast(label, "info", 2200);
   renderOpnameTable();
 }
 
-// ✅ NEW: dashboard stock click → filter opname sesuai gudang + bucket
 function gotoOpnameWithStockFilter(gudang, bucket) {
   whStockFilter = { gudang, bucket };
-  whExpiryFilter = null; // kalau klik stock, kosongkan expiry filter biar jelas
+  whExpiryFilter = null;
 
   setActiveNav(navWhOpname);
   showWhSection("opname");
-
-  if (whOpnameGudang) whOpnameGudang.value = gudang; // kunci gudang otomatis
+  if (whOpnameGudang) whOpnameGudang.value = gudang;
 
   const label =
-    bucket === "habis"
-      ? `Filter: Habis (${gudang.toUpperCase()})`
-      : bucket === "low"
-      ? `Filter: Stok < ${LOW_STOCK_LT} (${gudang.toUpperCase()})`
-      : `Filter: Stok > ${HIGH_STOCK_GT} (${gudang.toUpperCase()})`;
+    bucket === "habis" ? `Filter: Habis (${gudang.toUpperCase()})` :
+    bucket === "low" ? `Filter: Stok < ${LOW_STOCK_LT} (${gudang.toUpperCase()})` :
+    `Filter: Stok > ${HIGH_STOCK_GT} (${gudang.toUpperCase()})`;
 
   showToast(label, "info", 2200);
   renderOpnameTable();
 }
 
-// ✅ aktifkan klik pada card dashboard stok
 function bindStockCardClicks() {
   const setCursor = (el) => el && (el.style.cursor = "pointer");
 
-  setCursor(cardW1Habis);
-  setCursor(cardW1Lumayan);
-  setCursor(cardW1Banyak);
-  setCursor(cardW2Habis);
-  setCursor(cardW2Lumayan);
-  setCursor(cardW2Banyak);
+  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(setCursor);
 
   if (cardW1Habis) cardW1Habis.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "habis"));
   if (cardW1Lumayan) cardW1Lumayan.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "low"));
@@ -441,10 +417,7 @@ function updateDashboard() {
 
   ensureExpiryCards();
 
-  let expOk = 0,
-    expSoon = 0,
-    expBad = 0;
-
+  let expOk = 0, expSoon = 0, expBad = 0;
   items.forEach((it) => {
     const st = getExpStatus(it.expDate || "");
     if (st === "ok") expOk++;
@@ -462,14 +435,16 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ========== Dropdowns ==========
+// ===== Dropdowns =====
 function fillMoveSelect() {
   if (!moveItemSelect) return;
   moveItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
   items.forEach((it) => {
+    // biar transfer masuk akal: hanya item yang punya stok W1
+    if (Number(it.stockW1 || 0) <= 0) return;
     const opt = document.createElement("option");
     opt.value = it.id;
-    opt.textContent = it.name;
+    opt.textContent = `${it.name} (W1: ${it.stockW1 || 0})`;
     moveItemSelect.appendChild(opt);
   });
 }
@@ -497,7 +472,7 @@ function fillWasteUnitOptions() {
   });
 }
 
-// ========== Opname ==========
+// ===== Opname: filters =====
 function applyExpiryFilter(list) {
   if (!whExpiryFilter) return list;
   return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
@@ -506,11 +481,26 @@ function applyExpiryFilter(list) {
 function applyStockFilter(list) {
   if (!whStockFilter) return list;
   const { gudang, bucket } = whStockFilter;
-
   return (list || []).filter((it) => {
     const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
     return stockBucketCount(stock) === bucket;
   });
+}
+
+// ✅ NEW: gudang gating (W2 hanya item yg ada stok W2)
+function applyGudangVisibility(list, gudang) {
+  if (!gudang) return list;
+  if (gudang === "w1") {
+    // tampilkan hanya yang ada stok W1 (biar tidak semua master item numpuk)
+    return (list || []).filter((it) => Number(it.stockW1 || 0) > 0);
+  }
+  // w2
+  return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
+}
+
+// ===== Opname table (CRUD) =====
+function iconBtn(html, title, extraClass = "") {
+  return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(title)}">${html}</button>`;
 }
 
 function renderOpnameTable() {
@@ -531,15 +521,16 @@ function renderOpnameTable() {
     );
   }
 
-  // ✅ expiry filter
-  list = applyExpiryFilter(list);
+  // ✅ gating per gudang
+  list = applyGudangVisibility(list, gudang);
 
-  // ✅ stock filter (dashboard click)
+  // ✅ expiry & stock filter (from dashboard)
+  list = applyExpiryFilter(list);
   list = applyStockFilter(list);
 
   whOpnameTableBody.innerHTML = "";
   if (!list.length) {
-    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item.</td></tr>`;
+    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item untuk ${gudang.toUpperCase()}.</td></tr>`;
     return;
   }
 
@@ -556,49 +547,99 @@ function renderOpnameTable() {
         ? `<span class="status-badge yellow">SOON</span>`
         : `<span class="status-badge green">OK</span>`;
 
+    const isEditing = editingItemId === it.id;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${it.name || "-"}</td>
-      <td>${unitText}</td>
-      <td>${expStr}<div style="margin-top:6px;">${expBadge}</div></td>
-      <td>${it.info || "-"}</td>
-      <td>${it.receivedAt || "-"}</td>
-      <td>${it.supplier || "-"}</td>
+      <td>${isEditing ? `<input data-iedit="name" value="${escapeHtmlAttr(it.name || "")}"/>` : (it.name || "-")}</td>
+      <td>${isEditing
+        ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <input data-iedit="unitBig" style="max-width:110px" value="${escapeHtmlAttr(it.unitBig || "")}" placeholder="unit besar"/>
+            <input data-iedit="unitSmall" style="max-width:110px" value="${escapeHtmlAttr(it.unitSmall || "")}" placeholder="unit isi"/>
+            <input data-iedit="packQty" type="number" min="1" step="1" style="max-width:110px" value="${clampInt(it.packQty || 0, 0)}" placeholder="isi/dus"/>
+          </div>`
+        : `${unitText}<div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>`
+      }</td>
+      <td>${isEditing
+        ? `<input data-iedit="expDate" type="date" value="${escapeHtmlAttr(it.expDate || "")}" />`
+        : `${expStr}<div style="margin-top:6px;">${expBadge}</div>`
+      }</td>
+      <td>${isEditing
+        ? `<input data-iedit="info" value="${escapeHtmlAttr(it.info || "")}" />`
+        : (it.info || "-")
+      }</td>
+      <td>${isEditing
+        ? `<input data-iedit="receivedAt" type="date" value="${escapeHtmlAttr(it.receivedAt || "")}" />`
+        : (it.receivedAt || "-")
+      }</td>
+      <td>${isEditing
+        ? `<input data-iedit="supplier" value="${escapeHtmlAttr(it.supplier || "")}" />`
+        : (it.supplier || "-")
+      }</td>
       <td>${systemStock}</td>
       <td>
         <input
           type="number"
           min="0"
           step="1"
-          data-id="${it.id}"
+          data-opname-id="${it.id}"
           value="${systemStock}"
           style="min-width:110px;"
         />
       </td>
-      <td>
-        <button class="btn-table btn-table-delete small" data-act="save" data-id="${it.id}">Simpan</button>
+      <td style="text-align:right;">
+        <div class="table-actions">
+          <span data-ibtn="saveOpname">${iconBtn('<i class="lucide-save"></i>', "Simpan Opname")}</span>
+
+          ${
+            isEditing
+              ? `
+                <span data-ibtn="saveEdit">${iconBtn('<i class="lucide-check"></i>', "Simpan Edit")}</span>
+                <span data-ibtn="cancelEdit">${iconBtn('<i class="lucide-x"></i>', "Batal")}</span>
+              `
+              : `
+                <span data-ibtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit Item")}</span>
+                <span data-ibtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus Item", "danger")}</span>
+              `
+          }
+        </div>
       </td>
     `;
-    whOpnameTableBody.appendChild(tr);
-  });
 
-  whOpnameTableBody.querySelectorAll("button[data-act='save']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.getAttribute("data-id");
-      await saveOpname(id);
-    });
+    const bind = (key, fn) => {
+      const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
+      if (el) el.addEventListener("click", fn);
+    };
+
+    bind("saveOpname", async () => await saveOpname(it.id));
+    bind("edit", () => startEditItem(it.id));
+    bind("cancelEdit", () => cancelEditItem());
+    bind("saveEdit", async () => await saveEditItem(it.id));
+    bind("delete", async () => await deleteItem(it.id));
+
+    whOpnameTableBody.appendChild(tr);
   });
 }
 
+// ✅ stok fisik tidak boleh melebihi stok sistem
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
 
   const gudang = whOpnameGudang?.value || "w1";
-  const inp = whOpnameTableBody?.querySelector(`input[data-id="${itemId}"]`);
+  const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
   if (!inp) return;
 
   const physical = Number(inp.value || 0);
   if (physical < 0) return showToast("Stok fisik tidak valid", "error");
+
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return showToast("Item tidak ditemukan", "error");
+
+  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+
+  if (physical > systemStock) {
+    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
+  }
 
   const payload = { updatedAt: serverTimestamp() };
   if (gudang === "w1") payload.stockW1 = physical;
@@ -617,7 +658,7 @@ async function saveOpname(itemId) {
   }
 }
 
-// ========== Master Item (harga dihapus) ==========
+// ===== Master Item =====
 async function saveMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -635,6 +676,7 @@ async function saveMasterItem() {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
+  // stok awal tetap 0 (karena kamu belum punya fitur barang masuk)
   const docData = {
     name,
     unitBig,
@@ -674,7 +716,94 @@ async function saveMasterItem() {
   }
 }
 
-// ========== Transfer ==========
+// ===== CRUD: edit/delete item =====
+function startEditItem(id) {
+  editingItemId = id;
+  renderOpnameTable();
+}
+function cancelEditItem() {
+  editingItemId = null;
+  renderOpnameTable();
+}
+
+async function saveEditItem(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  if (!whOpnameTableBody) return;
+
+  // cari row yang sedang edit (editingItemId cuma 1)
+  const rows = whOpnameTableBody.querySelectorAll("tr");
+  let target = null;
+  rows.forEach((r) => {
+    const nameInp = r.querySelector(`input[data-iedit="name"]`);
+    if (nameInp) target = r;
+  });
+  if (!target) return;
+
+  const name = (target.querySelector(`input[data-iedit="name"]`)?.value || "").trim();
+  const unitBig = (target.querySelector(`input[data-iedit="unitBig"]`)?.value || "").trim();
+  const unitSmall = (target.querySelector(`input[data-iedit="unitSmall"]`)?.value || "").trim();
+  const packQty = Number(target.querySelector(`input[data-iedit="packQty"]`)?.value || 0);
+  const expDate = target.querySelector(`input[data-iedit="expDate"]`)?.value || "";
+  const receivedAt = target.querySelector(`input[data-iedit="receivedAt"]`)?.value || "";
+  const supplier = (target.querySelector(`input[data-iedit="supplier"]`)?.value || "").trim();
+  const info = (target.querySelector(`input[data-iedit="info"]`)?.value || "").trim();
+
+  if (!name) return showToast("Nama item wajib", "error");
+  if (!unitBig) return showToast("Unit besar wajib", "error");
+  if (!unitSmall) return showToast("Unit isi wajib", "error");
+  if (!packQty || packQty <= 0) return showToast("Isi/dus wajib > 0", "error");
+
+  try {
+    await updateDoc(doc(db, "wh_items", id), {
+      name,
+      unitBig,
+      unitSmall,
+      packQty,
+      expDate,
+      receivedAt,
+      supplier,
+      info,
+      updatedAt: serverTimestamp(),
+    });
+
+    showToast("Item berhasil diupdate", "success");
+    editingItemId = null;
+
+    await loadWhItems();
+    fillMoveSelect();
+    renderOpnameTable();
+    updateDashboard();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal update item", "error");
+  }
+}
+
+async function deleteItem(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+
+  const it = items.find((x) => x.id === id);
+  const name = it?.name || "item ini";
+  const ok = confirm(`Hapus ${name}?`);
+  if (!ok) return;
+
+  try {
+    await deleteDoc(doc(db, "wh_items", id));
+    showToast("Item dihapus", "success");
+
+    if (editingItemId === id) editingItemId = null;
+
+    await loadWhItems();
+    fillMoveSelect();
+    renderOpnameTable();
+    updateDashboard();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal hapus item", "error");
+  }
+}
+
+// ===== Transfer W1→W2 =====
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -699,6 +828,7 @@ async function transferW1toW2() {
     showToast("Transfer berhasil", "success");
     if (moveQty) moveQty.value = "";
     await loadWhItems();
+    fillMoveSelect();
     renderOpnameTable();
     updateDashboard();
   } catch (e) {
@@ -707,7 +837,7 @@ async function transferW1toW2() {
   }
 }
 
-// ========== Waste + History (CRUD icon + Sort) ==========
+// ===== Waste =====
 function ensureWasteDefaults() {
   const today = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -799,10 +929,6 @@ function buildWasteUnitSelectHTML(current) {
   return `<select data-wedit="unit">${opts}</select>`;
 }
 
-function iconBtn(html, title, extraClass = "") {
-  return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(title)}">${html}</button>`;
-}
-
 function renderWasteHistory() {
   if (!wasteHistoryBody) return;
 
@@ -819,7 +945,6 @@ function renderWasteHistory() {
   }
 
   list = sortWasteList(list);
-
   wasteHistoryBody.innerHTML = "";
 
   if (!list.length) {
@@ -875,7 +1000,6 @@ function startEditWaste(id) {
   editingWasteId = id;
   renderWasteHistory();
 }
-
 function cancelEditWaste() {
   editingWasteId = null;
   renderWasteHistory();
@@ -944,13 +1068,16 @@ async function deleteWaste(id) {
   }
 }
 
-// ========== Events ==========
+// ===== Events =====
 if (btnSaveItem) btnSaveItem.addEventListener("click", saveMasterItem);
 if (btnMove) btnMove.addEventListener("click", transferW1toW2);
 
 if (whOpnameGudang)
   whOpnameGudang.addEventListener("change", () => {
-    // kalau user manual ganti gudang, kita biarkan tapi tabel wajib re-render
+    // kalau user ganti gudang manual, batalkan filter dari dashboard yang beda gudang
+    if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) {
+      whStockFilter = null;
+    }
     renderOpnameTable();
   });
 
@@ -970,7 +1097,6 @@ if (wasteFilterEnd)
   });
 if (wasteHistorySearch) wasteHistorySearch.addEventListener("input", renderWasteHistory);
 
-// Sort events
 if (wasteSortBy)
   wasteSortBy.addEventListener("change", () => {
     wasteSortByState = wasteSortBy.value || "dateKey";
@@ -984,10 +1110,9 @@ if (wasteSortDirBtn)
     renderWasteHistory();
   });
 
-// ========== Boot ==========
+// ===== Boot =====
 async function bootWarehouse() {
   ensureWasteDefaults();
-
   fillWasteSelectPreset();
   fillWasteUnitOptions();
 
@@ -1002,9 +1127,7 @@ async function bootWarehouse() {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 
-  // ✅ bind click dashboard stok sekali
   bindStockCardClicks();
-
   updateDashboard();
 }
 
