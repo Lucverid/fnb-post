@@ -1,10 +1,7 @@
-// warehouse.js (Firestore-ready) — Warehouse: Master Item, Opname, Transfer, Waste + History + Expiry Dashboard
+// warehouse.js (Firestore-ready) — Warehouse: Master Item, Opname, Transfer, Waste + History + Expiry Dashboard + Click Filter
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import {
-  getAuth,
-  onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
@@ -12,11 +9,11 @@ import {
   getDocs,
   query,
   orderBy,
-  where,
   updateDoc,
   doc,
   serverTimestamp,
   limit,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 // ========== Reuse Firebase App from script.js ==========
@@ -47,7 +44,6 @@ function todayKey(d = new Date()) {
 
 function parseDateOnly(value) {
   if (!value) return null;
-  // treat as local date
   const d = new Date(value + "T00:00:00");
   return isNaN(d) ? null : d;
 }
@@ -58,9 +54,14 @@ function daysDiff(a, b) {
   return Math.floor((a.getTime() - b.getTime()) / ms);
 }
 
+function clampInt(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
 // ========== Collections ==========
-const colWhItems = collection(db, "wh_items");   // master + stok
-const colWhWaste = collection(db, "wh_waste");   // waste logs
+const colWhItems = collection(db, "wh_items"); // master + stok
+const colWhWaste = collection(db, "wh_waste"); // waste logs
 
 // ========== Elements ==========
 const whDashboardSection = $("whDashboardSection");
@@ -89,7 +90,7 @@ const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemPricePerPack = $("whItemPricePerPack"); // will be ignored (optional)
+const whItemPricePerPack = $("whItemPricePerPack"); // optional (not used in opname)
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -104,7 +105,7 @@ const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 
-// Waste
+// Waste (Search will be disabled/hidden)
 const wasteItemSearch = $("wasteItemSearch");
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
@@ -125,13 +126,37 @@ const notifList = $("notifList");
 
 // ========== State ==========
 let currentUser = null;
-let items = [];      // wh_items cache
-let wasteLogs = [];  // wh_waste cache
+let items = []; // wh_items cache
+let wasteLogs = []; // wh_waste cache
 
 // thresholds
 const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
+
+// Opname filter by expiry via dashboard click
+let whExpiryFilter = null; // null | "ok" | "soon" | "expired"
+
+// Waste CRUD edit state
+let editingWasteId = null;
+let editingWasteSnapshot = null;
+
+// Waste preset items (NOT from opname/master)
+const WASTE_PRESET_ITEMS = [
+  "Milktea",
+  "Teh Hijau",
+  "Teh Hitam",
+  "Teh Blooming",
+  "Teh oolong",
+  "boba",
+  "susu",
+  "pudding",
+  "kopi",
+  "crystal jelly",
+  "Eskrim original",
+  "eskrim yoghurt",
+  "pendamping lemon",
+];
 
 // ========== Navigation ==========
 function setActiveNav(btn) {
@@ -150,10 +175,33 @@ function showWhSection(which) {
   if (which === "report" && whReportSection) whReportSection.classList.remove("hidden");
 }
 
-if (navWhDashboard) navWhDashboard.addEventListener("click", () => (setActiveNav(navWhDashboard), showWhSection("dashboard")));
-if (navWhOpname) navWhOpname.addEventListener("click", () => (setActiveNav(navWhOpname), showWhSection("opname")));
-if (navWhWaste) navWhWaste.addEventListener("click", () => (setActiveNav(navWhWaste), showWhSection("waste")));
-if (navWhReport) navWhReport.addEventListener("click", () => (setActiveNav(navWhReport), showWhSection("report")));
+if (navWhDashboard)
+  navWhDashboard.addEventListener("click", () => {
+    whExpiryFilter = null;
+    setActiveNav(navWhDashboard);
+    showWhSection("dashboard");
+  });
+
+if (navWhOpname)
+  navWhOpname.addEventListener("click", () => {
+    // masuk opname biasa = reset filter expiry
+    whExpiryFilter = null;
+    setActiveNav(navWhOpname);
+    showWhSection("opname");
+    renderOpnameTable();
+  });
+
+if (navWhWaste)
+  navWhWaste.addEventListener("click", () => {
+    setActiveNav(navWhWaste);
+    showWhSection("waste");
+  });
+
+if (navWhReport)
+  navWhReport.addEventListener("click", () => {
+    setActiveNav(navWhReport);
+    showWhSection("report");
+  });
 
 // ========== Load Data ==========
 async function loadWhItems() {
@@ -163,17 +211,31 @@ async function loadWhItems() {
 }
 
 async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
-  // Keep it simple: load last 200 then filter on client (works fine for small biz)
+  // Load last 200 then filter client
   const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(200)));
   wasteLogs = [];
   snap.forEach((d) => wasteLogs.push({ id: d.id, ...d.data() }));
 
-  // optional client filter by dateKey
   if (rangeStart && rangeEnd) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
     wasteLogs = wasteLogs.filter((w) => (w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey);
   }
+}
+
+// ========== Expiry Helpers ==========
+function getExpStatus(expStr) {
+  // expStr: "YYYY-MM-DD" or ""
+  // Rule: empty exp = ok (Belum Expired)
+  if (!expStr) return "ok";
+  const now = new Date();
+  const exp = parseDateOnly(expStr);
+  if (!exp) return "ok";
+
+  const left = daysDiff(exp, now); // exp - now
+  if (left < 0) return "expired";
+  if (left <= EXP_SOON_DAYS) return "soon";
+  return "ok";
 }
 
 // ========== Dashboard: Stock Metrics + Expiry + Notif ==========
@@ -196,21 +258,46 @@ function ensureExpiryCards() {
   wrap.innerHTML = `
     <h3 style="margin:18px 0 10px;">Indikator Expired</h3>
     <div class="metric-row">
-      <div id="cardExpOk" class="metric-card green">
+      <div id="cardExpOk" class="metric-card green" style="cursor:pointer;">
         <i class="lucide-check-circle"></i>
         <div><b id="expOkCount">0</b> Belum Expired</div>
       </div>
-      <div id="cardExpSoon" class="metric-card yellow">
+      <div id="cardExpSoon" class="metric-card yellow" style="cursor:pointer;">
         <i class="lucide-alert-triangle"></i>
         <div><b id="expSoonCount">0</b> Mau Expired (≤ ${EXP_SOON_DAYS} hari)</div>
       </div>
-      <div id="cardExpBad" class="metric-card red">
+      <div id="cardExpBad" class="metric-card red" style="cursor:pointer;">
         <i class="lucide-x-circle"></i>
         <div><b id="expBadCount">0</b> Sudah Expired</div>
       </div>
     </div>
   `;
   whDashboardSection.appendChild(wrap);
+
+  // click-to-filter
+  const cardExpOk = $("cardExpOk");
+  const cardExpSoon = $("cardExpSoon");
+  const cardExpBad = $("cardExpBad");
+
+  if (cardExpOk) cardExpOk.addEventListener("click", () => gotoOpnameWithExpiryFilter("ok"));
+  if (cardExpSoon) cardExpSoon.addEventListener("click", () => gotoOpnameWithExpiryFilter("soon"));
+  if (cardExpBad) cardExpBad.addEventListener("click", () => gotoOpnameWithExpiryFilter("expired"));
+}
+
+function gotoOpnameWithExpiryFilter(type) {
+  whExpiryFilter = type; // "ok" | "soon" | "expired"
+  setActiveNav(navWhOpname);
+  showWhSection("opname");
+
+  const label =
+    type === "ok"
+      ? "Filter: Belum Expired"
+      : type === "soon"
+      ? `Filter: Mau Exp (≤ ${EXP_SOON_DAYS} hari)`
+      : "Filter: Sudah Expired";
+
+  showToast(label, "info", 2200);
+  renderOpnameTable();
 }
 
 function updateDashboard() {
@@ -239,16 +326,15 @@ function updateDashboard() {
 
   // expiry
   ensureExpiryCards();
-  const now = new Date();
+  let expOk = 0,
+    expSoon = 0,
+    expBad = 0;
 
-  let expOk = 0, expSoon = 0, expBad = 0;
   items.forEach((it) => {
-    const exp = it.expDate ? new Date(it.expDate) : null;
-    if (!exp || isNaN(exp)) return; // if no exp, ignore from exp metric
-    const left = daysDiff(exp, now); // exp - now
-    if (left < 0) expBad++;
-    else if (left <= EXP_SOON_DAYS) expSoon++;
-    else expOk++;
+    const st = getExpStatus(it.expDate || "");
+    if (st === "ok") expOk++;
+    else if (st === "soon") expSoon++;
+    else expBad++;
   });
 
   const expOkCount = $("expOkCount");
@@ -259,21 +345,20 @@ function updateDashboard() {
   if (expBadCount) expBadCount.textContent = expBad;
 
   // notif
-  updateWarehouseNotif(expSoon, expBad);
+  updateWarehouseNotif();
 }
 
-function updateWarehouseNotif(expSoonCount, expBadCount) {
+function updateWarehouseNotif() {
   if (!notifList || !notifBadge) return;
 
-  // We'll append warehouse notifications (simple, clear)
   notifList.innerHTML = "";
   let count = 0;
 
   const now = new Date();
 
-  // Expired
+  // expired
   const expiredItems = items
-    .filter((it) => it.expDate && !isNaN(new Date(it.expDate)) && daysDiff(new Date(it.expDate), now) < 0)
+    .filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || ""))
     .slice(0, 10);
 
   expiredItems.forEach((it) => {
@@ -283,28 +368,27 @@ function updateWarehouseNotif(expSoonCount, expBadCount) {
     count++;
   });
 
-  // Exp soon
+  // exp soon
   const expSoonItems = items
-    .filter((it) => {
-      const exp = it.expDate ? new Date(it.expDate) : null;
-      if (!exp || isNaN(exp)) return false;
-      const left = daysDiff(exp, now);
-      return left >= 0 && left <= EXP_SOON_DAYS;
-    })
+    .filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || ""))
     .slice(0, 10);
 
   expSoonItems.forEach((it) => {
-    const exp = new Date(it.expDate);
-    const left = daysDiff(exp, now);
+    const exp = parseDateOnly(it.expDate);
+    const left = exp ? daysDiff(exp, now) : 0;
     const li = document.createElement("li");
     li.textContent = `Mau EXP (${left} hari): ${it.name} (EXP ${it.expDate})`;
     notifList.appendChild(li);
     count++;
   });
 
-  // Low stock hints (optional, useful)
+  // low stock
   const lowStock = items
-    .filter((it) => (Number(it.stockW1 || 0) > 0 && Number(it.stockW1 || 0) < LOW_STOCK_LT) || (Number(it.stockW2 || 0) > 0 && Number(it.stockW2 || 0) < LOW_STOCK_LT))
+    .filter(
+      (it) =>
+        (Number(it.stockW1 || 0) > 0 && Number(it.stockW1 || 0) < LOW_STOCK_LT) ||
+        (Number(it.stockW2 || 0) > 0 && Number(it.stockW2 || 0) < LOW_STOCK_LT)
+    )
     .slice(0, 10);
 
   lowStock.forEach((it) => {
@@ -335,45 +419,41 @@ function fillMoveSelect() {
   });
 }
 
-function fillWasteSelect(keyword = "") {
+// Waste dropdown (PRESET, not from items)
+function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
-  const q = (keyword || "").trim().toLowerCase();
-  const list = q
-    ? items.filter((it) => (it.name || "").toLowerCase().includes(q) || (it.supplier || "").toLowerCase().includes(q))
-    : items;
-
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-  list.forEach((it) => {
+  WASTE_PRESET_ITEMS.forEach((name) => {
     const opt = document.createElement("option");
-    opt.value = it.id;
-    opt.textContent = it.name;
+    opt.value = name;
+    opt.textContent = name;
     wasteItemSelect.appendChild(opt);
   });
 }
 
-function updateWasteUnitBySelectedItem() {
-  if (!wasteUnit || !wasteItemSelect) return;
-  const id = wasteItemSelect.value;
-  const it = items.find((x) => x.id === id);
+// Waste unit options (standalone)
+function fillWasteUnitOptions() {
+  if (!wasteUnit) return;
+  const units = ["gram", "ml", "pcs", "unit"];
   wasteUnit.innerHTML = "";
-
-  if (!it) {
+  units.forEach((u) => {
     const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "—";
+    opt.value = u;
+    opt.textContent = u;
     wasteUnit.appendChild(opt);
-    return;
-  }
-
-  // waste uses small unit (gram/ml/pcs) as requested
-  const unitSmall = (it.unitSmall || "").trim() || "unit";
-  const opt = document.createElement("option");
-  opt.value = unitSmall;
-  opt.textContent = unitSmall;
-  wasteUnit.appendChild(opt);
+  });
 }
 
-// ========== Opname Table ==========
+// ========== Opname Table (with expiry filter) ==========
+function applyExpiryFilter(list) {
+  if (!whExpiryFilter) return list;
+
+  return (list || []).filter((it) => {
+    const st = getExpStatus(it.expDate || "");
+    return st === whExpiryFilter;
+  });
+}
+
 function renderOpnameTable() {
   if (!whOpnameTableBody || !whOpnameGudang) return;
 
@@ -381,14 +461,19 @@ function renderOpnameTable() {
   const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
 
   let list = [...items];
+
   if (keyword) {
-    list = list.filter((it) =>
-      (it.name || "").toLowerCase().includes(keyword) ||
-      (it.supplier || "").toLowerCase().includes(keyword) ||
-      (it.unitBig || "").toLowerCase().includes(keyword) ||
-      (it.unitSmall || "").toLowerCase().includes(keyword)
+    list = list.filter(
+      (it) =>
+        (it.name || "").toLowerCase().includes(keyword) ||
+        (it.supplier || "").toLowerCase().includes(keyword) ||
+        (it.unitBig || "").toLowerCase().includes(keyword) ||
+        (it.unitSmall || "").toLowerCase().includes(keyword)
     );
   }
+
+  // APPLY expiry filter from dashboard click
+  list = applyExpiryFilter(list);
 
   whOpnameTableBody.innerHTML = "";
   if (!list.length) {
@@ -400,11 +485,20 @@ function renderOpnameTable() {
     const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
     const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
 
+    const expStr = it.expDate || "-";
+    const expStatus = getExpStatus(it.expDate || "");
+    const expBadge =
+      expStatus === "expired"
+        ? `<span class="status-badge red">EXPIRED</span>`
+        : expStatus === "soon"
+        ? `<span class="status-badge yellow">SOON</span>`
+        : `<span class="status-badge green">OK</span>`;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${it.name || "-"}</td>
       <td>${unitText}</td>
-      <td>${it.expDate || "-"}</td>
+      <td>${expStr}<div style="margin-top:6px;">${expBadge}</div></td>
       <td>${it.info || "-"}</td>
       <td>${it.receivedAt || "-"}</td>
       <td>${it.supplier || "-"}</td>
@@ -448,19 +542,16 @@ async function saveOpname(itemId) {
   const it = items.find((x) => x.id === itemId);
   if (!it) return;
 
-  const payload = {
-    updatedAt: serverTimestamp(),
-  };
-
+  const payload = { updatedAt: serverTimestamp() };
   if (gudang === "w1") payload.stockW1 = physical;
   else payload.stockW2 = physical;
 
   try {
     await updateDoc(doc(db, "wh_items", itemId), payload);
     showToast(`Opname tersimpan: ${it.name} (${gudang.toUpperCase()})`, "success");
+
     await loadWhItems();
     fillMoveSelect();
-    fillWasteSelect(wasteItemSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
   } catch (e) {
@@ -487,7 +578,7 @@ async function saveMasterItem() {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
-  // ✅ Harga tidak dipakai di Opname (sesuai request). Tapi kita tetap simpan OPTIONAL kalau suatu saat perlu.
+  // Harga tidak dipakai di Opname. Tetap disimpan optional (kalau nanti perlu laporan pembelian)
   const pricePerPack = Number(whItemPricePerPack?.value || 0) || 0;
 
   const docData = {
@@ -496,7 +587,7 @@ async function saveMasterItem() {
     unitSmall,
     packQty,
     pricePerPack, // optional
-    expDate: exp, // store as YYYY-MM-DD string (simple)
+    expDate: exp, // YYYY-MM-DD
     receivedAt,
     supplier,
     info,
@@ -524,7 +615,6 @@ async function saveMasterItem() {
 
     await loadWhItems();
     fillMoveSelect();
-    fillWasteSelect();
     renderOpnameTable();
     updateDashboard();
   } catch (e) {
@@ -557,6 +647,7 @@ async function transferW1toW2() {
     });
     showToast("Transfer berhasil", "success");
     if (moveQty) moveQty.value = "";
+
     await loadWhItems();
     renderOpnameTable();
     updateDashboard();
@@ -566,7 +657,7 @@ async function transferW1toW2() {
   }
 }
 
-// ========== Waste Save + History ==========
+// ========== Waste Save + History (CRUD) ==========
 function ensureWasteDefaults() {
   const today = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -576,12 +667,26 @@ function ensureWasteDefaults() {
   if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
 }
 
+function disableWasteSearchUI() {
+  // request: hapus cari item => hide if still exists
+  if (wasteItemSearch) {
+    const wrap = wasteItemSearch.closest(".card") || wasteItemSearch.parentElement;
+    wasteItemSearch.value = "";
+    wasteItemSearch.disabled = true;
+    wasteItemSearch.style.display = "none";
+    // kalau label-nya tepat sebelum input
+    const prev = wasteItemSearch.previousElementSibling;
+    if (prev && prev.tagName === "LABEL") prev.style.display = "none";
+    // biar ada jarak rapi (optional)
+    if (wrap) wrap.style.gap = "10px";
+  }
+}
+
 async function saveWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
-  const itemId = wasteItemSelect?.value || "";
-  const it = items.find((x) => x.id === itemId);
-  if (!it) return showToast("Pilih item waste dulu", "error");
+  const itemName = (wasteItemSelect?.value || "").trim();
+  if (!itemName) return showToast("Pilih item waste dulu", "error");
 
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
@@ -589,32 +694,25 @@ async function saveWaste() {
   const qty = Number(wasteQty?.value || 0);
   if (!qty || qty <= 0) return showToast("Qty waste harus > 0", "error");
 
-  const unit = (wasteUnit?.value || it.unitSmall || "unit").trim();
+  const unit = (wasteUnit?.value || "unit").trim();
   const note = (wasteNote?.value || "").trim();
 
-  // Waste mengurangi stok — asumsi: waste terjadi di W1 (kalau nanti mau pilih gudang, kita tambah select)
-  // Qty waste pakai unit kecil (gram/ml/pcs). Jika kamu mau otomatis konversi dari unit kecil ke dus,
-  // kita bisa bikin aturan: qtySmall / packQty -> pengurangan stockW1.
-  // Untuk sekarang: kita catat log waste, dan KURANGI stok W1 dalam "unit kecil ekuivalen".
-  // Tapi stok W1 saat ini masih berbasis "unit besar". Jadi kita pakai cara aman:
-  // ✅ Saat ini kita HANYA simpan log waste (history), tidak mengurangi stok W1,
-  // karena satuannya beda. Nanti kalau kamu set aturan konversi, baru kita potong stok dengan benar.
-  // (Kalau kamu ingin sekarang juga potong stok W1, bilang: waste dihitung per dus atau per pcs?)
-
   const log = {
-    itemId,
-    itemName: it.name || "-",
-    dateKey: d,               // YYYY-MM-DD
+    itemId: `preset:${itemName}`,
+    itemName,
+    dateKey: d,
     qty,
-    unit,                     // unit small
+    unit,
     note,
     createdBy: currentUser.email || "-",
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   };
 
   try {
     await addDoc(colWhWaste, log);
     showToast("Waste tersimpan", "success");
+
     if (wasteQty) wasteQty.value = "";
     if (wasteNote) wasteNote.value = "";
 
@@ -652,22 +750,158 @@ function renderWasteHistory() {
   wasteHistoryBody.innerHTML = "";
 
   if (!list.length) {
-    wasteHistoryBody.innerHTML = `<tr><td colspan="6">Belum ada data waste.</td></tr>`;
+    wasteHistoryBody.innerHTML = `<tr><td colspan="7">Belum ada data waste.</td></tr>`;
     return;
   }
 
   list.forEach((w) => {
+    const isEditing = editingWasteId === w.id;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${w.dateKey || "-"}</td>
-      <td>${w.itemName || "-"}</td>
-      <td>${Number(w.qty || 0)}</td>
-      <td>${w.unit || "-"}</td>
-      <td>${w.note || "-"}</td>
+      <td>${isEditing ? `<input type="date" data-wedit="dateKey" value="${w.dateKey || ""}" />` : (w.dateKey || "-")}</td>
+      <td>${isEditing ? buildWasteItemSelectHTML(w.itemName || "") : (w.itemName || "-")}</td>
+      <td>${isEditing ? `<input type="number" min="0" step="1" data-wedit="qty" value="${clampInt(w.qty, 0)}" style="max-width:110px;" />` : clampInt(w.qty, 0)}</td>
+      <td>${isEditing ? buildWasteUnitSelectHTML(w.unit || "unit") : (w.unit || "-")}</td>
+      <td>${isEditing ? `<input type="text" data-wedit="note" value="${escapeHtml(w.note || "")}" />` : (w.note || "-")}</td>
       <td>${w.createdBy || "-"}</td>
+      <td>
+        <div class="table-actions" style="justify-content:flex-end;">
+          ${
+            isEditing
+              ? `
+                <button class="btn-table btn-table-edit small" data-wact="save" data-id="${w.id}">Save</button>
+                <button class="btn-table small" data-wact="cancel" data-id="${w.id}">Cancel</button>
+              `
+              : `
+                <button class="btn-table btn-table-edit small" data-wact="edit" data-id="${w.id}">Edit</button>
+                <button class="btn-table btn-table-delete small" data-wact="delete" data-id="${w.id}">Hapus</button>
+              `
+          }
+        </div>
+      </td>
     `;
     wasteHistoryBody.appendChild(tr);
+
+    // attach events
+    tr.querySelectorAll("button[data-wact]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const act = btn.getAttribute("data-wact");
+        const id = btn.getAttribute("data-id");
+        if (act === "edit") startEditWaste(id);
+        if (act === "cancel") cancelEditWaste();
+        if (act === "save") await saveEditWaste(id);
+        if (act === "delete") await deleteWaste(id);
+      });
+    });
   });
+}
+
+function startEditWaste(id) {
+  const w = wasteLogs.find((x) => x.id === id);
+  if (!w) return;
+  editingWasteId = id;
+  editingWasteSnapshot = { ...w };
+  renderWasteHistory();
+}
+
+function cancelEditWaste() {
+  editingWasteId = null;
+  editingWasteSnapshot = null;
+  renderWasteHistory();
+}
+
+async function saveEditWaste(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  if (!wasteHistoryBody) return;
+
+  const row = wasteHistoryBody.querySelector(`button[data-wact="save"][data-id="${id}"]`)?.closest("tr");
+  if (!row) return;
+
+  const dateKey = row.querySelector(`input[data-wedit="dateKey"]`)?.value || "";
+  const itemName = row.querySelector(`select[data-wedit="itemName"]`)?.value || "";
+  const qty = Number(row.querySelector(`input[data-wedit="qty"]`)?.value || 0);
+  const unit = row.querySelector(`select[data-wedit="unit"]`)?.value || "unit";
+  const note = row.querySelector(`input[data-wedit="note"]`)?.value || "";
+
+  if (!dateKey) return showToast("Tanggal wajib diisi", "error");
+  if (!itemName) return showToast("Item wajib dipilih", "error");
+  if (!qty || qty <= 0) return showToast("Qty harus > 0", "error");
+
+  try {
+    await updateDoc(doc(db, "wh_waste", id), {
+      dateKey,
+      itemId: `preset:${itemName}`,
+      itemName,
+      qty,
+      unit,
+      note,
+      updatedAt: serverTimestamp(),
+    });
+
+    showToast("Waste updated", "success");
+    editingWasteId = null;
+    editingWasteSnapshot = null;
+
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal update waste", "error");
+  }
+}
+
+async function deleteWaste(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  const ok = confirm("Hapus data waste ini?");
+  if (!ok) return;
+
+  try {
+    await deleteDoc(doc(db, "wh_waste", id));
+    showToast("Waste dihapus", "success");
+
+    if (editingWasteId === id) {
+      editingWasteId = null;
+      editingWasteSnapshot = null;
+    }
+
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal hapus waste", "error");
+  }
+}
+
+function buildWasteItemSelectHTML(current) {
+  const opts = WASTE_PRESET_ITEMS.map((x) => {
+    const sel = x === current ? "selected" : "";
+    return `<option value="${escapeHtmlAttr(x)}" ${sel}>${escapeHtml(x)}</option>`;
+  }).join("");
+  return `<select data-wedit="itemName">${opts}</select>`;
+}
+
+function buildWasteUnitSelectHTML(current) {
+  const units = ["gram", "ml", "pcs", "unit"];
+  const opts = units
+    .map((u) => {
+      const sel = u === current ? "selected" : "";
+      return `<option value="${escapeHtmlAttr(u)}" ${sel}>${escapeHtml(u)}</option>`;
+    })
+    .join("");
+  return `<select data-wedit="unit">${opts}</select>`;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+function escapeHtmlAttr(str) {
+  return escapeHtml(str).replaceAll("\n", " ");
 }
 
 // ========== Events ==========
@@ -677,30 +911,34 @@ if (btnMove) btnMove.addEventListener("click", transferW1toW2);
 if (whOpnameGudang) whOpnameGudang.addEventListener("change", renderOpnameTable);
 if (whOpnameSearch) whOpnameSearch.addEventListener("input", renderOpnameTable);
 
-if (wasteItemSearch) wasteItemSearch.addEventListener("input", () => fillWasteSelect(wasteItemSearch.value));
-if (wasteItemSelect) wasteItemSelect.addEventListener("change", updateWasteUnitBySelectedItem);
 if (btnSaveWaste) btnSaveWaste.addEventListener("click", saveWaste);
 
-if (wasteFilterStart) wasteFilterStart.addEventListener("change", async () => {
-  await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-  renderWasteHistory();
-});
-if (wasteFilterEnd) wasteFilterEnd.addEventListener("change", async () => {
-  await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-  renderWasteHistory();
-});
+if (wasteFilterStart)
+  wasteFilterStart.addEventListener("change", async () => {
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  });
+if (wasteFilterEnd)
+  wasteFilterEnd.addEventListener("change", async () => {
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  });
 if (wasteHistorySearch) wasteHistorySearch.addEventListener("input", renderWasteHistory);
 
 // ========== Boot ==========
 async function bootWarehouse() {
   ensureWasteDefaults();
 
+  // Waste UI changes
+  disableWasteSearchUI();
+  fillWasteSelectPreset();
+  fillWasteUnitOptions();
+
   await loadWhItems();
   fillMoveSelect();
-  fillWasteSelect();
-  updateWasteUnitBySelectedItem();
 
   renderOpnameTable();
+
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 
@@ -709,7 +947,7 @@ async function bootWarehouse() {
 
 onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
-  if (!currentUser) return; // script.js will handle login UI
+  if (!currentUser) return; // script.js handles login UI
 
   try {
     await bootWarehouse();
