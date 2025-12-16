@@ -1576,3 +1576,50 @@ td {
   from { opacity:0; transform:translateY(-5px); }
   to   { opacity:1; transform:translateY(0); }
 }
+
+/* ===== FIX FORM CONTROLS (biar ga default putih) ===== */
+label{
+  display:block;
+  margin:10px 0 6px;
+  font-size:12px;
+  opacity:.8;
+}
+
+input, select, textarea{
+  width:100%;
+  padding:12px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.92);
+  outline: none;
+  font-size:14px;
+}
+
+input::placeholder, textarea::placeholder{
+  color: rgba(255,255,255,.45);
+}
+
+input:focus, select:focus, textarea:focus{
+  border-color: rgba(140,90,255,.8);
+  box-shadow: 0 0 0 3px rgba(140,90,255,.18);
+}
+
+/* select arrow mobile */
+select{
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255,255,255,.7) 50%),
+    linear-gradient(135deg, rgba(255,255,255,.7) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat:no-repeat;
+}
+
+/* date input biar ga “putih banget” */
+input[type="date"]{
+  color-scheme: dark;
+}
