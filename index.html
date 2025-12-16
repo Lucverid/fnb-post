@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css">
   <link rel="stylesheet" href="style.css?v=4">
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -254,6 +255,11 @@
 
             <label>Cari Item</label>
             <input id="whOpnameSearch" type="text" placeholder="ketik nama / supplier / unit...">
+
+            <!-- ✅ NEW: Simpan Opname Semua Item -->
+            <button id="btnOpnameSaveAll" class="btn-primary" type="button" style="margin-top:10px;">
+              Simpan Opname Semua Item
+            </button>
           </div>
         </div>
 
@@ -361,50 +367,54 @@
         </div>
       </section>
 
-     <!-- WAREHOUSE: REPORT -->
-<section id="whReportSection" class="section hidden">
-  <h2>Laporan Warehouse</h2>
+      <!-- WAREHOUSE: REPORT -->
+      <section id="whReportSection" class="section hidden">
+        <h2>Laporan Warehouse</h2>
 
-  <div class="card glass" style="padding:12px; max-width:760px;">
-    <label>Tipe Laporan</label>
-    <select id="whReportType">
-      <option value="opname_w1">Opname Gudang 1</option>
-      <option value="opname_w2">Opname Gudang 2</option>
-      <option value="waste">Waste</option>
-    </select>
+        <div class="card glass" style="padding:12px; max-width:760px;">
+          <label>Tipe Laporan</label>
+          <select id="whReportType">
+            <option value="opname_w1">Opname Gudang 1 (Snapshot)</option>
+            <option value="opname_w2">Opname Gudang 2 (Snapshot)</option>
+            <option value="opname_history_w1">Histori Opname W1 (Per Item)</option>
+            <option value="opname_history_w2">Histori Opname W2 (Per Item)</option>
+            <option value="receiving">Penerimaan Barang</option>
+            <option value="waste">Waste</option>
+          </select>
 
-    <div class="grid-2" style="gap:10px;">
-      <div>
-        <label>Tanggal Mulai</label>
-        <input id="whReportStart" type="date">
-      </div>
-      <div>
-        <label>Tanggal Akhir</label>
-        <input id="whReportEnd" type="date">
-      </div>
-    </div>
+          <div class="grid-2" style="gap:10px;">
+            <div>
+              <label>Tanggal Mulai</label>
+              <input id="whReportStart" type="date">
+            </div>
+            <div>
+              <label>Tanggal Akhir</label>
+              <input id="whReportEnd" type="date">
+            </div>
+          </div>
 
-    <label style="margin-top:10px;">Catatan (opsional)</label>
-    <textarea id="whReportNote" rows="3"
-      placeholder="Contoh: Laporan stok untuk audit, ada selisih di item A..."></textarea>
+          <label style="margin-top:10px;">Catatan (opsional)</label>
+          <textarea id="whReportNote" rows="3"
+            placeholder="Contoh: Laporan stok untuk audit, ada selisih di item A..."></textarea>
 
-    <div class="grid-2" style="gap:10px; margin-top:10px;">
-      <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
-      <button id="btnWhReportDownload" class="btn-secondary" type="button">Download CSV</button>
-    </div>
-  </div>
+          <div class="grid-2" style="gap:10px; margin-top:10px;">
+            <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
+            <!-- ✅ FIX ID -->
+            <button id="btnWhReportDownload" class="btn-secondary" type="button">Download CSV</button>
+          </div>
+        </div>
 
-  <div class="card glass" style="padding:12px; margin-top:12px;">
-    <div style="overflow:auto;">
-      <table class="table">
-        <thead>
-          <tr id="whReportHead"></tr>
-        </thead>
-        <tbody id="whReportBody"></tbody>
-      </table>
-    </div>
-  </div>
-</section>
+        <div class="card glass" style="padding:12px; margin-top:12px;">
+          <div style="overflow:auto;">
+            <table class="table">
+              <thead>
+                <tr id="whReportHead"></tr>
+              </thead>
+              <tbody id="whReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <!-- SECTION LAMA -->
       <section id="salesSection" class="section hidden"></section>
