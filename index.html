@@ -25,7 +25,6 @@
 </head>
 
 <body>
-
   <div id="toast-container"></div>
 
   <!-- AUTH -->
@@ -34,10 +33,8 @@
       <h2>Login</h2>
       <label>Email</label>
       <input id="loginEmail" type="email">
-
       <label>Password</label>
       <input id="loginPassword" type="password">
-
       <button id="btnLogin" class="btn-primary" type="button">Login</button>
 
       <hr>
@@ -45,23 +42,19 @@
       <h2>Register</h2>
       <label>Email</label>
       <input id="registerEmail" type="email">
-
       <label>Password</label>
       <input id="registerPassword" type="password">
-
       <label>Role</label>
       <select id="registerRole">
         <option value="admin">Admin</option>
         <option value="kasir">Kasir</option>
       </select>
-
       <button id="btnRegister" class="btn-secondary" type="button">Daftar Baru</button>
     </div>
   </div>
 
   <!-- APP -->
   <div id="app-shell" class="app-shell hidden">
-
     <header class="app-header glass">
       <div class="header-left">
         <div class="logo">F&amp;B</div>
@@ -92,10 +85,8 @@
     <aside id="sidebar" class="sidebar">
       <nav>
         <div class="sidebar-group">
-
           <div style="margin:10px 0 6px; font-size:12px; opacity:.7;">WAREHOUSE</div>
 
-          <!-- ✅ HAPUS admin-only biar bisa di klik semua user -->
           <button id="navWhDashboard" class="side-item active" type="button" data-wh-nav="1">
             <i class="lucide-layout-dashboard"></i> <span>Dashboard Opname</span>
           </button>
@@ -114,31 +105,25 @@
 
           <hr style="margin:12px 0; opacity:.2;">
 
-          <!-- MENU LAMA (biarkan kalau mau, tapi memang kamu disable di JS) -->
+          <!-- MENU LAMA -->
           <button class="side-item admin-only" data-section="dashboard" type="button">
             <i class="lucide-bar-chart"></i> <span>Dashboard (Lama)</span>
           </button>
-
           <button class="side-item" data-section="sales" type="button">
             <i class="lucide-shopping-cart"></i> <span>Kasir (Lama)</span>
           </button>
-
           <button class="side-item admin-only" data-section="inventory" type="button">
             <i class="lucide-box"></i> <span>Inventory (Lama)</span>
           </button>
-
           <button class="side-item admin-only" data-section="recipe" type="button">
             <i class="lucide-utensils"></i> <span>Resep (Lama)</span>
           </button>
-
           <button class="side-item admin-only" data-section="opname" type="button">
             <i class="lucide-clipboard-list"></i> <span>Opname (Lama)</span>
           </button>
-
           <button class="side-item admin-only" data-section="reports" type="button">
             <i class="lucide-file-text"></i> <span>Laporan (Lama)</span>
           </button>
-
         </div>
 
         <div class="sidebar-footer">
@@ -151,13 +136,12 @@
 
     <!-- MAIN -->
     <main class="app-main">
-
       <section id="welcomeBanner" class="welcome-banner hidden">
         <h2>Selamat datang, <span id="bannerRole"></span></h2>
         <p>Akses cepat POS, inventory, dashboard, dan laporan.</p>
       </section>
 
-      <!-- ===================== WAREHOUSE ===================== -->
+      <!-- WAREHOUSE: DASHBOARD -->
       <section id="whDashboardSection" class="section">
         <h2>Dashboard Opname</h2>
         <p style="opacity:.8;margin-top:-6px;">Klik indikator untuk filter otomatis ke <b>Halaman Opname</b>.</p>
@@ -193,85 +177,91 @@
         </div>
       </section>
 
-      <!-- ===================== WAREHOUSE OPNAME ===================== -->
+      <!-- WAREHOUSE: OPNAME -->
       <section id="whOpnameSection" class="section hidden">
         <h2>Halaman Opname</h2>
 
-        <!-- MASTER ITEM -->
-        <div class="card glass" style="margin-top:12px;">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="flex:1;min-width:180px;">
-              <label>Nama Item</label>
-              <input id="whItemName" type="text" placeholder="Contoh: Tepung Terigu">
+        <div class="grid-2" style="gap:12px; margin:12px 0;">
+          <div class="card glass" style="padding:12px;">
+            <h3 style="margin:0 0 10px;">Tambah Master Item</h3>
+
+            <label>Nama Item</label>
+            <input id="whItemName" type="text" placeholder="Contoh: Tepung Terigu">
+
+            <div class="grid-2" style="gap:10px;">
+              <div>
+                <label>Unit Besar (dus)</label>
+                <input id="whItemUnitBig" type="text" placeholder="dus / sak / box">
+              </div>
+              <div>
+                <label>Unit Isi (pcs/ml/gram)</label>
+                <input id="whItemUnitSmall" type="text" placeholder="pcs / pack / barel">
+              </div>
             </div>
 
-            <!-- legacy (biar sesuai warehouse.js yang fallback ke whItemUnit) -->
-            <div style="width:140px;">
-              <label>Unit Dus (legacy)</label>
-              <input id="whItemUnit" type="text" placeholder="dus">
+            <div class="grid-2" style="gap:10px;">
+              <div>
+                <label>Isi per Dus</label>
+                <input id="whItemPackQty" type="number" min="0" step="1" placeholder="contoh: 24">
+              </div>
+              <div>
+                <label>Harga per Dus</label>
+                <input id="whItemPricePerPack" type="number" min="0" step="1" placeholder="contoh: 250000">
+              </div>
             </div>
 
-            <!-- field baru (opsional, tapi warehouse.js sudah siap) -->
-            <div style="width:140px;">
-              <label>Unit Besar</label>
-              <input id="whItemUnitBig" type="text" placeholder="dus">
-            </div>
-            <div style="width:140px;">
-              <label>Unit Isi</label>
-              <input id="whItemUnitSmall" type="text" placeholder="pcs/ml/gram">
-            </div>
-            <div style="width:160px;">
-              <label>Isi per Dus</label>
-              <input id="whItemPackQty" type="number" min="0" step="1" placeholder="cth 12">
-            </div>
-            <div style="width:180px;">
-              <label>Harga / Dus (Supplier)</label>
-              <input id="whItemPricePerPack" type="number" min="0" step="1" placeholder="cth 250000">
+            <!-- legacy agar tidak error kalau masih ada -->
+            <input id="whItemUnit" type="hidden">
+
+            <div class="grid-2" style="gap:10px;">
+              <div>
+                <label>EXP Date</label>
+                <input id="whItemExp" type="date">
+              </div>
+              <div>
+                <label>Tanggal Terima</label>
+                <input id="whItemReceivedAt" type="date">
+              </div>
             </div>
 
-            <div style="width:160px;">
-              <label>EXP Date</label>
-              <input id="whItemExp" type="date">
-            </div>
+            <label>Supplier</label>
+            <input id="whItemSupplier" type="text" placeholder="Nama supplier">
 
-            <div style="width:160px;">
-              <label>Tanggal Masuk</label>
-              <input id="whItemReceivedAt" type="date">
-            </div>
+            <label>Info</label>
+            <textarea id="whItemInfo" rows="3" placeholder="Catatan item..."></textarea>
 
-            <div style="flex:1;min-width:200px;">
-              <label>Supplier</label>
-              <input id="whItemSupplier" type="text" placeholder="Nama supplier">
-            </div>
+            <button id="btnSaveItem" class="btn-primary" type="button" style="margin-top:10px;">Simpan Item</button>
+          </div>
 
-            <div style="flex:2;min-width:240px;">
-              <label>Info</label>
-              <input id="whItemInfo" type="text" placeholder="Catatan (opsional)">
-            </div>
+          <div class="card glass" style="padding:12px;">
+            <h3 style="margin:0 0 10px;">Transfer W1 → W2</h3>
 
-            <div>
-              <button id="btnSaveItem" class="btn-primary" type="button">Simpan Item</button>
-            </div>
+            <label>Pilih Item</label>
+            <select id="moveItemSelect"></select>
+
+            <label>Qty Transfer (dalam unit besar)</label>
+            <input id="moveQty" type="number" min="0" step="1" placeholder="contoh: 1">
+
+            <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">Transfer</button>
+
+            <hr style="margin:14px 0; opacity:.25;">
+
+            <h3 style="margin:0 0 10px;">Filter Opname</h3>
+
+            <label>Gudang</label>
+            <select id="whOpnameGudang">
+              <option value="w1">Gudang 1</option>
+              <option value="w2">Gudang 2</option>
+            </select>
+
+            <label>Cari Item</label>
+            <input id="whOpnameSearch" type="text" placeholder="ketik nama / supplier / unit...">
           </div>
         </div>
 
-        <!-- FILTER + TABLE -->
-        <div class="card glass" style="margin-top:14px;">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="width:180px;">
-              <label>Pilih Gudang</label>
-              <select id="whOpnameGudang">
-                <option value="w1">Gudang 1</option>
-                <option value="w2">Gudang 2</option>
-              </select>
-            </div>
-            <div style="flex:1;min-width:220px;">
-              <label>Cari Item</label>
-              <input id="whOpnameSearch" type="text" placeholder="Cari nama/supplier/unit...">
-            </div>
-          </div>
-
-          <div style="overflow:auto;margin-top:12px;">
+        <div class="card glass" style="padding:12px;">
+          <h3 style="margin:0 0 10px;">Tabel Opname</h3>
+          <div style="overflow:auto;">
             <table class="table">
               <thead>
                 <tr>
@@ -279,132 +269,88 @@
                   <th>Unit</th>
                   <th>EXP</th>
                   <th>Info</th>
-                  <th>Masuk</th>
+                  <th>Terima</th>
                   <th>Supplier</th>
                   <th>Stok Sistem</th>
                   <th>Stok Fisik</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
-              <tbody id="whOpnameTableBody">
-                <tr><td colspan="9">Memuat...</td></tr>
-              </tbody>
+              <tbody id="whOpnameTableBody"></tbody>
             </table>
-          </div>
-        </div>
-
-        <!-- TRANSFER -->
-        <div class="card glass" style="margin-top:14px;">
-          <h3 style="margin:0 0 10px;">Transfer Gudang 1 → Gudang 2</h3>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="flex:1;min-width:240px;">
-              <label>Pilih Item</label>
-              <select id="moveItemSelect"></select>
-            </div>
-            <div style="width:160px;">
-              <label>Qty (dus)</label>
-              <input id="moveQty" type="number" min="0" step="1" placeholder="cth 2">
-            </div>
-            <div>
-              <button id="btnMove" class="btn-secondary" type="button">Transfer</button>
-            </div>
-          </div>
-          <div style="font-size:12px;opacity:.7;margin-top:8px;">
-            * Qty transfer memakai unit besar (dus). Kalau mau unit kecil, nanti kita bikin konversi dari packQty.
           </div>
         </div>
       </section>
 
-      <!-- ===================== WAREHOUSE WASTE ===================== -->
+      <!-- WAREHOUSE: WASTE -->
       <section id="whWasteSection" class="section hidden">
         <h2>Waste</h2>
 
-        <div class="card glass" style="margin-top:12px;">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="flex:1;min-width:220px;">
-              <label>Search Item (opsional)</label>
-              <input id="wasteItemSearch" type="text" placeholder="Ketik nama item...">
-            </div>
+        <div class="card glass" style="padding:12px; max-width:640px;">
+          <label>Cari Item</label>
+          <input id="wasteItemSearch" type="text" placeholder="ketik nama item...">
 
-            <div style="flex:1;min-width:240px;">
-              <label>Pilih Item</label>
-              <select id="wasteItemSelect"></select>
-            </div>
+          <label>Pilih Item</label>
+          <select id="wasteItemSelect"></select>
 
-            <div style="width:170px;">
+          <div class="grid-2" style="gap:10px;">
+            <div>
               <label>Tanggal</label>
               <input id="wasteDate" type="date">
             </div>
-
-            <div style="width:150px;">
-              <label>Qty</label>
-              <input id="wasteQty" type="number" min="0" step="0.01" placeholder="cth 250">
-            </div>
-
-            <div style="width:140px;">
+            <div>
               <label>Satuan</label>
               <select id="wasteUnit"></select>
             </div>
-
-            <div style="flex:2;min-width:240px;">
-              <label>Catatan</label>
-              <input id="wasteNote" type="text" placeholder="Alasan waste...">
-            </div>
-
-            <div>
-              <button id="btnSaveWaste" class="btn-primary" type="button">Simpan Waste</button>
-            </div>
           </div>
 
-          <div style="font-size:12px;opacity:.7;margin-top:10px;">
-            * Waste tidak mengurangi stok gudang (sesuai warehouse.js kamu). Kalau mau nanti, kita bisa bikin opsi “kurangi stok W1/W2”.
-          </div>
+          <label>Qty (gram/ml)</label>
+          <input id="wasteQty" type="number" min="0" step="1" placeholder="contoh: 250">
+
+          <label>Catatan</label>
+          <textarea id="wasteNote" rows="3" placeholder="Alasan waste..."></textarea>
+
+          <button id="btnSaveWaste" class="btn-primary" type="button" style="margin-top:10px;">Simpan Waste</button>
         </div>
       </section>
 
-      <!-- ===================== WAREHOUSE REPORT ===================== -->
+      <!-- WAREHOUSE: REPORT -->
       <section id="whReportSection" class="section hidden">
         <h2>Laporan Warehouse</h2>
 
-        <div class="card glass" style="margin-top:12px;">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="width:220px;">
-              <label>Jenis Laporan</label>
-              <select id="whReportType">
-                <option value="opname_w1">Opname Gudang 1</option>
-                <option value="opname_w2">Opname Gudang 2</option>
-                <option value="waste_w1">Waste</option>
-                <option value="waste_w2">Waste</option>
-              </select>
-            </div>
+        <div class="card glass" style="padding:12px; max-width:760px;">
+          <label>Tipe Laporan</label>
+          <select id="whReportType">
+            <option value="opname_w1">Opname Gudang 1</option>
+            <option value="opname_w2">Opname Gudang 2</option>
+            <option value="waste">Waste</option>
+          </select>
 
-            <div style="width:170px;">
+          <div class="grid-2" style="gap:10px;">
+            <div>
               <label>Tanggal Mulai</label>
               <input id="whReportStart" type="date">
             </div>
-
-            <div style="width:170px;">
+            <div>
               <label>Tanggal Akhir</label>
               <input id="whReportEnd" type="date">
             </div>
-
-            <div>
-              <button id="btnWhReport" class="btn-primary" type="button">Generate</button>
-            </div>
           </div>
 
-          <div style="overflow:auto;margin-top:12px;">
+          <button id="btnWhReport" class="btn-secondary" type="button" style="margin-top:10px;">Generate</button>
+        </div>
+
+        <div class="card glass" style="padding:12px; margin-top:12px;">
+          <div style="overflow:auto;">
             <table class="table">
               <thead id="whReportHead"></thead>
-              <tbody id="whReportBody">
-                <tr><td>Silakan generate laporan.</td></tr>
-              </tbody>
+              <tbody id="whReportBody"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- SECTION LAMA (boleh tetap ada) -->
+      <!-- SECTION LAMA (tetap ada biar script.js nggak error) -->
       <section id="salesSection" class="section hidden"></section>
       <section id="inventorySection" class="section hidden"></section>
       <section id="recipeSection" class="section hidden"></section>
