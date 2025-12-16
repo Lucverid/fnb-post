@@ -20,6 +20,7 @@ const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
 
+// ===================== Utils =====================
 function showToast(msg, type = "info", time = 3000) {
   const container = $("toast-container");
   if (!container) return alert(msg);
@@ -61,14 +62,51 @@ function escapeHtmlAttr(str) {
   return escapeHtml(str).replaceAll("\n", " ");
 }
 function iconBtn(html, title, extraClass = "") {
-  return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(title)}">${html}</button>`;
+  return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(
+    title
+  )}">${html}</button>`;
 }
 
-// ===== Collections
+// CSV helpers (Excel-friendly)
+function csvEscape(v) {
+  const s = (v ?? "").toString();
+  if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+  return s;
+}
+function buildCsv(metaRows, headers, rows) {
+  const lines = [];
+  // UTF-8 BOM for Excel
+  lines.push("\ufeff" + metaRows.map((r) => r.map(csvEscape).join(",")).join("\n"));
+  lines.push(""); // blank line
+  lines.push(headers.map(csvEscape).join(","));
+  rows.forEach((r) => lines.push(r.map(csvEscape).join(",")));
+  return lines.join("\n");
+}
+function downloadTextFile(filename, content, mime = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function dateInRange(dateStr, startStr, endStr) {
+  if (!dateStr) return false;
+  if (!startStr && !endStr) return true;
+  const key = dateStr; // YYYY-MM-DD
+  const s = startStr || "0000-01-01";
+  const e = endStr || "9999-12-31";
+  return key >= s && key <= e;
+}
+
+// ===================== Collections =====================
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
-// ===== DOM
+// ===================== DOM =====================
 const whDashboardSection = $("whDashboardSection");
 const whOpnameSection = $("whOpnameSection");
 const whWasteSection = $("whWasteSection");
@@ -96,12 +134,12 @@ const cardW2Banyak = $("cardW2Banyak");
 
 const dashboardExpiryWrapId = "whExpiryWrap";
 
-// Master item
+// Master form
 const whItemName = $("whItemName");
 const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
-const whItemInitStockW1 = $("whItemInitStockW1"); // optional (kalau ada di HTML)
+const whItemInitStockW1 = $("whItemInitStockW1"); // optional
 const whItemExp = $("whItemExp");
 const whItemReceivedAt = $("whItemReceivedAt");
 const whItemSupplier = $("whItemSupplier");
@@ -120,7 +158,7 @@ const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 
-// Waste
+// Waste form
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
 const wasteUnit = $("wasteUnit");
@@ -142,12 +180,12 @@ const notifList = $("notifList");
 const whReportType = $("whReportType");
 const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
+const whReportNote = $("whReportNote"); // ✅ textarea catatan (opsional)
 const btnWhReport = $("btnWhReport");
-const btnWhReportCsv = $("btnWhReportCsv");
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
-// ===== State
+// ===================== State =====================
 let currentUser = null;
 let items = [];
 let wasteLogs = [];
@@ -158,14 +196,15 @@ const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
 let whStockFilter = null;  // null | { gudang, bucket }
-let editingWasteId = null;
-let editingItemId = null;
+
+// ✅ Master edit mode (via form)
+let editingMasterId = null;
+
+// ✅ Waste edit mode (via form)
+let editingWasteFormId = null;
 
 let wasteSortByState = "dateKey";
 let wasteSortDirState = "asc";
-
-// Report state (buat export CSV)
-let lastReport = null; // { title, startKey, endKey, headCols, rows }
 
 const WASTE_PRESET_ITEMS = [
   "Milktea","Teh Hijau","Teh Hitam","Teh Blooming","Teh oolong",
@@ -173,7 +212,7 @@ const WASTE_PRESET_ITEMS = [
   "Eskrim original","eskrim yoghurt","pendamping lemon",
 ];
 
-// ===== Navigation
+// ===================== Navigation =====================
 function setActiveNav(btn) {
   document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
@@ -211,7 +250,7 @@ navWhReport?.addEventListener("click", () => {
   showWhSection("report");
 });
 
-// ===== Load
+// ===================== Load =====================
 async function loadWhItems() {
   const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
   items = [];
@@ -230,7 +269,7 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   }
 }
 
-// ===== Expiry
+// ===================== Expiry =====================
 function getExpStatus(expStr) {
   if (!expStr) return "ok";
   const now = new Date();
@@ -243,7 +282,7 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===== Stock bucket
+// ===================== Stock bucket =====================
 function stockBucketCount(stock) {
   const n = Number(stock || 0);
   if (n <= 0) return "habis";
@@ -252,7 +291,7 @@ function stockBucketCount(stock) {
   return "mid";
 }
 
-// ===== Dashboard expiry cards + click filter
+// ===================== Dashboard expiry cards =====================
 function ensureExpiryCards() {
   if (!whDashboardSection) return;
 
@@ -411,222 +450,35 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ===== Transfer helpers
-function currentTransferItem() {
-  const id = moveItemSelect?.value || "";
-  return items.find((x) => x.id === id) || null;
+// ===================== Master Form helpers =====================
+function fillMasterForm(it) {
+  if (!it) return;
+  if (whItemName) whItemName.value = it.name || "";
+  if (whItemUnitBig) whItemUnitBig.value = it.unitBig || "";
+  if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
+  if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
+  if (whItemInitStockW1) whItemInitStockW1.value = String(clampInt(it.stockW1, 0));
+  if (whItemExp) whItemExp.value = it.expDate || "";
+  if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
+  if (whItemSupplier) whItemSupplier.value = it.supplier || "";
+  if (whItemInfo) whItemInfo.value = it.info || "";
+  if (btnSaveItem) btnSaveItem.textContent = "Update";
+}
+function resetMasterForm() {
+  if (whItemName) whItemName.value = "";
+  if (whItemUnitBig) whItemUnitBig.value = "";
+  if (whItemUnitSmall) whItemUnitSmall.value = "";
+  if (whItemPackQty) whItemPackQty.value = "";
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
+  if (whItemExp) whItemExp.value = "";
+  if (whItemReceivedAt) whItemReceivedAt.value = "";
+  if (whItemSupplier) whItemSupplier.value = "";
+  if (whItemInfo) whItemInfo.value = "";
+  editingMasterId = null;
+  if (btnSaveItem) btnSaveItem.textContent = "Simpan Item";
 }
 
-function updateMoveInfo() {
-  if (!moveInfo) return;
-  const it = currentTransferItem();
-  const qtyPack = Number(moveQty?.value || 0);
-
-  if (!it) {
-    moveInfo.textContent = "";
-    return;
-  }
-
-  const packQty = Number(it.packQty || 0);
-  const unitBig = it.unitBig || "dus";
-  const unitSmall = it.unitSmall || "pcs";
-
-  const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
-  moveInfo.textContent =
-    packQty > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty})`
-      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
-}
-
-function fillMoveSelect(keyword = "") {
-  if (!moveItemSelect) return;
-
-  const kw = (keyword || "").trim().toLowerCase();
-  moveItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-
-  items.forEach((it) => {
-    // Transfer hanya boleh dari W1 yang punya stok
-    if (Number(it.stockW1 || 0) <= 0) return;
-
-    if (kw) {
-      const s = (it.name || "").toLowerCase();
-      if (!s.includes(kw)) return;
-    }
-
-    const opt = document.createElement("option");
-    opt.value = it.id;
-    opt.textContent = `${it.name} (W1: ${it.stockW1 || 0})`;
-    moveItemSelect.appendChild(opt);
-  });
-
-  updateMoveInfo();
-}
-
-// ===== Opname filters
-function applyExpiryFilter(list) {
-  if (!whExpiryFilter) return list;
-  return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
-}
-function applyStockFilter(list) {
-  if (!whStockFilter) return list;
-  const { gudang, bucket } = whStockFilter;
-  return (list || []).filter((it) => {
-    const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
-    return stockBucketCount(stock) === bucket;
-  });
-}
-
-/**
- * FIX:
- * - Gudang 1: tampilkan semua master item (biar item baru tetap muncul walau stok 0)
- * - Gudang 2: tampilkan hanya item yg punya stockW2 > 0 (hasil transfer)
- */
-function applyGudangVisibility(list, gudang) {
-  if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
-  return (list || []);
-}
-
-// ===== Opname Table
-function renderOpnameTable() {
-  if (!whOpnameTableBody || !whOpnameGudang) return;
-
-  const gudang = whOpnameGudang.value || "w1";
-  const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
-
-  let list = [...items];
-
-  if (keyword) {
-    list = list.filter(
-      (it) =>
-        (it.name || "").toLowerCase().includes(keyword) ||
-        (it.supplier || "").toLowerCase().includes(keyword) ||
-        (it.unitBig || "").toLowerCase().includes(keyword) ||
-        (it.unitSmall || "").toLowerCase().includes(keyword)
-    );
-  }
-
-  list = applyGudangVisibility(list, gudang);
-  list = applyExpiryFilter(list);
-  list = applyStockFilter(list);
-
-  whOpnameTableBody.innerHTML = "";
-  if (!list.length) {
-    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item untuk ${gudang.toUpperCase()}.</td></tr>`;
-    return;
-  }
-
-  list.forEach((it) => {
-    const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-    const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
-    const isEditing = editingItemId === it.id;
-
-    const expStr = it.expDate || "-";
-    const expStatus = getExpStatus(it.expDate || "");
-    const expBadge =
-      expStatus === "expired"
-        ? `<span class="status-badge red">EXPIRED</span>`
-        : expStatus === "soon"
-        ? `<span class="status-badge yellow">SOON</span>`
-        : `<span class="status-badge green">OK</span>`;
-
-    const tr = document.createElement("tr");
-    tr.dataset.itemId = it.id;
-
-    tr.innerHTML = `
-      <td>${isEditing ? `<input data-iedit="name" value="${escapeHtmlAttr(it.name || "")}"/>` : (it.name || "-")}</td>
-      <td>${
-        isEditing
-          ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <input data-iedit="unitBig" style="max-width:110px" value="${escapeHtmlAttr(it.unitBig || "")}" placeholder="unit besar"/>
-              <input data-iedit="unitSmall" style="max-width:110px" value="${escapeHtmlAttr(it.unitSmall || "")}" placeholder="unit isi"/>
-              <input data-iedit="packQty" type="number" min="1" step="1" style="max-width:110px" value="${clampInt(it.packQty || 0, 0)}" placeholder="isi/dus"/>
-            </div>`
-          : `${unitText}<div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>`
-      }</td>
-      <td>${
-        isEditing
-          ? `<input data-iedit="expDate" type="date" value="${escapeHtmlAttr(it.expDate || "")}" />`
-          : `${expStr}<div style="margin-top:6px;">${expBadge}</div>`
-      }</td>
-      <td>${isEditing ? `<input data-iedit="info" value="${escapeHtmlAttr(it.info || "")}" />` : (it.info || "-")}</td>
-      <td>${isEditing ? `<input data-iedit="receivedAt" type="date" value="${escapeHtmlAttr(it.receivedAt || "")}" />` : (it.receivedAt || "-")}</td>
-      <td>${isEditing ? `<input data-iedit="supplier" value="${escapeHtmlAttr(it.supplier || "")}" />` : (it.supplier || "-")}</td>
-      <td>${systemStock}</td>
-      <td>
-        <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
-      </td>
-      <td style="text-align:right;">
-        <div class="table-actions">
-          <span data-ibtn="saveOpname">${iconBtn('<i class="lucide-save"></i>', "Simpan Opname")}</span>
-          ${
-            isEditing
-              ? `
-                <span data-ibtn="saveEdit">${iconBtn('<i class="lucide-check"></i>', "Simpan Edit")}</span>
-                <span data-ibtn="cancelEdit">${iconBtn('<i class="lucide-x"></i>', "Batal")}</span>
-              `
-              : `
-                <span data-ibtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit Item")}</span>
-                <span data-ibtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus Item", "danger")}</span>
-              `
-          }
-        </div>
-      </td>
-    `;
-
-    const bind = (key, fn) => {
-      const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
-      if (el) el.addEventListener("click", fn);
-    };
-
-    bind("saveOpname", async () => await saveOpname(it.id));
-    bind("edit", () => { editingItemId = it.id; renderOpnameTable(); });
-    bind("cancelEdit", () => { editingItemId = null; renderOpnameTable(); });
-    bind("saveEdit", async () => await saveEditItem(it.id));
-    bind("delete", async () => await deleteItem(it.id));
-
-    whOpnameTableBody.appendChild(tr);
-  });
-}
-
-// stok fisik > stok sistem => ERROR
-async function saveOpname(itemId) {
-  if (!currentUser) return showToast("Harus login", "error");
-
-  const gudang = whOpnameGudang?.value || "w1";
-  const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
-  if (!inp) return;
-
-  const physical = Number(inp.value || 0);
-  if (physical < 0) return showToast("Stok fisik tidak valid", "error");
-
-  const it = items.find((x) => x.id === itemId);
-  if (!it) return showToast("Item tidak ditemukan", "error");
-
-  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-
-  if (physical > systemStock) {
-    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
-  }
-
-  const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = physical;
-  else payload.stockW2 = physical;
-
-  try {
-    await updateDoc(doc(db, "wh_items", itemId), payload);
-    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
-    await loadWhItems();
-    fillMoveSelect(moveSearch?.value || "");
-    renderOpnameTable();
-    updateDashboard();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal simpan opname", "error");
-  }
-}
-
-// ===== Master item
-async function saveMasterItem() {
+async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
 
   const name = (whItemName?.value || "").trim();
@@ -666,65 +518,270 @@ async function saveMasterItem() {
   try {
     await addDoc(colWhItems, docData);
     showToast("Master item tersimpan", "success");
-
-    if (whItemName) whItemName.value = "";
-    if (whItemUnitBig) whItemUnitBig.value = "";
-    if (whItemUnitSmall) whItemUnitSmall.value = "";
-    if (whItemPackQty) whItemPackQty.value = "";
-    if (whItemInitStockW1) whItemInitStockW1.value = "";
-    if (whItemExp) whItemExp.value = "";
-    if (whItemReceivedAt) whItemReceivedAt.value = "";
-    if (whItemSupplier) whItemSupplier.value = "";
-    if (whItemInfo) whItemInfo.value = "";
+    resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan master item", "error");
   }
 }
 
-// ===== CRUD item
-async function saveEditItem(id) {
+async function updateMasterItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!whOpnameTableBody) return;
+  if (!id) return;
 
-  const target = whOpnameTableBody.querySelector(`tr[data-item-id="${id}"]`);
-  if (!target) return showToast("Row edit tidak ditemukan", "error");
+  const itOld = items.find((x) => x.id === id);
+  if (!itOld) return showToast("Item tidak ditemukan", "error");
 
-  const name = (target.querySelector(`input[data-iedit="name"]`)?.value || "").trim();
-  const unitBig = (target.querySelector(`input[data-iedit="unitBig"]`)?.value || "").trim();
-  const unitSmall = (target.querySelector(`input[data-iedit="unitSmall"]`)?.value || "").trim();
-  const packQty = Number(target.querySelector(`input[data-iedit="packQty"]`)?.value || 0);
-  const expDate = target.querySelector(`input[data-iedit="expDate"]`)?.value || "";
-  const receivedAt = target.querySelector(`input[data-iedit="receivedAt"]`)?.value || "";
-  const supplier = (target.querySelector(`input[data-iedit="supplier"]`)?.value || "").trim();
-  const info = (target.querySelector(`input[data-iedit="info"]`)?.value || "").trim();
+  const name = (whItemName?.value || "").trim();
+  const unitBig = (whItemUnitBig?.value || "").trim();
+  const unitSmall = (whItemUnitSmall?.value || "").trim();
+  const packQty = Number(whItemPackQty?.value || 0);
 
-  if (!name) return showToast("Nama item wajib", "error");
-  if (!unitBig) return showToast("Unit besar wajib", "error");
-  if (!unitSmall) return showToast("Unit isi wajib", "error");
-  if (!packQty || packQty <= 0) return showToast("Isi/dus wajib > 0", "error");
+  const expDate = whItemExp?.value || "";
+  const receivedAt = whItemReceivedAt?.value || "";
+  const supplier = (whItemSupplier?.value || "").trim();
+  const info = (whItemInfo?.value || "").trim();
+
+  if (!name) return showToast("Nama item wajib diisi", "error");
+  if (!unitBig) return showToast("Unit besar wajib diisi", "error");
+  if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
+  if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
+
+  const payload = {
+    name,
+    unitBig,
+    unitSmall,
+    packQty,
+    expDate,
+    receivedAt,
+    supplier,
+    info,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (whItemInitStockW1) {
+    const s = Number(whItemInitStockW1.value || 0);
+    payload.stockW1 = Number.isFinite(s) && s >= 0 ? Math.trunc(s) : (itOld.stockW1 || 0);
+  }
 
   try {
-    await updateDoc(doc(db, "wh_items", id), {
-      name, unitBig, unitSmall, packQty, expDate, receivedAt, supplier, info,
-      updatedAt: serverTimestamp(),
-    });
-
-    showToast("Item berhasil diupdate", "success");
-    editingItemId = null;
+    await updateDoc(doc(db, "wh_items", id), payload);
+    showToast("Master item diupdate", "success");
+    resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update item", "error");
+    showToast("Gagal update master item", "error");
+  }
+}
+
+async function saveOrUpdateMasterItem() {
+  if (editingMasterId) return await updateMasterItem(editingMasterId);
+  return await createMasterItem();
+}
+
+// ===================== Transfer helpers =====================
+function currentTransferItem() {
+  const id = moveItemSelect?.value || "";
+  return items.find((x) => x.id === id) || null;
+}
+
+function updateMoveInfo() {
+  if (!moveInfo) return;
+  const it = currentTransferItem();
+  const qtyPack = Number(moveQty?.value || 0);
+
+  if (!it) {
+    moveInfo.textContent = "";
+    return;
+  }
+
+  const packQty = Number(it.packQty || 0);
+  const unitBig = it.unitBig || "dus";
+  const unitSmall = it.unitSmall || "pcs";
+
+  const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
+  moveInfo.textContent =
+    packQty > 0
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0}`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
+}
+
+function fillMoveSelect(keyword = "") {
+  if (!moveItemSelect) return;
+
+  const kw = (keyword || "").trim().toLowerCase();
+  moveItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
+
+  items.forEach((it) => {
+    if (kw) {
+      const s = (it.name || "").toLowerCase();
+      if (!s.includes(kw)) return;
+    }
+
+    const s1 = Number(it.stockW1 || 0);
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = `${it.name} (W1: ${s1})`;
+    if (s1 <= 0) opt.disabled = true; // tetap terlihat
+    moveItemSelect.appendChild(opt);
+  });
+
+  updateMoveInfo();
+}
+
+// ===================== Opname filters =====================
+function applyExpiryFilter(list) {
+  if (!whExpiryFilter) return list;
+  return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
+}
+function applyStockFilter(list) {
+  if (!whStockFilter) return list;
+  const { gudang, bucket } = whStockFilter;
+  return (list || []).filter((it) => {
+    const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
+    return stockBucketCount(stock) === bucket;
+  });
+}
+function applyGudangVisibility(list, gudang) {
+  if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
+  return (list || []);
+}
+
+// ===================== Opname table =====================
+function renderOpnameTable() {
+  if (!whOpnameTableBody || !whOpnameGudang) return;
+
+  const gudang = whOpnameGudang.value || "w1";
+  const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
+
+  let list = [...items];
+
+  if (keyword) {
+    list = list.filter(
+      (it) =>
+        (it.name || "").toLowerCase().includes(keyword) ||
+        (it.supplier || "").toLowerCase().includes(keyword) ||
+        (it.unitBig || "").toLowerCase().includes(keyword) ||
+        (it.unitSmall || "").toLowerCase().includes(keyword)
+    );
+  }
+
+  list = applyGudangVisibility(list, gudang);
+  list = applyExpiryFilter(list);
+  list = applyStockFilter(list);
+
+  whOpnameTableBody.innerHTML = "";
+  if (!list.length) {
+    whOpnameTableBody.innerHTML = `<tr><td colspan="9">Belum ada item untuk ${gudang.toUpperCase()}.</td></tr>`;
+    return;
+  }
+
+  list.forEach((it) => {
+    const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+    const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
+
+    const expStr = it.expDate || "-";
+    const expStatus = getExpStatus(it.expDate || "");
+    const expBadge =
+      expStatus === "expired"
+        ? `<span class="status-badge red">EXPIRED</span>`
+        : expStatus === "soon"
+        ? `<span class="status-badge yellow">SOON</span>`
+        : `<span class="status-badge green">OK</span>`;
+
+    const tr = document.createElement("tr");
+    tr.dataset.itemId = it.id;
+
+    tr.innerHTML = `
+      <td>${escapeHtml(it.name || "-")}</td>
+      <td>
+        ${escapeHtml(unitText)}
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>
+      </td>
+      <td>
+        ${escapeHtml(expStr)}
+        <div style="margin-top:6px;">${expBadge}</div>
+      </td>
+      <td>${escapeHtml(it.info || "-")}</td>
+      <td>${escapeHtml(it.receivedAt || "-")}</td>
+      <td>${escapeHtml(it.supplier || "-")}</td>
+      <td>${systemStock}</td>
+      <td>
+        <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
+      </td>
+      <td style="text-align:right;">
+        <div class="table-actions">
+          <span data-ibtn="saveOpname">${iconBtn('<i class="lucide-save"></i>', "Simpan Opname")}</span>
+          <span data-ibtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit (muncul di form master)")}</span>
+          <span data-ibtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus Item", "danger")}</span>
+        </div>
+      </td>
+    `;
+
+    const bind = (key, fn) => {
+      const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
+      if (el) el.addEventListener("click", fn);
+    };
+
+    bind("saveOpname", async () => await saveOpname(it.id));
+    bind("edit", () => {
+      editingMasterId = it.id;
+      fillMasterForm(it);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    bind("delete", async () => await deleteItem(it.id));
+
+    whOpnameTableBody.appendChild(tr);
+  });
+}
+
+async function saveOpname(itemId) {
+  if (!currentUser) return showToast("Harus login", "error");
+
+  const gudang = whOpnameGudang?.value || "w1";
+  const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
+  if (!inp) return;
+
+  const physical = Number(inp.value || 0);
+  if (physical < 0) return showToast("Stok fisik tidak valid", "error");
+
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return showToast("Item tidak ditemukan", "error");
+
+  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+
+  if (physical > systemStock) {
+    return showToast(`Error: stok fisik (${physical}) > stok sistem (${systemStock}).`, "error", 3500);
+  }
+
+  const payload = { updatedAt: serverTimestamp() };
+  if (gudang === "w1") payload.stockW1 = physical;
+  else payload.stockW2 = physical;
+
+  try {
+    await updateDoc(doc(db, "wh_items", itemId), payload);
+    showToast(`Opname tersimpan (${gudang.toUpperCase()})`, "success");
+
+    await loadWhItems();
+    fillMoveSelect(moveSearch?.value || "");
+    renderOpnameTable();
+    updateDashboard();
+    updateMoveInfo();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal simpan opname", "error");
   }
 }
 
@@ -737,19 +794,20 @@ async function deleteItem(id) {
   try {
     await deleteDoc(doc(db, "wh_items", id));
     showToast("Item dihapus", "success");
-    if (editingItemId === id) editingItemId = null;
+
+    if (editingMasterId === id) resetMasterForm();
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal hapus item", "error");
   }
 }
 
-// ===== Transfer W1 → W2
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -780,49 +838,45 @@ async function transferW1toW2() {
     fillMoveSelect(moveSearch?.value || "");
     renderOpnameTable();
     updateDashboard();
+    updateMoveInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal transfer", "error");
   }
 }
 
-// ===== Waste
-function ensureWasteDefaults() {
+// ===================== Waste: form mode (Simpan/Update) =====================
+function setWasteButtonModeUpdate(on) {
+  if (!btnSaveWaste) return;
+  btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste";
+}
+
+function resetWasteForm() {
+  if (wasteItemSelect) wasteItemSelect.value = "";
+  if (wasteQty) wasteQty.value = "";
+  if (wasteNote) wasteNote.value = "";
+  if (wasteUnit) wasteUnit.value = "gram";
+
   const today = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const val = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  if (wasteDate && !wasteDate.value) wasteDate.value = val;
-  if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
-  if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
+  if (wasteDate) wasteDate.value = val;
 
-  // report defaults
-  if (whReportStart && !whReportStart.value) whReportStart.value = val;
-  if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
+  editingWasteFormId = null;
+  setWasteButtonModeUpdate(false);
 }
 
-function fillWasteSelectPreset() {
-  if (!wasteItemSelect) return;
-  wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-  WASTE_PRESET_ITEMS.forEach((name) => {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    wasteItemSelect.appendChild(opt);
-  });
-}
-function fillWasteUnitOptions() {
-  if (!wasteUnit) return;
-  const units = ["gram", "ml", "pcs", "unit"];
-  wasteUnit.innerHTML = "";
-  units.forEach((u) => {
-    const opt = document.createElement("option");
-    opt.value = u;
-    opt.textContent = u;
-    wasteUnit.appendChild(opt);
-  });
+function fillWasteFormFromRow(w) {
+  if (!w) return;
+  if (wasteItemSelect) wasteItemSelect.value = w.itemName || "";
+  if (wasteDate) wasteDate.value = w.dateKey || "";
+  if (wasteUnit) wasteUnit.value = w.unit || "gram";
+  if (wasteQty) wasteQty.value = String(clampInt(w.qty, 0));
+  if (wasteNote) wasteNote.value = w.note || "";
+  setWasteButtonModeUpdate(true);
 }
 
-async function saveWaste() {
+async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
   const itemName = (wasteItemSelect?.value || "").trim();
@@ -852,8 +906,7 @@ async function saveWaste() {
   try {
     await addDoc(colWhWaste, log);
     showToast("Waste tersimpan", "success");
-    if (wasteQty) wasteQty.value = "";
-    if (wasteNote) wasteNote.value = "";
+    resetWasteForm();
 
     await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
     renderWasteHistory();
@@ -861,6 +914,81 @@ async function saveWaste() {
     console.error(e);
     showToast("Gagal simpan waste", "error");
   }
+}
+
+async function updateWaste(id) {
+  if (!currentUser) return showToast("Harus login", "error");
+  if (!id) return;
+
+  const itemName = (wasteItemSelect?.value || "").trim();
+  if (!itemName) return showToast("Pilih item waste dulu", "error");
+
+  const d = wasteDate?.value || "";
+  if (!d) return showToast("Tanggal waste wajib diisi", "error");
+
+  const qty = Number(wasteQty?.value || 0);
+  if (!qty || qty <= 0) return showToast("Qty waste harus > 0", "error");
+
+  const unit = (wasteUnit?.value || "unit").trim();
+  const note = (wasteNote?.value || "").trim();
+
+  try {
+    await updateDoc(doc(db, "wh_waste", id), {
+      itemId: `preset:${itemName}`,
+      itemName,
+      dateKey: d,
+      qty,
+      unit,
+      note,
+      updatedAt: serverTimestamp(),
+    });
+
+    showToast("Waste berhasil diupdate", "success");
+    resetWasteForm();
+
+    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+    renderWasteHistory();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal update waste", "error");
+  }
+}
+
+async function saveOrUpdateWaste() {
+  if (editingWasteFormId) return await updateWaste(editingWasteFormId);
+  return await createWaste();
+}
+
+// ===================== Waste list =====================
+function ensureWasteDefaults() {
+  const today = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const val = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  if (wasteDate && !wasteDate.value) wasteDate.value = val;
+  if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
+  if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
+}
+
+function fillWasteSelectPreset() {
+  if (!wasteItemSelect) return;
+  wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
+  WASTE_PRESET_ITEMS.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    wasteItemSelect.appendChild(opt);
+  });
+}
+function fillWasteUnitOptions() {
+  if (!wasteUnit) return;
+  const units = ["gram", "ml", "pcs", "unit"];
+  wasteUnit.innerHTML = "";
+  units.forEach((u) => {
+    const opt = document.createElement("option");
+    opt.value = u;
+    opt.textContent = u;
+    wasteUnit.appendChild(opt);
+  });
 }
 
 function getWasteFilterStart() {
@@ -883,24 +1011,6 @@ function sortWasteList(list) {
   });
 
   return dir === "asc" ? sorted : sorted.reverse();
-}
-
-function buildWasteItemSelectHTML(current) {
-  const opts = WASTE_PRESET_ITEMS.map((x) => {
-    const sel = x === current ? "selected" : "";
-    return `<option value="${escapeHtmlAttr(x)}" ${sel}>${escapeHtml(x)}</option>`;
-  }).join("");
-  return `<select data-wedit="itemName">${opts}</select>`;
-}
-function buildWasteUnitSelectHTML(current) {
-  const units = ["gram", "ml", "pcs", "unit"];
-  const opts = units
-    .map((u) => {
-      const sel = u === current ? "selected" : "";
-      return `<option value="${escapeHtmlAttr(u)}" ${sel}>${escapeHtml(u)}</option>`;
-    })
-    .join("");
-  return `<select data-wedit="unit">${opts}</select>`;
 }
 
 function renderWasteHistory() {
@@ -927,30 +1037,20 @@ function renderWasteHistory() {
   }
 
   list.forEach((w) => {
-    const isEditing = editingWasteId === w.id;
     const tr = document.createElement("tr");
     tr.dataset.wasteId = w.id;
 
     tr.innerHTML = `
-      <td>${isEditing ? `<input type="date" data-wedit="dateKey" value="${w.dateKey || ""}" />` : (w.dateKey || "-")}</td>
-      <td>${isEditing ? buildWasteItemSelectHTML(w.itemName || "") : (w.itemName || "-")}</td>
-      <td>${isEditing ? `<input type="number" min="0" step="1" data-wedit="qty" value="${clampInt(w.qty, 0)}" style="max-width:110px;" />` : clampInt(w.qty, 0)}</td>
-      <td>${isEditing ? buildWasteUnitSelectHTML(w.unit || "unit") : (w.unit || "-")}</td>
-      <td>${isEditing ? `<input type="text" data-wedit="note" value="${escapeHtmlAttr(w.note || "")}" />` : (w.note || "-")}</td>
-      <td>${w.createdBy || "-"}</td>
+      <td>${escapeHtml(w.dateKey || "-")}</td>
+      <td>${escapeHtml(w.itemName || "-")}</td>
+      <td>${clampInt(w.qty, 0)}</td>
+      <td>${escapeHtml(w.unit || "-")}</td>
+      <td>${escapeHtml(w.note || "-")}</td>
+      <td>${escapeHtml(w.createdBy || "-")}</td>
       <td style="text-align:right;">
         <div class="table-actions">
-          ${
-            isEditing
-              ? `
-                <span data-wbtn="save">${iconBtn('<i class="lucide-check"></i>', "Save")}</span>
-                <span data-wbtn="cancel">${iconBtn('<i class="lucide-x"></i>', "Cancel")}</span>
-              `
-              : `
-                <span data-wbtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit")}</span>
-                <span data-wbtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus", "danger")}</span>
-              `
-          }
+          <span data-wbtn="edit">${iconBtn('<i class="lucide-pencil"></i>', "Edit (muncul di form waste)")}</span>
+          <span data-wbtn="delete">${iconBtn('<i class="lucide-trash-2"></i>', "Hapus", "danger")}</span>
         </div>
       </td>
     `;
@@ -960,52 +1060,16 @@ function renderWasteHistory() {
       if (el) el.addEventListener("click", fn);
     };
 
-    bind("edit", () => { editingWasteId = w.id; renderWasteHistory(); });
-    bind("cancel", () => { editingWasteId = null; renderWasteHistory(); });
-    bind("save", async () => await saveEditWaste(w.id));
+    bind("edit", () => {
+      editingWasteFormId = w.id;
+      fillWasteFormFromRow(w);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
     bind("delete", async () => await deleteWaste(w.id));
 
     wasteHistoryBody.appendChild(tr);
   });
-}
-
-async function saveEditWaste(id) {
-  if (!currentUser) return showToast("Harus login", "error");
-  if (!wasteHistoryBody) return;
-
-  const target = wasteHistoryBody.querySelector(`tr[data-waste-id="${id}"]`);
-  if (!target) return showToast("Row waste tidak ditemukan", "error");
-
-  const dateKey = target.querySelector(`input[data-wedit="dateKey"]`)?.value || "";
-  const itemName = target.querySelector(`select[data-wedit="itemName"]`)?.value || "";
-  const qty = Number(target.querySelector(`input[data-wedit="qty"]`)?.value || 0);
-  const unit = target.querySelector(`select[data-wedit="unit"]`)?.value || "unit";
-  const note = target.querySelector(`input[data-wedit="note"]`)?.value || "";
-
-  if (!dateKey) return showToast("Tanggal wajib diisi", "error");
-  if (!itemName) return showToast("Item wajib dipilih", "error");
-  if (!qty || qty <= 0) return showToast("Qty harus > 0", "error");
-
-  try {
-    await updateDoc(doc(db, "wh_waste", id), {
-      dateKey,
-      itemId: `preset:${itemName}`,
-      itemName,
-      qty,
-      unit,
-      note,
-      updatedAt: serverTimestamp(),
-    });
-
-    showToast("Waste updated", "success");
-    editingWasteId = null;
-
-    await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-    renderWasteHistory();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal update waste", "error");
-  }
 }
 
 async function deleteWaste(id) {
@@ -1016,7 +1080,8 @@ async function deleteWaste(id) {
   try {
     await deleteDoc(doc(db, "wh_waste", id));
     showToast("Waste dihapus", "success");
-    if (editingWasteId === id) editingWasteId = null;
+
+    if (editingWasteFormId === id) resetWasteForm();
 
     await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
     renderWasteHistory();
@@ -1026,136 +1091,164 @@ async function deleteWaste(id) {
   }
 }
 
-// ===== REPORT (Generate + CSV)
-function renderReportTable(headCols, rows) {
+// ===================== REPORT (Generate + CSV Download) =====================
+let reportLast = null; // simpan data report terakhir untuk tombol Download CSV
+
+function ensureDownloadReportButton() {
+  if (!whReportSection) return null;
+
+  let btn = $("btnWhReportDownload");
+  if (btn) return btn;
+
+  // cari container card yang sama dengan tombol generate, kalau nggak ketemu: taruh di section
+  const anchor = btnWhReport?.parentElement || whReportSection;
+
+  btn = document.createElement("button");
+  btn.id = "btnWhReportDownload";
+  btn.type = "button";
+  btn.className = "btn-outline";
+  btn.textContent = "Download CSV";
+  btn.style.marginTop = "10px";
+  btn.disabled = true;
+
+  anchor.appendChild(btn);
+
+  btn.addEventListener("click", () => {
+    if (!reportLast) return showToast("Belum ada laporan. Klik Generate dulu.", "error");
+    const { type, start, end, note, headers, rows } = reportLast;
+
+    const meta = [
+      ["Report Type", type],
+      ["Start Date", start || "-"],
+      ["End Date", end || "-"],
+      ["Note", note || "-"],
+      ["Generated At", new Date().toISOString()],
+    ];
+
+    const csv = buildCsv(meta, headers, rows);
+    const safeStart = (start || "all").replaceAll(":", "-");
+    const safeEnd = (end || "all").replaceAll(":", "-");
+    const filename = `warehouse_report_${type}_${safeStart}_${safeEnd}.csv`;
+    downloadTextFile(filename, csv);
+  });
+
+  return btn;
+}
+
+function renderReportTable(headers, rows) {
   if (!whReportHead || !whReportBody) return;
 
-  whReportHead.innerHTML = `
-    <tr>${headCols.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>
-  `;
+  whReportHead.innerHTML = `<tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
+  whReportBody.innerHTML = "";
 
   if (!rows.length) {
-    whReportBody.innerHTML = `<tr><td colspan="${headCols.length}">Tidak ada data pada rentang ini.</td></tr>`;
+    whReportBody.innerHTML = `<tr><td colspan="${headers.length}">Tidak ada data.</td></tr>`;
     return;
   }
 
-  whReportBody.innerHTML = rows
-    .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
-    .join("");
-}
-
-function csvEscape(v) {
-  const s = String(v ?? "");
-  if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
-  return s;
-}
-function toCsv(headCols, rows) {
-  const lines = [];
-  lines.push(headCols.map(csvEscape).join(","));
-  rows.forEach((r) => lines.push(r.map(csvEscape).join(",")));
-  return lines.join("\n");
-}
-function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function getReportRangeKeys() {
-  const s = (whReportStart?.value || "").trim();
-  const e = (whReportEnd?.value || "").trim();
-  if (!s || !e) return null;
-  if (s > e) return null;
-  return { s, e };
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = r.map((c) => `<td>${escapeHtml(c ?? "")}</td>`).join("");
+    whReportBody.appendChild(tr);
+  });
 }
 
 async function generateWarehouseReport() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!whReportType) return;
 
-  const range = getReportRangeKeys();
-  if (!range) return showToast("Tanggal mulai/akhir tidak valid", "error");
+  const type = whReportType?.value || "opname_w1";
+  const start = whReportStart?.value || "";
+  const end = whReportEnd?.value || "";
+  const note = (whReportNote?.value || "").trim();
 
-  const type = whReportType.value || "waste";
-  const startKey = range.s;
-  const endKey = range.e;
+  const btnDownload = ensureDownloadReportButton();
+  if (btnDownload) btnDownload.disabled = true;
 
-  // Pastikan data terbaru
-  await loadWhItems();
+  try {
+    if (type === "waste") {
+      // waste berdasarkan dateKey
+      await loadWasteLogs(parseDateOnly(start), parseDateOnly(end));
+      const list = (wasteLogs || []).filter((w) => dateInRange(w.dateKey || "", start, end));
 
-  if (type === "opname_w1") {
-    const head = ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1", "EXP", "Terima", "Info"];
-    const rows = items.map((it) => ([
-      it.name || "-",
-      it.supplier || "-",
-      it.unitBig || "-",
-      it.unitSmall || "-",
-      String(clampInt(it.packQty || 0, 0)),
-      String(clampInt(it.stockW1 || 0, 0)),
-      it.expDate || "-",
-      it.receivedAt || "-",
-      it.info || "-",
-    ]));
+      const headers = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
+      const rows = list.map((w) => [
+        w.dateKey || "-",
+        w.itemName || "-",
+        String(clampInt(w.qty, 0)),
+        w.unit || "-",
+        w.note || "-",
+        w.createdBy || "-",
+      ]);
 
-    lastReport = { title: type, startKey, endKey, headCols: head, rows };
-    renderReportTable(head, rows);
-    showToast("Laporan Opname W1 dibuat", "success");
-    return;
-  }
+      renderReportTable(headers, rows);
+      reportLast = { type, start, end, note, headers, rows };
+      if (btnDownload) btnDownload.disabled = false;
+      showToast("Laporan waste berhasil dibuat", "success");
+      return;
+    }
 
-  if (type === "opname_w2") {
-    // W2: sesuai konsep kamu (cuma yang pernah transfer / stockW2 > 0)
-    const head = ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W2", "EXP", "Terima", "Info"];
-    const rows = items
-      .filter((it) => Number(it.stockW2 || 0) > 0)
-      .map((it) => ([
+    // opname snapshot (filter optional berdasarkan receivedAt kalau kamu isi)
+    await loadWhItems();
+
+    const gudang = type === "opname_w2" ? "w2" : "w1";
+
+    let list = [...items];
+
+    // kalau W2: sesuai rule kamu, hanya yang stockW2 > 0
+    if (gudang === "w2") list = list.filter((it) => Number(it.stockW2 || 0) > 0);
+
+    // filter tanggal terima optional (receivedAt format YYYY-MM-DD)
+    if (start || end) {
+      list = list.filter((it) => dateInRange(it.receivedAt || "", start, end));
+    }
+
+    const headers = [
+      "Nama Item",
+      "Gudang",
+      "Stok (Dus)",
+      "Unit Besar",
+      "Isi / Dus",
+      "Unit Isi",
+      "Total (PCS)",
+      "EXP",
+      "Terima",
+      "Supplier",
+      "Info",
+    ];
+
+    const rows = list.map((it) => {
+      const stockDus = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+      const packQty = Number(it.packQty || 0);
+      const totalPcs = stockDus > 0 && packQty > 0 ? stockDus * packQty : 0;
+
+      return [
         it.name || "-",
-        it.supplier || "-",
+        gudang.toUpperCase(),
+        String(stockDus),
         it.unitBig || "-",
+        String(clampInt(packQty, 0)),
         it.unitSmall || "-",
-        String(clampInt(it.packQty || 0, 0)),
-        String(clampInt(it.stockW2 || 0, 0)),
+        String(clampInt(totalPcs, 0)),
         it.expDate || "-",
         it.receivedAt || "-",
+        it.supplier || "-",
         it.info || "-",
-      ]));
+      ];
+    });
 
-    lastReport = { title: type, startKey, endKey, headCols: head, rows };
-    renderReportTable(head, rows);
-    showToast("Laporan Opname W2 dibuat", "success");
-    return;
+    renderReportTable(headers, rows);
+    reportLast = { type, start, end, note, headers, rows };
+    if (btnDownload) btnDownload.disabled = false;
+
+    showToast("Laporan opname berhasil dibuat", "success");
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal generate laporan", "error");
   }
-
-  // WASTE
-  const sDate = parseDateOnly(startKey);
-  const eDate = parseDateOnly(endKey);
-  await loadWasteLogs(sDate, eDate);
-
-  const head = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
-  const rows = [...wasteLogs]
-    .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
-    .map((w) => ([
-      w.dateKey || "-",
-      w.itemName || "-",
-      String(clampInt(w.qty, 0)),
-      w.unit || "-",
-      w.note || "-",
-      w.createdBy || "-",
-    ]));
-
-  lastReport = { title: type, startKey, endKey, headCols: head, rows };
-  renderReportTable(head, rows);
-  showToast("Laporan Waste dibuat", "success");
 }
 
-// ===== Events
-btnSaveItem?.addEventListener("click", saveMasterItem);
+// ===================== Events =====================
+btnSaveItem?.addEventListener("click", saveOrUpdateMasterItem);
 
 btnMove?.addEventListener("click", transferW1toW2);
 moveSearch?.addEventListener("input", () => fillMoveSelect(moveSearch.value || ""));
@@ -1168,7 +1261,8 @@ whOpnameGudang?.addEventListener("change", () => {
 });
 whOpnameSearch?.addEventListener("input", renderOpnameTable);
 
-btnSaveWaste?.addEventListener("click", saveWaste);
+// ✅ Waste button pakai saveOrUpdateWaste
+btnSaveWaste?.addEventListener("click", saveOrUpdateWaste);
 
 wasteFilterStart?.addEventListener("change", async () => {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
@@ -1190,37 +1284,24 @@ wasteSortDirBtn?.addEventListener("click", () => {
   renderWasteHistory();
 });
 
-// Report events
-btnWhReport?.addEventListener("click", async () => {
-  try {
-    await generateWarehouseReport();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal generate laporan", "error");
-  }
-});
+// ✅ Report
+btnWhReport?.addEventListener("click", generateWarehouseReport);
 
-btnWhReportCsv?.addEventListener("click", () => {
-  if (!lastReport) return showToast("Generate laporan dulu", "error");
-
-  const csv = toCsv(lastReport.headCols, lastReport.rows);
-  const safeTitle = (lastReport.title || "report").replaceAll(" ", "_");
-  const file = `laporan_${safeTitle}_${lastReport.startKey}_sd_${lastReport.endKey}.csv`;
-  downloadText(file, csv);
-  showToast("CSV didownload", "success");
-});
-
-// ===== Boot
+// ===================== Boot =====================
 async function bootWarehouse() {
   ensureWasteDefaults();
   fillWasteSelectPreset();
   fillWasteUnitOptions();
+  setWasteButtonModeUpdate(false);
+
+  ensureDownloadReportButton(); // tombol download siap, masih disabled sampai generate
 
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
   if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
 
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
+
   renderOpnameTable();
 
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
@@ -1229,12 +1310,6 @@ async function bootWarehouse() {
   bindStockCardClicks();
   updateDashboard();
   updateMoveInfo();
-
-  // report table kosong default
-  if (whReportHead && whReportBody) {
-    whReportHead.innerHTML = "";
-    whReportBody.innerHTML = `<tr><td>Silakan pilih tipe & tanggal, lalu klik Generate.</td></tr>`;
-  }
 }
 
 onAuthStateChanged(auth, async (u) => {
