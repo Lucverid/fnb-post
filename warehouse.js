@@ -91,17 +91,61 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
+// ===================== Weekly (Senin–Minggu) helpers =====================
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function formatDateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Senin–Minggu (week kalender)
+function getWeekRangeMondaySunday(baseDate = new Date()) {
+  const d = new Date(baseDate);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Min..6=Sab
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = addDays(d, diffToMonday);
+  const sunday = addDays(monday, 6);
+  return { monday, sunday };
+}
+
+function makeWeekLabel(monday, sunday) {
+  return `Minggu Kalender: ${formatDateKey(monday)} s/d ${formatDateKey(sunday)}`;
+}
+
+let lastWeekLabel = ""; // cache label minggu terakhir yg dipakai
+
+function setReportRangeToWeek(offsetWeeks = 0) {
+  const base = addDays(new Date(), offsetWeeks * 7);
+  const { monday, sunday } = getWeekRangeMondaySunday(base);
+  const startKey = formatDateKey(monday);
+  const endKey = formatDateKey(sunday);
+
+  if (whReportStart) whReportStart.value = startKey;
+  if (whReportEnd) whReportEnd.value = endKey;
+
+  lastWeekLabel = makeWeekLabel(monday, sunday);
+  showToast(`Range otomatis: ${lastWeekLabel}`, "info", 2200);
+}
+
 // ===================== Collections =====================
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
-// ✅ penerimaan barang (riwayat masuk)
+// penerimaan barang (riwayat masuk)
 const colWhBatches = collection(db, "wh_batches");
 
-// ✅ audit trail (IN / TRANSFER / ADJUST)
+// audit trail (IN / TRANSFER / ADJUST)
 const colWhTx = collection(db, "wh_tx");
 
-// ✅ histori opname per item (untuk laporan mingguan)
+// histori opname per item (untuk laporan mingguan)
 const colWhOpname = collection(db, "wh_opname_logs");
 
 // ===================== DOM =====================
@@ -138,7 +182,7 @@ const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
 
-// ✅ saat EDIT item: dianggap "Tambah stok W1 (dus)" (bukan overwrite)
+// saat EDIT item: field ini dianggap "Tambah stok W1 (dus)" (bukan overwrite)
 const whItemInitStockW1 = $("whItemInitStockW1");
 
 const whItemExp = $("whItemExp");
@@ -148,21 +192,19 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch"); // opsional (kalau ga ada di HTML, aman)
+const moveSearch = $("moveSearch"); // optional (kalau ada input cari)
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo"); // opsional
+const moveInfo = $("moveInfo"); // optional (kalau ada elemen info)
 const btnMove = $("btnMove");
 
 // Opname
 const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
-
-// ✅ tombol 1-klik simpan opname semua item (harus ada di HTML)
 const btnOpnameSaveAll = $("btnOpnameSaveAll");
 
-// Waste form
+// Waste
 const wasteItemSelect = $("wasteItemSelect");
 const wasteDate = $("wasteDate");
 const wasteUnit = $("wasteUnit");
@@ -186,12 +228,14 @@ const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
-
-// ✅ FIX FINAL: harus match HTML: id="btnWhReportDownload"
-const btnWhReportDownload = $("btnWhReportDownload");
-
-const whReportHead = $("whReportHead");
+const btnWhReportDownload = $("btnWhReportDownload"); // ✅ match HTML
+const whReportHead = $("whReportHead"); // <tr id="whReportHead">
 const whReportBody = $("whReportBody");
+
+// Optional weekly buttons (kalau kamu tambahin di HTML)
+const btnWeekThis = $("btnWeekThis");
+const btnWeekLast = $("btnWeekLast");
+const btnWeekPrev2 = $("btnWeekPrev2");
 
 // ===================== State =====================
 let currentUser = null;
@@ -260,18 +304,15 @@ navWhDashboard?.addEventListener("click", () => {
   setActiveNav(navWhDashboard);
   showWhSection("dashboard");
 });
-
 navWhOpname?.addEventListener("click", () => {
   setActiveNav(navWhOpname);
   showWhSection("opname");
   renderOpnameTable();
 });
-
 navWhWaste?.addEventListener("click", () => {
   setActiveNav(navWhWaste);
   showWhSection("waste");
 });
-
 navWhReport?.addEventListener("click", () => {
   setActiveNav(navWhReport);
   showWhSection("report");
@@ -304,9 +345,7 @@ async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
   if (rangeStart && rangeEnd) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
-    batchLogs = batchLogs.filter(
-      (b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey
-    );
+    batchLogs = batchLogs.filter((b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey);
   }
 }
 
@@ -318,9 +357,7 @@ async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
   if (rangeStart && rangeEnd) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
-    opnameLogs = opnameLogs.filter(
-      (o) => (o.opnameDateKey || "") >= sKey && (o.opnameDateKey || "") <= eKey
-    );
+    opnameLogs = opnameLogs.filter((o) => (o.opnameDateKey || "") >= sKey && (o.opnameDateKey || "") <= eKey);
   }
 }
 
@@ -389,7 +426,6 @@ function gotoOpnameWithExpiryFilter(type) {
 function gotoOpnameWithStockFilter(gudang, bucket) {
   whStockFilter = { gudang, bucket };
   whExpiryFilter = null;
-
   setActiveNav(navWhOpname);
   showWhSection("opname");
   if (whOpnameGudang) whOpnameGudang.value = gudang;
@@ -398,9 +434,7 @@ function gotoOpnameWithStockFilter(gudang, bucket) {
 
 function bindStockCardClicks() {
   const setCursor = (el) => el && (el.style.cursor = "pointer");
-  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(
-    setCursor
-  );
+  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(setCursor);
 
   cardW1Habis?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "habis"));
   cardW1Lumayan?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "low"));
@@ -575,7 +609,7 @@ function fillMasterForm(it) {
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
 
-  // ✅ saat edit: field ini untuk tambah stok, jadi kosongkan
+  // saat edit: field ini untuk tambah stok, jadi kosongkan
   if (whItemInitStockW1) whItemInitStockW1.value = "";
 
   if (whItemExp) whItemExp.value = it.expDate || "";
@@ -626,7 +660,7 @@ async function createMasterItem() {
     unitSmall,
     packQty,
 
-    // hanya “last-known” untuk UI; histori penerimaan ada di wh_batches
+    // only last-known untuk UI; histori penerimaan ada di wh_batches
     expDate: exp,
     receivedAt,
 
@@ -643,11 +677,12 @@ async function createMasterItem() {
     const ref = await addDoc(colWhItems, docData);
 
     if (safeInit > 0) {
+      const rcv = receivedAt || todayKey();
       await logBatchIn({
         itemId: ref.id,
         itemName: name,
         supplier,
-        receivedAt: receivedAt || todayKey(),
+        receivedAt: rcv,
         expDate: exp || "",
         qtyPack: safeInit,
         note: "Stok awal",
@@ -658,7 +693,7 @@ async function createMasterItem() {
         itemName: name,
         qtyPack: safeInit,
         gudang: "w1",
-        receivedAt: receivedAt || todayKey(),
+        receivedAt: rcv,
         expDate: exp || "",
         supplier,
         note: "Stok awal",
@@ -702,7 +737,7 @@ async function updateMasterItem(id) {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
-  // ✅ tambah stok (dus) saat edit
+  // tambah stok (dus) saat edit
   const addQty = Number(whItemInitStockW1?.value || 0);
   const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
 
@@ -726,11 +761,12 @@ async function updateMasterItem(id) {
     await updateDoc(doc(db, "wh_items", id), payload);
 
     if (addPack > 0) {
+      const rcv = receivedAt || todayKey();
       await logBatchIn({
         itemId: id,
         itemName: name,
         supplier,
-        receivedAt: receivedAt || todayKey(),
+        receivedAt: rcv,
         expDate: expDate || "",
         qtyPack: addPack,
         note: "Restock",
@@ -741,7 +777,7 @@ async function updateMasterItem(id) {
         itemName: name,
         qtyPack: addPack,
         gudang: "w1",
-        receivedAt: receivedAt || todayKey(),
+        receivedAt: rcv,
         expDate: expDate || "",
         supplier,
         note: "Restock",
@@ -791,9 +827,7 @@ function updateMoveInfo() {
   const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     packQty > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${
-          it.stockW1 || 0
-        }`
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0}`
       : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
 }
 
@@ -815,7 +849,6 @@ function fillMoveSelect(keyword = "") {
     opt.textContent = `${it.name} (W1: ${s1})`;
 
     if (s1 <= 0) opt.disabled = true;
-
     moveItemSelect.appendChild(opt);
   });
 
@@ -842,7 +875,7 @@ function applyGudangVisibility(list, gudang) {
   return list || [];
 }
 
-// ✅ list item yang sedang tampil (sesuai filter + search + gudang)
+// list item yang sedang tampil (sesuai filter + search + gudang)
 function getVisibleOpnameList() {
   if (!whOpnameGudang) return [];
   const gudang = whOpnameGudang.value || "w1";
@@ -900,10 +933,7 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
         ${escapeHtml(unitText)}
-        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(
-          it.packQty || 0,
-          0
-        )}</div>
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>
       </td>
       <td>
         ${escapeHtml(expStr)}
@@ -942,7 +972,7 @@ function renderOpnameTable() {
   });
 }
 
-// ✅ simpan opname per item (manual klik)
+// simpan opname per item (manual klik)
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -957,14 +987,11 @@ async function saveOpname(itemId) {
   if (!it) return showToast("Item tidak ditemukan", "error");
 
   const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-
-  const physicalInt = Math.trunc(physical);
-  const systemInt = Math.trunc(systemStock);
-  const diff = physicalInt - systemInt;
+  const diff = Math.trunc(physical) - Math.trunc(systemStock);
 
   const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = physicalInt;
-  else payload.stockW2 = physicalInt;
+  if (gudang === "w1") payload.stockW1 = Math.trunc(physical);
+  else payload.stockW2 = Math.trunc(physical);
 
   const opnameDateKey = todayKey();
   const sessionKey = `${opnameDateKey}:${gudang}`;
@@ -979,8 +1006,8 @@ async function saveOpname(itemId) {
       itemId,
       itemName: it.name || "",
       gudang,
-      systemStock: systemInt,
-      physicalStock: physicalInt,
+      systemStock: Math.trunc(systemStock),
+      physicalStock: Math.trunc(physical),
       diffPack: diff,
       note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
       ref: `opname:${opnameDateKey}`,
@@ -994,8 +1021,8 @@ async function saveOpname(itemId) {
       gudang,
       itemId,
       itemName: it.name || "",
-      systemStock: systemInt,
-      physicalStock: physicalInt,
+      systemStock: Math.trunc(systemStock),
+      physicalStock: Math.trunc(physical),
       diffPack: diff,
     });
 
@@ -1015,7 +1042,7 @@ async function saveOpname(itemId) {
   }
 }
 
-// ✅ simpan opname SEMUA item yang tampil (1 klik)
+// simpan opname SEMUA item yang tampil (1 klik)
 async function saveOpnameAllVisible() {
   if (!currentUser) return showToast("Harus login", "error");
   if (!whOpnameTableBody || !whOpnameGudang) return;
@@ -1430,10 +1457,6 @@ async function deleteWaste(id) {
 }
 
 // ===================== REPORT (Generate + CSV Download) =====================
-// Pastikan <select id="whReportType"> punya opsi:
-// - opname_history_w1
-// - opname_history_w2
-// - receiving
 function reportTypeLabel(type) {
   if (type === "opname_w1") return "Opname Gudang 1 (Snapshot Stok Saat Ini)";
   if (type === "opname_w2") return "Opname Gudang 2 (Snapshot Stok Saat Ini)";
@@ -1476,6 +1499,7 @@ function renderReportTable(header, rows) {
 function buildReportCSV(meta, header, rows) {
   const lines = [];
   lines.push(`${csvEscape("Report")},${csvEscape(reportTypeLabel(meta?.type))}`);
+  lines.push(`${csvEscape("Periode Minggu")},${csvEscape(meta?.weekLabel || "")}`);
   lines.push(`${csvEscape("Tanggal Mulai")},${csvEscape(meta?.startKey || "")}`);
   lines.push(`${csvEscape("Tanggal Akhir")},${csvEscape(meta?.endKey || "")}`);
   lines.push(`${csvEscape("Dibuat")},${csvEscape(meta?.generatedAt || "")}`);
@@ -1511,6 +1535,9 @@ async function generateWarehouseReport() {
 
   const note = (whReportNote?.value || "").trim();
   const generatedAt = new Date().toISOString();
+
+  // auto label minggu kalau start/end pas Senin–Minggu (atau user pakai tombol mingguan)
+  const weekLabel = lastWeekLabel || "";
 
   let header = [];
   let rows = [];
@@ -1607,7 +1634,7 @@ async function generateWarehouseReport() {
 
     renderReportTable(header, rows);
 
-    lastReportMeta = { type, startKey, endKey, note, generatedAt };
+    lastReportMeta = { type, startKey, endKey, note, generatedAt, weekLabel };
     lastReportHeader = header;
     lastReportRows = rows;
 
@@ -1623,10 +1650,19 @@ function downloadLastReportCSV() {
   if (!lastReportMeta || !lastReportHeader?.length) {
     return showToast("Generate laporan dulu sebelum download.", "error");
   }
+
   const safeType = (lastReportMeta.type || "report").replaceAll(/[^\w-]+/g, "_");
-  const filename = `warehouse_${safeType}_${lastReportMeta.startKey || ""}_${
-    lastReportMeta.endKey || ""
+
+  const weekPart = (lastReportMeta.weekLabel || "")
+    .replaceAll("Minggu Kalender:", "")
+    .trim()
+    .replaceAll(/\s+/g, "_")
+    .replaceAll("/", "-");
+
+  const filename = `warehouse_${safeType}_${
+    weekPart || `${lastReportMeta.startKey || ""}_${lastReportMeta.endKey || ""}`
   }.csv`;
+
   const csv = buildReportCSV(lastReportMeta, lastReportHeader, lastReportRows);
   downloadText(filename, csv, "text/csv;charset=utf-8");
   showToast("CSV didownload.", "success");
@@ -1644,10 +1680,9 @@ whOpnameGudang?.addEventListener("change", () => {
   if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) whStockFilter = null;
   renderOpnameTable();
 });
-
 whOpnameSearch?.addEventListener("input", renderOpnameTable);
 
-// ✅ 1-klik opname semua item
+// 1-klik opname semua item
 btnOpnameSaveAll?.addEventListener("click", saveOpnameAllVisible);
 
 btnSaveWaste?.addEventListener("click", saveOrUpdateWaste);
@@ -1656,19 +1691,16 @@ wasteFilterStart?.addEventListener("change", async () => {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 });
-
 wasteFilterEnd?.addEventListener("change", async () => {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 });
-
 wasteHistorySearch?.addEventListener("input", renderWasteHistory);
 
 wasteSortBy?.addEventListener("change", () => {
   wasteSortByState = wasteSortBy.value || "dateKey";
   renderWasteHistory();
 });
-
 wasteSortDirBtn?.addEventListener("click", () => {
   wasteSortDirState = wasteSortDirState === "asc" ? "desc" : "asc";
   wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
@@ -1677,6 +1709,11 @@ wasteSortDirBtn?.addEventListener("click", () => {
 
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
+
+// Weekly quick buttons (optional)
+btnWeekThis?.addEventListener("click", () => setReportRangeToWeek(0));
+btnWeekLast?.addEventListener("click", () => setReportRangeToWeek(-1));
+btnWeekPrev2?.addEventListener("click", () => setReportRangeToWeek(-2));
 
 // ===================== Boot =====================
 async function bootWarehouse() {
@@ -1701,6 +1738,9 @@ async function bootWarehouse() {
   bindStockCardClicks();
   updateDashboard();
   updateMoveInfo();
+
+  // default: biar enak, otomatis set ke Minggu Ini (kalau user mau)
+  // setReportRangeToWeek(0);
 }
 
 onAuthStateChanged(auth, async (u) => {
