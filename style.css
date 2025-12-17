@@ -595,13 +595,23 @@ td {
   margin-bottom: 6px;
 }
 
+.chart-card h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.chart-box {
+  position: relative;
+  height: 260px;
+}
+
 /* --------------------------------------------------
    CART SCROLL BOX
 -------------------------------------------------- */
 .cart-items-wrapper {
-  max-height: 250px;      /* batas tinggi daftar pesanan */
-  overflow-y: auto;       /* aktifkan scroll */
-  scrollbar-width: thin;  /* firefox */
+  max-height: 250px;
+  overflow-y: auto;
+  scrollbar-width: thin;
   margin-bottom: 12px;
 }
 
@@ -616,17 +626,6 @@ td {
 
 .cart-items-wrapper::-webkit-scrollbar-track {
   background: transparent;
-}
-
-
-.chart-card h4 {
-  margin: 0 0 8px;
-  font-size: 15px;
-}
-
-.chart-box {
-  position: relative;
-  height: 260px;
 }
 
 /* --------------------------------------------------
@@ -761,7 +760,6 @@ td {
 /* --------------------------------------------------
    BOM / RESEP MENU
 -------------------------------------------------- */
-
 #bomWrapper label {
   display: block;
   font-size: 12px;
@@ -896,12 +894,11 @@ td {
 }
 
 /* ===================== STRUK RAPIH (HTML) ===================== */
-
 .receipt {
   background: #fff;
   padding: 18px 18px;
   border-radius: 16px;
-  margin-top: 20px;       /* jarak dari tombol Simpan */
+  margin-top: 20px;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.07);
   font-size: 13px;
 }
@@ -914,7 +911,7 @@ td {
 
 .r-title {
   font-size: 14px;
-  font-weight: 700;       /* F&B Cafe BOLD */
+  font-weight: 700;
 }
 
 .r-address {
@@ -999,11 +996,10 @@ td {
   margin-top: 12px;
   color: #444;
 }
+
 /* --------------------------------------------------
   RECIPE TABLE (BOM kolom rapi)
 -------------------------------------------------- */
-
-/* Kolom BOM */
 #recipeTable td:nth-child(4) {
   font-size: 12px;
   line-height: 1.3;
@@ -1027,8 +1023,6 @@ td {
 /* --------------------------------------------------
   LAPORAN (reportsSection)
 -------------------------------------------------- */
-
-/* Sama seperti .section tapi dipakai di html sebagai .page-section */
 .page-section {
   max-width: 1100px;
   margin: 0 auto 24px;
@@ -1039,7 +1033,6 @@ td {
   font-size: 22px;
 }
 
-/* kartu wrapper */
 .card {
   background: var(--bg-card);
   border-radius: 16px;
@@ -1121,8 +1114,6 @@ td {
 /* --------------------------------------------------
   RESPONSIVE
 -------------------------------------------------- */
-
-/* Tablet / HP */
 @media (max-width: 900px) {
   .burger-btn {
     display: flex;
@@ -1174,7 +1165,6 @@ td {
   }
 }
 
-/* HP kecil */
 @media (max-width: 480px) {
   .auth-card {
     margin: 20px auto 24px;
@@ -1218,6 +1208,7 @@ td {
     flex-direction: column;
   }
 }
+
 /* textarea umum (dipakai buat deskripsi menu) */
 .textarea {
   width: 100%;
@@ -1329,12 +1320,9 @@ td {
   margin: 0;
 }
 
-
 /* ==================================================
    STOK OPNAME – DESKTOP & MOBILE
 ================================================== */
-
-/* DESKTOP */
 #opnameSection .table-wrap {
   max-height: none;
 }
@@ -1386,11 +1374,8 @@ td {
   background: #ffffff;
 }
 
-/* ================================
-   MOBILE – CARD STYLING
-================================ */
+/* MOBILE – CARD STYLING */
 @media (max-width: 640px) {
-  /* bungkus tabel jadi flat, card by row */
   #opnameSection .table-wrap {
     max-height: none;
     background: transparent;
@@ -1401,7 +1386,7 @@ td {
   #opnameSection table {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 0 18px; /* jarak antar card */
+    border-spacing: 0 18px;
   }
 
   #opnameSection thead {
@@ -1428,7 +1413,6 @@ td {
     border-bottom: none;
   }
 
-  /* label kiri per baris */
   #opnameSection td:nth-child(1)::before { content: "Item"; }
   #opnameSection td:nth-child(2)::before { content: "Sistem"; }
   #opnameSection td:nth-child(3)::before { content: "Fisik"; }
@@ -1443,7 +1427,6 @@ td {
     font-weight: 500;
   }
 
-  /* tombol Simpan di pojok kanan bawah card */
   #opnameSection td:nth-child(6) {
     justify-content: flex-end;
   }
@@ -1452,8 +1435,10 @@ td {
     max-width: 150px;
   }
 }
- 
 
+/* ==================================================
+   BOM SEARCH + SUGGESTION
+================================================== */
 .bom-row {
   display: grid;
   grid-template-columns: 2fr 1fr auto;
@@ -1465,7 +1450,7 @@ td {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  position: relative; /* buat suggestion box nempel */
+  position: relative;
 }
 
 .bom-search {
@@ -1510,12 +1495,8 @@ td {
   cursor: default;
 }
 
-
-
 /* ===== PRINT THERMAL MODE 58mm ===== */
 @media print {
-
-  /* Hilangkan semua elemen kecuali #printArea */
   body * {
     visibility: hidden !important;
     background: white !important;
@@ -1529,45 +1510,39 @@ td {
     position: absolute;
     left: 0;
     top: 0;
-    width: 58mm;         /* 👈 ukuran thermal */
+    width: 58mm;
     max-width: 58mm;
     padding: 0;
     margin: 0;
     background: white !important;
   }
 
-  /* Hilangkan shadow, border radius */
   .print-area {
     box-shadow: none !important;
     border-radius: 0 !important;
   }
 
-  /* Hapus header, sidebar, tombol */
   header, footer, nav, button {
     display: none !important;
   }
 }
 
-
 /* STRUK AREA – RESPONSIVE MARGIN */
 .cart-box #strukTitle {
-  margin-top: 30px !important;      /* Desktop normal */
+  margin-top: 30px !important;
 }
 
-/* Tablet (≤ 992px) */
 @media (max-width: 992px) {
   .cart-box #strukTitle {
     margin-top: 32px !important;
   }
 }
 
-/* HP (≤ 600px) */
 @media (max-width: 600px) {
   .cart-box #strukTitle {
     margin-top: 44px !important;
   }
 }
-
 
 /* --------------------------------------------------
   ANIMATIONS
@@ -1577,7 +1552,7 @@ td {
   to   { opacity:1; transform:translateY(0); }
 }
 
-/* ===== FIX FORM CONTROLS (biar ga default putih) ===== */
+/* ===== FIX FORM CONTROLS (global glass style) ===== */
 label{
   display:block;
   margin:10px 0 6px;
@@ -1642,25 +1617,84 @@ input[type="date"]{
   justify-content: center;
   font-size: 16px;
 }
+
 .btn-icon-mini:hover{
   border-color: rgba(140,90,255,.6);
   box-shadow: 0 0 0 3px rgba(140,90,255,.12);
 }
+
 .btn-icon-mini.danger{
   border-color: rgba(239,68,68,.5);
 }
+
 .btn-icon-mini.danger:hover{
   box-shadow: 0 0 0 3px rgba(239,68,68,.12);
 }
+
 .table-actions{
   display:flex;
   gap:8px;
   justify-content:flex-end;
   align-items:center;
 }
+
+/* ==================================================
+   WAREHOUSE REPORT (RAPIH MOBILE) ✅ TAMBAHAN BARU
+   Cocok dengan HTML yang aku kasih sebelumnya
+================================================== */
+.wh-report-card{
+  padding: 12px;
+  max-width: 760px;
+}
+
+.wh-report-grid{
+  display: grid;
+  gap: 12px;
+}
+
+.wh-report-field label{
+  display:block;
+  margin-bottom: 6px;
+  opacity: .85;
+  font-size: 13px;
+}
+
+.wh-week-preset{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.wh-week-preset #btnWeekPrev2{
+  grid-column: 1 / -1;
+  opacity: .95;
+}
+
+.wh-report-note textarea{
+  width: 100%;
+  resize: vertical;
+}
+
+.wh-report-actions{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.wh-report-table{
+  padding: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 520px){
+  .wh-report-actions{
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ==================================================
    FIX LIGHT MODE VISIBILITY (override dark hardcode)
-   Tempel paling bawah
+   Tempel paling bawah ✅
 ================================================== */
 @media (prefers-color-scheme: light) {
   label{
@@ -1684,25 +1718,21 @@ input[type="date"]{
     background: #fff;
   }
 
-  /* select arrow versi light */
   select{
     background-image:
       linear-gradient(45deg, transparent 50%, rgba(15,23,42,.55) 50%),
       linear-gradient(135deg, rgba(15,23,42,.55) 50%, transparent 50%);
   }
 
-  /* date picker ikut light */
   input[type="date"]{
     color-scheme: light;
   }
 
-  /* elemen yang kamu bikin semi-transparan */
   .btn-icon-mini{
     background: #fff;
   }
 }
 
-/* Dark mode tetap pakai yang sekarang, tapi date ikut dark */
 @media (prefers-color-scheme: dark){
   input[type="date"]{ color-scheme: dark; }
 }
