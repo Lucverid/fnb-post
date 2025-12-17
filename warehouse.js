@@ -1,3 +1,6 @@
+// warehouse.js (FINAL) — Warehouse Module (W1/W2, Opname, Waste, Report + Weekly Snapshot)
+// NOTE: pastikan HTML kamu pakai id tombol download: id="btnWhReportDownload"
+
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
@@ -194,10 +197,10 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch");
+const moveSearch = $("moveSearch"); // optional
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo");
+const moveInfo = $("moveInfo"); // optional
 const btnMove = $("btnMove");
 
 // Opname
@@ -221,6 +224,7 @@ const wasteHistoryBody = $("wasteHistoryBody");
 const wasteSortBy = $("wasteSortBy");
 const wasteSortDirBtn = $("wasteSortDir");
 
+// Notif (topbar)
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
@@ -231,8 +235,8 @@ const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
 
-// ✅ sesuai HTML kamu: id="btnWhReportCsv"
-const btnWhReportDownload = $("btnWhReportCsv");
+// ✅ FIX: harus match HTML kamu -> id="btnWhReportDownload"
+const btnWhReportDownload = $("btnWhReportDownload");
 
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
@@ -552,7 +556,7 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ===================== Stock Audit Helpers =====================
+// ===================== Stock Audit Helpers (EXPLICIT) =====================
 async function logTx(payload) {
   try {
     await addDoc(colWhTx, {
@@ -619,7 +623,8 @@ function fillMasterForm(it) {
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
 
-  if (whItemInitStockW1) whItemInitStockW1.value = ""; // tambah stok saat edit
+  // input ini dipakai buat "tambah stok" saat edit (bukan overwrite)
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
 
   if (whItemExp) whItemExp.value = it.expDate || "";
   if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
@@ -713,6 +718,7 @@ async function createMasterItem() {
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
+    fillWasteSelectPreset(); // refresh waste list (gabung item + preset)
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan master item", "error");
@@ -741,6 +747,7 @@ async function updateMasterItem(id) {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
+  // “Restock” eksplisit: input ini dianggap tambahan stok, bukan ganti stok
   const addQty = Number(whItemInitStockW1?.value || 0);
   const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
 
@@ -795,6 +802,7 @@ async function updateMasterItem(id) {
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
+    fillWasteSelectPreset(); // refresh waste list (gabung item + preset)
   } catch (e) {
     console.error(e);
     showToast("Gagal update master item", "error");
@@ -872,6 +880,7 @@ function applyStockFilter(list) {
   });
 }
 function applyGudangVisibility(list, gudang) {
+  // w2: hanya tampilkan yang ada stok W2 (biar tidak penuh)
   if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
   return list || [];
 }
@@ -1032,6 +1041,7 @@ async function saveOpname(itemId) {
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
+    fillWasteSelectPreset();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan opname", "error");
@@ -1121,6 +1131,7 @@ async function saveOpnameAllVisible() {
   renderOpnameTable();
   updateDashboard();
   updateMoveInfo();
+  fillWasteSelectPreset();
 }
 
 async function deleteItem(id) {
@@ -1130,6 +1141,17 @@ async function deleteItem(id) {
   if (!ok) return;
 
   try {
+    // ✅ EXPLICIT: simpan audit log sebelum delete
+    await logTx({
+      type: "DELETE_ITEM",
+      itemId: id,
+      itemName: it?.name || "",
+      stockW1: clampInt(it?.stockW1, 0),
+      stockW2: clampInt(it?.stockW2, 0),
+      note: "Item dihapus",
+      ref: `wh_items:${id}`,
+    });
+
     await deleteDoc(doc(db, "wh_items", id));
     showToast("Item dihapus", "success");
 
@@ -1140,6 +1162,7 @@ async function deleteItem(id) {
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
+    fillWasteSelectPreset();
   } catch (e) {
     console.error(e);
     showToast("Gagal hapus item", "error");
@@ -1191,6 +1214,7 @@ async function transferW1toW2() {
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
+    fillWasteSelectPreset();
   } catch (e) {
     console.error(e);
     showToast("Gagal transfer", "error");
@@ -1219,7 +1243,8 @@ function resetWasteForm() {
 
 function fillWasteFormFromRow(w) {
   if (!w) return;
-  if (wasteItemSelect) wasteItemSelect.value = w.itemName || "";
+  // untuk dropdown gabungan, value = itemId (atau preset:xxx)
+  if (wasteItemSelect) wasteItemSelect.value = w.itemId || "";
   if (wasteDate) wasteDate.value = w.dateKey || "";
   if (wasteUnit) wasteUnit.value = w.unit || "gram";
   if (wasteQty) wasteQty.value = String(clampInt(w.qty, 0));
@@ -1227,11 +1252,28 @@ function fillWasteFormFromRow(w) {
   setWasteButtonModeUpdate(true);
 }
 
+// helper: get selected waste item (id + name)
+function getSelectedWasteItem() {
+  const val = (wasteItemSelect?.value || "").trim();
+  if (!val) return null;
+
+  if (val.startsWith("preset:")) {
+    const name = val.replace("preset:", "");
+    return { itemId: val, itemName: name, kind: "preset" };
+  }
+
+  const it = items.find((x) => x.id === val);
+  if (it) return { itemId: it.id, itemName: it.name || "", kind: "wh_item" };
+
+  // fallback (harusnya tidak kejadian kalau select rapih)
+  return { itemId: val, itemName: val, kind: "unknown" };
+}
+
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
-  const itemName = (wasteItemSelect?.value || "").trim();
-  if (!itemName) return showToast("Pilih item waste dulu", "error");
+  const sel = getSelectedWasteItem();
+  if (!sel) return showToast("Pilih item waste dulu", "error");
 
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
@@ -1243,8 +1285,8 @@ async function createWaste() {
   const note = (wasteNote?.value || "").trim();
 
   const log = {
-    itemId: `preset:${itemName}`,
-    itemName,
+    itemId: sel.itemId,
+    itemName: sel.itemName,
     dateKey: d,
     qty,
     unit,
@@ -1256,6 +1298,19 @@ async function createWaste() {
 
   try {
     await addDoc(colWhWaste, log);
+
+    // ✅ EXPLICIT: waste juga dicatat sebagai transaksi (audit), tapi tidak mengubah stok pack
+    await logTx({
+      type: "WASTE",
+      itemId: sel.itemId,
+      itemName: sel.itemName,
+      qty: Number(qty),
+      unit,
+      dateKey: d,
+      note: note || "",
+      ref: `wh_waste`,
+    });
+
     showToast("Waste tersimpan", "success");
     resetWasteForm();
 
@@ -1271,8 +1326,8 @@ async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!id) return;
 
-  const itemName = (wasteItemSelect?.value || "").trim();
-  if (!itemName) return showToast("Pilih item waste dulu", "error");
+  const sel = getSelectedWasteItem();
+  if (!sel) return showToast("Pilih item waste dulu", "error");
 
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
@@ -1285,13 +1340,25 @@ async function updateWaste(id) {
 
   try {
     await updateDoc(doc(db, "wh_waste", id), {
-      itemId: `preset:${itemName}`,
-      itemName,
+      itemId: sel.itemId,
+      itemName: sel.itemName,
       dateKey: d,
       qty,
       unit,
       note,
       updatedAt: serverTimestamp(),
+    });
+
+    // ✅ EXPLICIT: update waste juga dicatat sebagai transaksi audit
+    await logTx({
+      type: "WASTE_UPDATE",
+      itemId: sel.itemId,
+      itemName: sel.itemName,
+      qty: Number(qty),
+      unit,
+      dateKey: d,
+      note: note || "",
+      ref: `wh_waste:${id}`,
     });
 
     showToast("Waste berhasil diupdate", "success");
@@ -1322,13 +1389,23 @@ function ensureWasteDefaults() {
 
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
+
+  // gabung: wh_items + preset (biar bisa pilih item real juga)
+  const opts = [];
+  for (const it of items) {
+    opts.push({ value: it.id, label: `📦 ${it.name || "-"} (Item Gudang)` });
+  }
+  for (const name of WASTE_PRESET_ITEMS) {
+    opts.push({ value: `preset:${name}`, label: `🧪 ${name} (Preset)` });
+  }
+
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-  WASTE_PRESET_ITEMS.forEach((name) => {
+  for (const o of opts) {
     const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
+    opt.value = o.value;
+    opt.textContent = o.label;
     wasteItemSelect.appendChild(opt);
-  });
+  }
 }
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
@@ -1428,7 +1505,21 @@ async function deleteWaste(id) {
   const ok = confirm("Hapus data waste ini?");
   if (!ok) return;
 
+  const old = wasteLogs.find((x) => x.id === id);
+
   try {
+    // ✅ EXPLICIT: log delete waste
+    await logTx({
+      type: "WASTE_DELETE",
+      itemId: old?.itemId || "",
+      itemName: old?.itemName || "",
+      qty: Number(old?.qty || 0),
+      unit: old?.unit || "",
+      dateKey: old?.dateKey || "",
+      note: old?.note || "",
+      ref: `wh_waste:${id}`,
+    });
+
     await deleteDoc(doc(db, "wh_waste", id));
     showToast("Waste dihapus", "success");
 
@@ -1458,7 +1549,6 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
   if (existing.length) return existing;
 
   // Kalau belum ada: buat snapshot dari items saat ini
-  // (di Firestore disimpan per item supaya bisa banyak data)
   const createdAtKey = todayKey();
   const createdBy = currentUser?.email || "-";
 
@@ -1763,7 +1853,6 @@ btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
 // ===================== Boot =====================
 async function bootWarehouse() {
   ensureWasteDefaults();
-  fillWasteSelectPreset();
   fillWasteUnitOptions();
   setWasteButtonModeUpdate(false);
 
@@ -1779,6 +1868,7 @@ async function bootWarehouse() {
 
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
+  fillWasteSelectPreset(); // butuh items loaded
 
   renderOpnameTable();
 
