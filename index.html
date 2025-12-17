@@ -175,6 +175,7 @@
             <div><b id="w2Banyak">0</b> Banyak &gt; 50 (Gudang 2)</div>
           </div>
         </div>
+        <!-- NOTE: expiry cards dibuat via JS -->
       </section>
 
       <!-- WAREHOUSE: OPNAME -->
@@ -210,8 +211,6 @@
               </div>
             </div>
 
-            <input id="whItemUnit" type="hidden">
-
             <div class="grid-2" style="gap:10px;">
               <div>
                 <label>EXP Date</label>
@@ -235,11 +234,20 @@
           <div class="card glass" style="padding:12px;">
             <h3 style="margin:0 0 10px;">Transfer W1 → W2</h3>
 
+            <!-- optional search (kalau mau dipakai oleh moveSearch di JS)
+            <label>Cari Item</label>
+            <input id="moveSearch" type="text" placeholder="ketik nama item...">
+            -->
+
             <label>Pilih Item</label>
             <select id="moveItemSelect"></select>
 
             <label>Qty Transfer (dalam unit besar)</label>
             <input id="moveQty" type="number" min="0" step="1" placeholder="contoh: 1">
+
+            <!-- optional info (kalau mau dipakai oleh moveInfo di JS)
+            <div id="moveInfo" style="margin-top:8px; font-size:12px; opacity:.8;"></div>
+            -->
 
             <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">Transfer</button>
 
@@ -256,7 +264,6 @@
             <label>Cari Item</label>
             <input id="whOpnameSearch" type="text" placeholder="ketik nama / supplier / unit...">
 
-            <!-- ✅ NEW: Simpan Opname Semua Item -->
             <button id="btnOpnameSaveAll" class="btn-primary" type="button" style="margin-top:10px;">
               Simpan Opname Semua Item
             </button>
@@ -382,7 +389,16 @@
             <option value="waste">Waste</option>
           </select>
 
-          <div class="grid-2" style="gap:10px;">
+          <!-- OPTIONAL: tombol cepat minggu kalender (Senin–Minggu) -->
+          <div class="grid-2" style="gap:10px; margin-top:10px;">
+            <button id="btnWeekThis" class="btn-secondary" type="button">Minggu Ini</button>
+            <button id="btnWeekLast" class="btn-secondary" type="button">Minggu Lalu</button>
+          </div>
+          <div style="margin-top:10px;">
+            <button id="btnWeekPrev2" class="btn-secondary small ghost" type="button">2 Minggu Lalu</button>
+          </div>
+
+          <div class="grid-2" style="gap:10px; margin-top:10px;">
             <div>
               <label>Tanggal Mulai</label>
               <input id="whReportStart" type="date">
@@ -399,7 +415,6 @@
 
           <div class="grid-2" style="gap:10px; margin-top:10px;">
             <button id="btnWhReport" class="btn-secondary" type="button">Generate</button>
-            <!-- ✅ FIX ID -->
             <button id="btnWhReportDownload" class="btn-secondary" type="button">Download CSV</button>
           </div>
         </div>
