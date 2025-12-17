@@ -1,6 +1,3 @@
-// warehouse.js (FINAL) — Warehouse Module (W1/W2, Opname, Waste, Report + Weekly Snapshot)
-// NOTE: pastikan HTML kamu pakai id tombol download: id="btnWhReportDownload"
-
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
@@ -95,8 +92,6 @@ function toDateInputValue(d) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
-// Minggu Kalender: Senin = 1 ... Minggu = 0/7 (JS Minggu=0)
 function startOfWeekMonday(date = new Date()) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -112,7 +107,6 @@ function endOfWeekSunday(date = new Date()) {
   return e;
 }
 function setReportRangeByWeekOffset(weekOffset = 0) {
-  // weekOffset: 0 minggu ini, 1 minggu lalu, 2 dua minggu lalu
   const base = new Date();
   const start = startOfWeekMonday(base);
   start.setDate(start.getDate() - weekOffset * 7);
@@ -142,8 +136,40 @@ function isFullCalendarWeekRange(startKey, endKey) {
   return todayKey(s) === todayKey(s2) && todayKey(e) === todayKey(e2);
 }
 function weekKeyFromStartKey(startKey) {
-  // startKey = Senin
-  return startKey;
+  return startKey; // startKey = Senin
+}
+
+// ===================== Opsi 2: Pack + Loose (UNIT KECIL) =====================
+function getPackQty(it) {
+  const pq = clampInt(it?.packQty, 0);
+  return pq > 0 ? pq : 1;
+}
+function getUnitsW(it, gudang) {
+  const pq = getPackQty(it);
+  const packs = clampInt(gudang === "w2" ? it?.stockW2 : it?.stockW1, 0);
+  const loose = clampInt(gudang === "w2" ? it?.stockW2Loose : it?.stockW1Loose, 0);
+  return packs * pq + loose;
+}
+function splitUnitsToPackLoose(totalUnits, packQty) {
+  const t = Math.max(0, clampInt(totalUnits, 0));
+  const pq = Math.max(1, clampInt(packQty, 1));
+  const packs = Math.floor(t / pq);
+  const loose = t % pq;
+  return { packs, loose };
+}
+function normalizeItemStock(it) {
+  // jaga-jaga jika data lama punya loose > packQty
+  const pq = getPackQty(it);
+  const w1u = getUnitsW(it, "w1");
+  const w2u = getUnitsW(it, "w2");
+  const w1 = splitUnitsToPackLoose(w1u, pq);
+  const w2 = splitUnitsToPackLoose(w2u, pq);
+  return {
+    stockW1: w1.packs,
+    stockW1Loose: w1.loose,
+    stockW2: w2.packs,
+    stockW2Loose: w2.loose,
+  };
 }
 
 // ===================== Collections =====================
@@ -153,7 +179,7 @@ const colWhBatches = collection(db, "wh_batches");
 const colWhTx = collection(db, "wh_tx");
 const colWhOpname = collection(db, "wh_opname_logs");
 
-// ✅ Snapshot mingguan per item (biar bisa lihat snapshot minggu lalu)
+// Snapshot mingguan per item
 const colWhWeeklySnap = collection(db, "wh_weekly_snapshot_items");
 
 // ===================== DOM =====================
@@ -197,17 +223,24 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch"); // optional
+const moveSearch = $("moveSearch");
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo"); // optional
+const moveInfo = $("moveInfo");
 const btnMove = $("btnMove");
+
+// ✅ Issue (ambil unit kecil dari W1)
+const issueItemSelect = $("issueItemSelect");
+const issueQty = $("issueQty");
+const issueInfo = $("issueInfo");
+const btnIssueW1 = $("btnIssueW1");
 
 // Opname
 const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 const btnOpnameSaveAll = $("btnOpnameSaveAll");
+const whOpnameModeSmall = $("whOpnameModeSmall"); // checkbox
 
 // Waste
 const wasteItemSelect = $("wasteItemSelect");
@@ -224,7 +257,6 @@ const wasteHistoryBody = $("wasteHistoryBody");
 const wasteSortBy = $("wasteSortBy");
 const wasteSortDirBtn = $("wasteSortDir");
 
-// Notif (topbar)
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
@@ -235,8 +267,8 @@ const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
 
-// ✅ FIX: harus match HTML kamu -> id="btnWhReportDownload"
-const btnWhReportDownload = $("btnWhReportDownload");
+// download btn: dukung dua id (biar gak kejebak mismatch)
+const btnWhReportDownload = $("btnWhReportDownload") || $("btnWhReportCsv");
 
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
@@ -329,7 +361,16 @@ navWhReport?.addEventListener("click", () => {
 async function loadWhItems() {
   const snap = await getDocs(query(colWhItems, orderBy("name", "asc")));
   items = [];
-  snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+  snap.forEach((d) => {
+    const data = d.data() || {};
+    // normalize on read (supaya data lama aman)
+    const norm = normalizeItemStock(data);
+    items.push({
+      id: d.id,
+      ...data,
+      ...norm,
+    });
+  });
 }
 
 async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
@@ -384,9 +425,14 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===================== Stock bucket =====================
-function stockBucketCount(stock) {
-  const n = Number(stock || 0);
+// ===================== Stock bucket (pakai “pack ekuivalen”) =====================
+function packsEquivalent(it, gudang) {
+  const pq = getPackQty(it);
+  const units = getUnitsW(it, gudang);
+  return units / pq; // float
+}
+function stockBucketCount(packEqFloat) {
+  const n = Number(packEqFloat || 0);
   if (n <= 0) return "habis";
   if (n < LOW_STOCK_LT) return "low";
   if (n > HIGH_STOCK_GT) return "high";
@@ -489,17 +535,18 @@ function updateWarehouseNotif() {
     count++;
   });
 
+  // low stock pakai pack ekuivalen (biar loose keitung)
   const lowStock = items
-    .filter(
-      (it) =>
-        (Number(it.stockW1 || 0) > 0 && Number(it.stockW1 || 0) < LOW_STOCK_LT) ||
-        (Number(it.stockW2 || 0) > 0 && Number(it.stockW2 || 0) < LOW_STOCK_LT)
-    )
+    .filter((it) => {
+      const w1eq = packsEquivalent(it, "w1");
+      const w2eq = packsEquivalent(it, "w2");
+      return (w1eq > 0 && w1eq < LOW_STOCK_LT) || (w2eq > 0 && w2eq < LOW_STOCK_LT);
+    })
     .slice(0, 10);
 
   lowStock.forEach((it) => {
     const li = document.createElement("li");
-    li.textContent = `Stok rendah: ${it.name} (W1 ${it.stockW1 || 0}, W2 ${it.stockW2 || 0})`;
+    li.textContent = `Stok rendah: ${it.name} (W1 ${it.stockW1 || 0}+${it.stockW1Loose || 0}, W2 ${it.stockW2 || 0}+${it.stockW2Loose || 0})`;
     notifList.appendChild(li);
     count++;
   });
@@ -518,8 +565,8 @@ function updateDashboard() {
   let w2 = { habis: 0, low: 0, high: 0 };
 
   items.forEach((it) => {
-    const s1 = stockBucketCount(it.stockW1 || 0);
-    const s2 = stockBucketCount(it.stockW2 || 0);
+    const s1 = stockBucketCount(packsEquivalent(it, "w1"));
+    const s2 = stockBucketCount(packsEquivalent(it, "w2"));
 
     if (s1 === "habis") w1.habis++;
     if (s1 === "low") w1.low++;
@@ -556,7 +603,7 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ===================== Stock Audit Helpers (EXPLICIT) =====================
+// ===================== Stock Audit Helpers =====================
 async function logTx(payload) {
   try {
     await addDoc(colWhTx, {
@@ -593,9 +640,13 @@ async function logOpnameItem({
   gudang,
   itemId,
   itemName,
-  systemStock,
-  physicalStock,
-  diffPack,
+  systemUnits,
+  physicalUnits,
+  diffUnits,
+  systemPack,
+  physicalPack,
+  systemLoose,
+  physicalLoose,
 }) {
   try {
     await addDoc(colWhOpname, {
@@ -604,9 +655,14 @@ async function logOpnameItem({
       gudang,
       itemId,
       itemName,
-      systemStock: clampInt(systemStock, 0),
-      physicalStock: clampInt(physicalStock, 0),
-      diffPack: clampInt(diffPack, 0),
+      // ✅ eksplisit (unit kecil + pack/loose)
+      systemUnits: clampInt(systemUnits, 0),
+      physicalUnits: clampInt(physicalUnits, 0),
+      diffUnits: clampInt(diffUnits, 0),
+      systemPack: clampInt(systemPack, 0),
+      physicalPack: clampInt(physicalPack, 0),
+      systemLoose: clampInt(systemLoose, 0),
+      physicalLoose: clampInt(physicalLoose, 0),
       createdAt: serverTimestamp(),
       createdBy: currentUser?.email || "-",
     });
@@ -623,8 +679,7 @@ function fillMasterForm(it) {
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
 
-  // input ini dipakai buat "tambah stok" saat edit (bukan overwrite)
-  if (whItemInitStockW1) whItemInitStockW1.value = "";
+  if (whItemInitStockW1) whItemInitStockW1.value = ""; // tambah stok saat edit
 
   if (whItemExp) whItemExp.value = it.expDate || "";
   if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
@@ -676,8 +731,11 @@ async function createMasterItem() {
     receivedAt,
     supplier,
     info,
+    // ✅ Opsi 2: pack + loose
     stockW1: safeInit,
+    stockW1Loose: 0,
     stockW2: 0,
+    stockW2Loose: 0,
     createdBy: currentUser.email || "-",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -697,7 +755,7 @@ async function createMasterItem() {
         note: "Stok awal",
       });
       await logTx({
-        type: "IN",
+        type: "IN_PACK",
         itemId: ref.id,
         itemName: name,
         qtyPack: safeInit,
@@ -715,10 +773,11 @@ async function createMasterItem() {
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
-    fillWasteSelectPreset(); // refresh waste list (gabung item + preset)
+    updateIssueInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan master item", "error");
@@ -747,7 +806,6 @@ async function updateMasterItem(id) {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
-  // “Restock” eksplisit: input ini dianggap tambahan stok, bukan ganti stok
   const addQty = Number(whItemInitStockW1?.value || 0);
   const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
 
@@ -763,9 +821,19 @@ async function updateMasterItem(id) {
     updatedAt: serverTimestamp(),
   };
 
+  // ✅ normalisasi dulu, supaya loose aman kalau packQty berubah
+  const normOld = normalizeItemStock(itOld);
+
   if (addPack > 0) {
-    payload.stockW1 = Number(itOld.stockW1 || 0) + addPack;
+    payload.stockW1 = clampInt(normOld.stockW1, 0) + addPack;
+    payload.stockW1Loose = clampInt(normOld.stockW1Loose, 0);
+  } else {
+    payload.stockW1 = clampInt(normOld.stockW1, 0);
+    payload.stockW1Loose = clampInt(normOld.stockW1Loose, 0);
   }
+
+  payload.stockW2 = clampInt(normOld.stockW2, 0);
+  payload.stockW2Loose = clampInt(normOld.stockW2Loose, 0);
 
   try {
     await updateDoc(doc(db, "wh_items", id), payload);
@@ -781,7 +849,7 @@ async function updateMasterItem(id) {
         note: "Restock",
       });
       await logTx({
-        type: "IN",
+        type: "IN_PACK",
         itemId: id,
         itemName: name,
         qtyPack: addPack,
@@ -799,10 +867,11 @@ async function updateMasterItem(id) {
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
-    fillWasteSelectPreset(); // refresh waste list (gabung item + preset)
+    updateIssueInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal update master item", "error");
@@ -830,15 +899,16 @@ function updateMoveInfo() {
     return;
   }
 
-  const packQty = Number(it.packQty || 0);
+  const packQty = getPackQty(it);
   const unitBig = it.unitBig || "dus";
   const unitSmall = it.unitSmall || "pcs";
+  const w1Units = getUnitsW(it, "w1");
 
-  const pcs = qtyPack > 0 && packQty > 0 ? qtyPack * packQty : 0;
+  const pcs = qtyPack > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     qtyPack > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0}`
-      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0}`;
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`;
 }
 
 function fillMoveSelect(keyword = "") {
@@ -853,17 +923,102 @@ function fillMoveSelect(keyword = "") {
       if (!s.includes(kw)) return;
     }
 
-    const s1 = Number(it.stockW1 || 0);
+    const w1Units = getUnitsW(it, "w1");
     const opt = document.createElement("option");
     opt.value = it.id;
-    opt.textContent = `${it.name} (W1: ${s1})`;
+    opt.textContent = `${it.name} (W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0})`;
 
-    if (s1 <= 0) opt.disabled = true;
+    if (w1Units <= 0) opt.disabled = true;
 
     moveItemSelect.appendChild(opt);
   });
 
   updateMoveInfo();
+}
+
+// ===================== Issue (ambil unit kecil dari W1) =====================
+function currentIssueItem() {
+  const id = issueItemSelect?.value || "";
+  return items.find((x) => x.id === id) || null;
+}
+function fillIssueSelect() {
+  if (!issueItemSelect) return;
+  issueItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
+  items.forEach((it) => {
+    const w1Units = getUnitsW(it, "w1");
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = `${it.name} (W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0})`;
+    if (w1Units <= 0) opt.disabled = true;
+    issueItemSelect.appendChild(opt);
+  });
+  updateIssueInfo();
+}
+function updateIssueInfo() {
+  if (!issueInfo) return;
+  const it = currentIssueItem();
+  if (!it) {
+    issueInfo.textContent = "";
+    return;
+  }
+  const pq = getPackQty(it);
+  const unitSmall = it.unitSmall || "pcs";
+  const w1Units = getUnitsW(it, "w1");
+  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
+}
+
+async function issueFromW1Units() {
+  if (!currentUser) return showToast("Harus login", "error");
+  const it = currentIssueItem();
+  if (!it) return showToast("Pilih item dulu", "error");
+
+  const qty = clampInt(issueQty?.value, 0);
+  if (!qty || qty <= 0) return showToast("Qty ambil harus > 0", "error");
+
+  const pq = getPackQty(it);
+  const unitSmall = it.unitSmall || "pcs";
+
+  const beforeUnits = getUnitsW(it, "w1");
+  if (qty > beforeUnits) {
+    return showToast(`Stok W1 tidak cukup. Stok: ${beforeUnits} ${unitSmall}`, "error");
+  }
+
+  const afterUnits = beforeUnits - qty;
+  const next = splitUnitsToPackLoose(afterUnits, pq);
+
+  try {
+    await updateDoc(doc(db, "wh_items", it.id), {
+      stockW1: next.packs,
+      stockW1Loose: next.loose,
+      updatedAt: serverTimestamp(),
+    });
+
+    await logTx({
+      type: "ISSUE_UNITS",
+      itemId: it.id,
+      itemName: it.name || "",
+      gudang: "w1",
+      qtyUnits: qty,
+      unitSmall,
+      beforeUnits,
+      afterUnits,
+      note: "Ambil dari W1 (unit kecil)",
+      ref: `wh_items:${it.id}`,
+    });
+
+    showToast(`Ambil ${qty} ${unitSmall} dari W1 ✅`, "success");
+    if (issueQty) issueQty.value = "";
+    await loadWhItems();
+    fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
+    renderOpnameTable();
+    updateDashboard();
+    updateMoveInfo();
+    updateIssueInfo();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal ambil dari W1", "error");
+  }
 }
 
 // ===================== Opname filters =====================
@@ -874,14 +1029,10 @@ function applyExpiryFilter(list) {
 function applyStockFilter(list) {
   if (!whStockFilter) return list;
   const { gudang, bucket } = whStockFilter;
-  return (list || []).filter((it) => {
-    const stock = gudang === "w1" ? Number(it.stockW1 || 0) : Number(it.stockW2 || 0);
-    return stockBucketCount(stock) === bucket;
-  });
+  return (list || []).filter((it) => stockBucketCount(packsEquivalent(it, gudang)) === bucket);
 }
 function applyGudangVisibility(list, gudang) {
-  // w2: hanya tampilkan yang ada stok W2 (biar tidak penuh)
-  if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
+  if (gudang === "w2") return (list || []).filter((it) => getUnitsW(it, "w2") > 0);
   return list || [];
 }
 
@@ -915,6 +1066,7 @@ function renderOpnameTable() {
 
   const gudang = whOpnameGudang.value || "w1";
   const list = getVisibleOpnameList();
+  const modeSmall = !!whOpnameModeSmall?.checked;
 
   whOpnameTableBody.innerHTML = "";
   if (!list.length) {
@@ -923,8 +1075,13 @@ function renderOpnameTable() {
   }
 
   list.forEach((it) => {
-    const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+    const pq = getPackQty(it);
     const unitText = `${it.unitBig || "-"} / ${it.unitSmall || "-"}`;
+    const unitSmall = it.unitSmall || "pcs";
+
+    const systemPack = clampInt(gudang === "w1" ? it.stockW1 : it.stockW2, 0);
+    const systemLoose = clampInt(gudang === "w1" ? it.stockW1Loose : it.stockW2Loose, 0);
+    const systemUnits = getUnitsW(it, gudang);
 
     const expStr = it.expDate || "-";
     const expStatus = getExpStatus(it.expDate || "");
@@ -935,6 +1092,15 @@ function renderOpnameTable() {
         ? `<span class="status-badge yellow">SOON</span>`
         : `<span class="status-badge green">OK</span>`;
 
+    const systemLabel = modeSmall
+      ? `${systemUnits} ${unitSmall}`
+      : `${systemPack} ${it.unitBig || "pack"} + ${systemLoose} ${unitSmall}`;
+
+    const inputValue = modeSmall ? systemUnits : systemPack; // default: isi sama sistem
+    const inputHint = modeSmall
+      ? `Input fisik (${unitSmall})`
+      : `Input fisik (${it.unitBig || "pack"})`;
+
     const tr = document.createElement("tr");
     tr.dataset.itemId = it.id;
 
@@ -942,7 +1108,7 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
         ${escapeHtml(unitText)}
-        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/dus: ${clampInt(it.packQty || 0, 0)}</div>
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/${escapeHtml(it.unitBig || "pack")}: ${pq} ${escapeHtml(unitSmall)}</div>
       </td>
       <td>
         ${escapeHtml(expStr)}
@@ -951,9 +1117,21 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.info || "-")}</td>
       <td>${escapeHtml(it.receivedAt || "-")}</td>
       <td>${escapeHtml(it.supplier || "-")}</td>
-      <td>${systemStock}</td>
       <td>
-        <input type="number" min="0" step="1" data-opname-id="${it.id}" value="${systemStock}" style="min-width:110px;" />
+        ${systemLabel}
+        <div style="opacity:.7;font-size:12px;margin-top:4px;">(pack=${systemPack}, loose=${systemLoose})</div>
+      </td>
+      <td>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          data-opname-id="${it.id}"
+          value="${inputValue}"
+          style="min-width:110px;"
+          placeholder="${escapeHtmlAttr(inputHint)}"
+        />
+        <div style="opacity:.7;font-size:12px;margin-top:4px;">${escapeHtml(inputHint)}</div>
       </td>
       <td style="text-align:right;">
         <div class="table-actions">
@@ -988,18 +1166,40 @@ async function saveOpname(itemId) {
   const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
   if (!inp) return;
 
-  const physical = Number(inp.value || 0);
-  if (!Number.isFinite(physical) || physical < 0) return showToast("Stok fisik tidak valid", "error");
-
   const it = items.find((x) => x.id === itemId);
   if (!it) return showToast("Item tidak ditemukan", "error");
 
-  const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-  const diff = Math.trunc(physical) - Math.trunc(systemStock);
+  const modeSmall = !!whOpnameModeSmall?.checked;
+  const pq = getPackQty(it);
+  const unitSmall = it.unitSmall || "pcs";
+
+  const systemPack = clampInt(gudang === "w1" ? it.stockW1 : it.stockW2, 0);
+  const systemLoose = clampInt(gudang === "w1" ? it.stockW1Loose : it.stockW2Loose, 0);
+  const systemUnits = getUnitsW(it, gudang);
+
+  const inputVal = Number(inp.value || 0);
+  if (!Number.isFinite(inputVal) || inputVal < 0) return showToast("Stok fisik tidak valid", "error");
+
+  // ✅ fisik bisa ditulis sebagai unit kecil (modeSmall) atau pack (mode pack)
+  let physicalUnits = 0;
+  if (modeSmall) {
+    physicalUnits = Math.trunc(inputVal);
+  } else {
+    const physicalPack = Math.trunc(inputVal);
+    physicalUnits = physicalPack * pq; // mode pack: loose dianggap 0 (biar eksplisit & gak ambiguous)
+  }
+
+  const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
+  const diffUnits = clampInt(physicalUnits - systemUnits, 0);
 
   const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = Math.trunc(physical);
-  else payload.stockW2 = Math.trunc(physical);
+  if (gudang === "w1") {
+    payload.stockW1 = physicalSplit.packs;
+    payload.stockW1Loose = physicalSplit.loose;
+  } else {
+    payload.stockW2 = physicalSplit.packs;
+    payload.stockW2Loose = physicalSplit.loose;
+  }
 
   const opnameDateKey = todayKey();
   const sessionKey = `${opnameDateKey}:${gudang}`;
@@ -1008,14 +1208,19 @@ async function saveOpname(itemId) {
     await updateDoc(doc(db, "wh_items", itemId), payload);
 
     await logTx({
-      type: "ADJUST",
+      type: "ADJUST_UNITS",
       itemId,
       itemName: it.name || "",
       gudang,
-      systemStock: Math.trunc(systemStock),
-      physicalStock: Math.trunc(physical),
-      diffPack: diff,
-      note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
+      systemUnits,
+      physicalUnits,
+      diffUnits,
+      systemPack,
+      systemLoose,
+      physicalPack: physicalSplit.packs,
+      physicalLoose: physicalSplit.loose,
+      unitSmall,
+      note: diffUnits === 0 ? "Opname (no change)" : "Opname koreksi stok",
       ref: `opname:${opnameDateKey}`,
       sessionKey,
     });
@@ -1026,22 +1231,29 @@ async function saveOpname(itemId) {
       gudang,
       itemId,
       itemName: it.name || "",
-      systemStock: Math.trunc(systemStock),
-      physicalStock: Math.trunc(physical),
-      diffPack: diff,
+      systemUnits,
+      physicalUnits,
+      diffUnits,
+      systemPack,
+      physicalPack: physicalSplit.packs,
+      systemLoose,
+      physicalLoose: physicalSplit.loose,
     });
 
     showToast(
-      diff === 0 ? `Opname tersimpan (${gudang.toUpperCase()})` : `Opname OK (selisih ${diff})`,
+      diffUnits === 0
+        ? `Opname tersimpan (${gudang.toUpperCase()})`
+        : `Opname OK (selisih ${diffUnits} ${unitSmall})`,
       "success"
     );
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
-    fillWasteSelectPreset();
+    updateIssueInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal simpan opname", "error");
@@ -1056,9 +1268,11 @@ async function saveOpnameAllVisible() {
   const list = getVisibleOpnameList();
   if (!list.length) return showToast("Tidak ada item untuk disimpan.", "info");
 
+  const modeSmall = !!whOpnameModeSmall?.checked;
+
   const ok = confirm(
     `Simpan opname untuk ${list.length} item (${gudang.toUpperCase()})?\n` +
-      `Ini akan update stok saat ini + simpan histori opname per item.`
+      `Mode: ${modeSmall ? "UNIT KECIL" : "PACK"}`
   );
   if (!ok) return;
 
@@ -1073,29 +1287,48 @@ async function saveOpnameAllVisible() {
       const inp = whOpnameTableBody.querySelector(`input[data-opname-id="${it.id}"]`);
       if (!inp) continue;
 
-      const physical = Number(inp.value || 0);
-      if (!Number.isFinite(physical) || physical < 0) throw new Error("Stok fisik tidak valid");
+      const pq = getPackQty(it);
+      const unitSmall = it.unitSmall || "pcs";
 
-      const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-      const physicalInt = Math.trunc(physical);
-      const systemInt = Math.trunc(systemStock);
-      const diff = physicalInt - systemInt;
+      const systemPack = clampInt(gudang === "w1" ? it.stockW1 : it.stockW2, 0);
+      const systemLoose = clampInt(gudang === "w1" ? it.stockW1Loose : it.stockW2Loose, 0);
+      const systemUnits = getUnitsW(it, gudang);
+
+      const inputVal = Number(inp.value || 0);
+      if (!Number.isFinite(inputVal) || inputVal < 0) throw new Error("Stok fisik tidak valid");
+
+      let physicalUnits = 0;
+      if (modeSmall) physicalUnits = Math.trunc(inputVal);
+      else physicalUnits = Math.trunc(inputVal) * pq;
+
+      const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
+      const diffUnits = clampInt(physicalUnits - systemUnits, 0);
 
       const payload = { updatedAt: serverTimestamp() };
-      if (gudang === "w1") payload.stockW1 = physicalInt;
-      else payload.stockW2 = physicalInt;
+      if (gudang === "w1") {
+        payload.stockW1 = physicalSplit.packs;
+        payload.stockW1Loose = physicalSplit.loose;
+      } else {
+        payload.stockW2 = physicalSplit.packs;
+        payload.stockW2Loose = physicalSplit.loose;
+      }
 
       await updateDoc(doc(db, "wh_items", it.id), payload);
 
       await logTx({
-        type: "ADJUST",
+        type: "ADJUST_UNITS",
         itemId: it.id,
         itemName: it.name || "",
         gudang,
-        systemStock: systemInt,
-        physicalStock: physicalInt,
-        diffPack: diff,
-        note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
+        systemUnits,
+        physicalUnits,
+        diffUnits,
+        systemPack,
+        systemLoose,
+        physicalPack: physicalSplit.packs,
+        physicalLoose: physicalSplit.loose,
+        unitSmall,
+        note: diffUnits === 0 ? "Opname (no change)" : "Opname koreksi stok",
         ref: `opname:${opnameDateKey}`,
         sessionKey,
       });
@@ -1106,9 +1339,13 @@ async function saveOpnameAllVisible() {
         gudang,
         itemId: it.id,
         itemName: it.name || "",
-        systemStock: systemInt,
-        physicalStock: physicalInt,
-        diffPack: diff,
+        systemUnits,
+        physicalUnits,
+        diffUnits,
+        systemPack,
+        physicalPack: physicalSplit.packs,
+        systemLoose,
+        physicalLoose: physicalSplit.loose,
       });
 
       saved++;
@@ -1128,10 +1365,11 @@ async function saveOpnameAllVisible() {
 
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
+  fillIssueSelect();
   renderOpnameTable();
   updateDashboard();
   updateMoveInfo();
-  fillWasteSelectPreset();
+  updateIssueInfo();
 }
 
 async function deleteItem(id) {
@@ -1141,17 +1379,6 @@ async function deleteItem(id) {
   if (!ok) return;
 
   try {
-    // ✅ EXPLICIT: simpan audit log sebelum delete
-    await logTx({
-      type: "DELETE_ITEM",
-      itemId: id,
-      itemName: it?.name || "",
-      stockW1: clampInt(it?.stockW1, 0),
-      stockW2: clampInt(it?.stockW2, 0),
-      note: "Item dihapus",
-      ref: `wh_items:${id}`,
-    });
-
     await deleteDoc(doc(db, "wh_items", id));
     showToast("Item dihapus", "success");
 
@@ -1159,10 +1386,11 @@ async function deleteItem(id) {
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
-    fillWasteSelectPreset();
+    updateIssueInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal hapus item", "error");
@@ -1181,27 +1409,32 @@ async function transferW1toW2() {
   const it = items.find((x) => x.id === itemId);
   if (!it) return showToast("Item tidak ditemukan", "error");
 
-  const s1 = Number(it.stockW1 || 0);
-  if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (stok: ${s1})`, "error");
+  const s1 = clampInt(it.stockW1, 0);
+  const loose1 = clampInt(it.stockW1Loose, 0);
 
+  if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (pack: ${s1})`, "error");
+
+  // ✅ Transfer hanya pack (loose tetap di W1 biar jelas)
   try {
     const nextW1 = Math.trunc(s1 - qtyPack);
-    const nextW2 = Math.trunc(Number(it.stockW2 || 0) + qtyPack);
+    const nextW2 = Math.trunc(clampInt(it.stockW2, 0) + qtyPack);
 
     await updateDoc(doc(db, "wh_items", itemId), {
       stockW1: nextW1,
+      stockW1Loose: loose1,
       stockW2: nextW2,
+      stockW2Loose: clampInt(it.stockW2Loose, 0),
       updatedAt: serverTimestamp(),
     });
 
     await logTx({
-      type: "TRANSFER",
+      type: "TRANSFER_PACK",
       itemId,
       itemName: it.name || "",
       qtyPack: Math.trunc(qtyPack),
       from: "w1",
       to: "w2",
-      note: "Transfer W1 → W2",
+      note: "Transfer W1 → W2 (pack saja)",
       ref: `wh_items:${itemId}`,
     });
 
@@ -1211,22 +1444,22 @@ async function transferW1toW2() {
 
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
     renderOpnameTable();
     updateDashboard();
     updateMoveInfo();
-    fillWasteSelectPreset();
+    updateIssueInfo();
   } catch (e) {
     console.error(e);
     showToast("Gagal transfer", "error");
   }
 }
 
-// ===================== Waste =====================
+// ===================== Waste (tetap) =====================
 function setWasteButtonModeUpdate(on) {
   if (!btnSaveWaste) return;
   btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste";
 }
-
 function resetWasteForm() {
   if (wasteItemSelect) wasteItemSelect.value = "";
   if (wasteQty) wasteQty.value = "";
@@ -1240,40 +1473,20 @@ function resetWasteForm() {
   editingWasteFormId = null;
   setWasteButtonModeUpdate(false);
 }
-
 function fillWasteFormFromRow(w) {
   if (!w) return;
-  // untuk dropdown gabungan, value = itemId (atau preset:xxx)
-  if (wasteItemSelect) wasteItemSelect.value = w.itemId || "";
+  if (wasteItemSelect) wasteItemSelect.value = w.itemName || "";
   if (wasteDate) wasteDate.value = w.dateKey || "";
   if (wasteUnit) wasteUnit.value = w.unit || "gram";
   if (wasteQty) wasteQty.value = String(clampInt(w.qty, 0));
   if (wasteNote) wasteNote.value = w.note || "";
   setWasteButtonModeUpdate(true);
 }
-
-// helper: get selected waste item (id + name)
-function getSelectedWasteItem() {
-  const val = (wasteItemSelect?.value || "").trim();
-  if (!val) return null;
-
-  if (val.startsWith("preset:")) {
-    const name = val.replace("preset:", "");
-    return { itemId: val, itemName: name, kind: "preset" };
-  }
-
-  const it = items.find((x) => x.id === val);
-  if (it) return { itemId: it.id, itemName: it.name || "", kind: "wh_item" };
-
-  // fallback (harusnya tidak kejadian kalau select rapih)
-  return { itemId: val, itemName: val, kind: "unknown" };
-}
-
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
-  const sel = getSelectedWasteItem();
-  if (!sel) return showToast("Pilih item waste dulu", "error");
+  const itemName = (wasteItemSelect?.value || "").trim();
+  if (!itemName) return showToast("Pilih item waste dulu", "error");
 
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
@@ -1285,8 +1498,8 @@ async function createWaste() {
   const note = (wasteNote?.value || "").trim();
 
   const log = {
-    itemId: sel.itemId,
-    itemName: sel.itemName,
+    itemId: `preset:${itemName}`,
+    itemName,
     dateKey: d,
     qty,
     unit,
@@ -1298,19 +1511,6 @@ async function createWaste() {
 
   try {
     await addDoc(colWhWaste, log);
-
-    // ✅ EXPLICIT: waste juga dicatat sebagai transaksi (audit), tapi tidak mengubah stok pack
-    await logTx({
-      type: "WASTE",
-      itemId: sel.itemId,
-      itemName: sel.itemName,
-      qty: Number(qty),
-      unit,
-      dateKey: d,
-      note: note || "",
-      ref: `wh_waste`,
-    });
-
     showToast("Waste tersimpan", "success");
     resetWasteForm();
 
@@ -1321,13 +1521,12 @@ async function createWaste() {
     showToast("Gagal simpan waste", "error");
   }
 }
-
 async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!id) return;
 
-  const sel = getSelectedWasteItem();
-  if (!sel) return showToast("Pilih item waste dulu", "error");
+  const itemName = (wasteItemSelect?.value || "").trim();
+  if (!itemName) return showToast("Pilih item waste dulu", "error");
 
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
@@ -1340,25 +1539,13 @@ async function updateWaste(id) {
 
   try {
     await updateDoc(doc(db, "wh_waste", id), {
-      itemId: sel.itemId,
-      itemName: sel.itemName,
+      itemId: `preset:${itemName}`,
+      itemName,
       dateKey: d,
       qty,
       unit,
       note,
       updatedAt: serverTimestamp(),
-    });
-
-    // ✅ EXPLICIT: update waste juga dicatat sebagai transaksi audit
-    await logTx({
-      type: "WASTE_UPDATE",
-      itemId: sel.itemId,
-      itemName: sel.itemName,
-      qty: Number(qty),
-      unit,
-      dateKey: d,
-      note: note || "",
-      ref: `wh_waste:${id}`,
     });
 
     showToast("Waste berhasil diupdate", "success");
@@ -1371,12 +1558,10 @@ async function updateWaste(id) {
     showToast("Gagal update waste", "error");
   }
 }
-
 async function saveOrUpdateWaste() {
   if (editingWasteFormId) return await updateWaste(editingWasteFormId);
   return await createWaste();
 }
-
 function ensureWasteDefaults() {
   const val = toDateInputValue(new Date());
   if (wasteDate && !wasteDate.value) wasteDate.value = val;
@@ -1386,26 +1571,15 @@ function ensureWasteDefaults() {
   if (whReportStart && !whReportStart.value) whReportStart.value = val;
   if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
-
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
-
-  // gabung: wh_items + preset (biar bisa pilih item real juga)
-  const opts = [];
-  for (const it of items) {
-    opts.push({ value: it.id, label: `📦 ${it.name || "-"} (Item Gudang)` });
-  }
-  for (const name of WASTE_PRESET_ITEMS) {
-    opts.push({ value: `preset:${name}`, label: `🧪 ${name} (Preset)` });
-  }
-
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
-  for (const o of opts) {
+  WASTE_PRESET_ITEMS.forEach((name) => {
     const opt = document.createElement("option");
-    opt.value = o.value;
-    opt.textContent = o.label;
+    opt.value = name;
+    opt.textContent = name;
     wasteItemSelect.appendChild(opt);
-  }
+  });
 }
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
@@ -1418,14 +1592,12 @@ function fillWasteUnitOptions() {
     wasteUnit.appendChild(opt);
   });
 }
-
 function getWasteFilterStart() {
   return parseDateOnly(wasteFilterStart?.value || "") || null;
 }
 function getWasteFilterEnd() {
   return parseDateOnly(wasteFilterEnd?.value || "") || null;
 }
-
 function sortWasteList(list) {
   const by = wasteSortByState;
   const dir = wasteSortDirState;
@@ -1440,7 +1612,6 @@ function sortWasteList(list) {
 
   return dir === "asc" ? sorted : sorted.reverse();
 }
-
 function renderWasteHistory() {
   if (!wasteHistoryBody) return;
 
@@ -1499,27 +1670,12 @@ function renderWasteHistory() {
     wasteHistoryBody.appendChild(tr);
   });
 }
-
 async function deleteWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   const ok = confirm("Hapus data waste ini?");
   if (!ok) return;
 
-  const old = wasteLogs.find((x) => x.id === id);
-
   try {
-    // ✅ EXPLICIT: log delete waste
-    await logTx({
-      type: "WASTE_DELETE",
-      itemId: old?.itemId || "",
-      itemName: old?.itemName || "",
-      qty: Number(old?.qty || 0),
-      unit: old?.unit || "",
-      dateKey: old?.dateKey || "",
-      note: old?.note || "",
-      ref: `wh_waste:${id}`,
-    });
-
     await deleteDoc(doc(db, "wh_waste", id));
     showToast("Waste dihapus", "success");
 
@@ -1544,11 +1700,9 @@ async function getWeeklySnapshotItems(weekKey, gudang) {
 }
 
 async function ensureWeeklySnapshot(weekKey, gudang) {
-  // Jika sudah ada snapshot untuk minggu+gudang, pakai itu
   const existing = await getWeeklySnapshotItems(weekKey, gudang);
   if (existing.length) return existing;
 
-  // Kalau belum ada: buat snapshot dari items saat ini
   const createdAtKey = todayKey();
   const createdBy = currentUser?.email || "-";
 
@@ -1563,8 +1717,13 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
       unitBig: it.unitBig || "",
       unitSmall: it.unitSmall || "",
       packQty: clampInt(it.packQty, 0),
+      // ✅ simpan pack + loose juga
       stockW1: clampInt(it.stockW1, 0),
+      stockW1Loose: clampInt(it.stockW1Loose, 0),
       stockW2: clampInt(it.stockW2, 0),
+      stockW2Loose: clampInt(it.stockW2Loose, 0),
+      totalW1Units: getUnitsW(it, "w1"),
+      totalW2Units: getUnitsW(it, "w2"),
       expDate: it.expDate || "",
       receivedAt: it.receivedAt || "",
       createdAtKey,
@@ -1581,7 +1740,6 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
     console.warn("Gagal simpan snapshot mingguan (tidak fatal):", e);
   }
 
-  // reload snapshot
   return await getWeeklySnapshotItems(weekKey, gudang);
 }
 
@@ -1644,7 +1802,6 @@ function getReportRangeKeys() {
   const endKey = (whReportEnd?.value || "").trim();
   return { startKey, endKey };
 }
-
 function validateReportRange(startKey, endKey) {
   if (!startKey || !endKey) return "Tanggal mulai & akhir wajib diisi.";
   if (startKey > endKey) return "Tanggal mulai tidak boleh lebih besar dari tanggal akhir.";
@@ -1710,7 +1867,7 @@ async function generateWarehouseReport() {
 
       const gudang = type === "opname_history_w2" ? "w2" : "w1";
 
-      header = ["Tanggal Opname", "Gudang", "Item", "Stok Sistem", "Stok Fisik", "Selisih", "User"];
+      header = ["Tanggal", "Gudang", "Item", "Sistem (unit)", "Fisik (unit)", "Selisih (unit)", "User"];
 
       rows = opnameLogs
         .slice()
@@ -1725,55 +1882,67 @@ async function generateWarehouseReport() {
           o.opnameDateKey || "",
           (o.gudang || "").toUpperCase(),
           o.itemName || "",
-          String(clampInt(o.systemStock, 0)),
-          String(clampInt(o.physicalStock, 0)),
-          String(clampInt(o.diffPack, 0)),
+          String(clampInt(o.systemUnits ?? o.systemStock, 0)),
+          String(clampInt(o.physicalUnits ?? o.physicalStock, 0)),
+          String(clampInt(o.diffUnits ?? o.diffPack, 0)),
           o.createdBy || "",
         ]);
     } else if (type === "opname_w1" || type === "opname_w2") {
-      // ✅ Snapshot mingguan (bisa lihat minggu lalu)
       const gudang = type === "opname_w2" ? "w2" : "w1";
 
       const useWeekly = isFullCalendarWeekRange(startKey, endKey);
       let snapRows = null;
 
       if (useWeekly) {
-        const weekKey = weekKeyFromStartKey(startKey); // startKey = Senin
+        const weekKey = weekKeyFromStartKey(startKey);
         snapRows = await ensureWeeklySnapshot(weekKey, gudang);
       }
 
       header =
         type === "opname_w2"
-          ? ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1", "Stok W2"]
-          : ["Item", "Supplier", "Unit Besar", "Unit Isi", "Isi/Dus", "Stok W1"];
+          ? ["Item", "Supplier", "Isi/Dus", "W1 Pack", "W1 Loose", "W1 Total(unit)", "W2 Pack", "W2 Loose", "W2 Total(unit)"]
+          : ["Item", "Supplier", "Isi/Dus", "W1 Pack", "W1 Loose", "W1 Total(unit)"];
 
       const dataSource = snapRows?.length
         ? snapRows
         : items.map((it) => ({
             itemName: it.name || "",
             supplier: it.supplier || "",
-            unitBig: it.unitBig || "",
-            unitSmall: it.unitSmall || "",
             packQty: clampInt(it.packQty, 0),
             stockW1: clampInt(it.stockW1, 0),
+            stockW1Loose: clampInt(it.stockW1Loose, 0),
             stockW2: clampInt(it.stockW2, 0),
+            stockW2Loose: clampInt(it.stockW2Loose, 0),
+            totalW1Units: getUnitsW(it, "w1"),
+            totalW2Units: getUnitsW(it, "w2"),
           }));
 
       rows = dataSource
         .slice()
         .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
-        .filter((it) => (type === "opname_w2" ? Number(it.stockW2 || 0) > 0 : true))
+        .filter((it) => (type === "opname_w2" ? Number(it.totalW2Units || 0) > 0 : true))
         .map((it) => {
-          const base = [
+          if (type === "opname_w2") {
+            return [
+              it.itemName || "",
+              it.supplier || "",
+              String(clampInt(it.packQty, 0)),
+              String(clampInt(it.stockW1, 0)),
+              String(clampInt(it.stockW1Loose, 0)),
+              String(clampInt(it.totalW1Units, 0)),
+              String(clampInt(it.stockW2, 0)),
+              String(clampInt(it.stockW2Loose, 0)),
+              String(clampInt(it.totalW2Units, 0)),
+            ];
+          }
+          return [
             it.itemName || "",
             it.supplier || "",
-            it.unitBig || "",
-            it.unitSmall || "",
             String(clampInt(it.packQty, 0)),
+            String(clampInt(it.stockW1, 0)),
+            String(clampInt(it.stockW1Loose, 0)),
+            String(clampInt(it.totalW1Units, 0)),
           ];
-          const stokW1 = String(clampInt(it.stockW1, 0));
-          const stokW2 = String(clampInt(it.stockW2, 0));
-          return type === "opname_w2" ? [...base, stokW1, stokW2] : [...base, stokW1];
         });
     } else {
       return showToast("Tipe laporan tidak dikenali.", "error");
@@ -1812,11 +1981,17 @@ moveSearch?.addEventListener("input", () => fillMoveSelect(moveSearch.value || "
 moveItemSelect?.addEventListener("change", updateMoveInfo);
 moveQty?.addEventListener("input", updateMoveInfo);
 
+// ✅ Issue events
+btnIssueW1?.addEventListener("click", issueFromW1Units);
+issueItemSelect?.addEventListener("change", updateIssueInfo);
+issueQty?.addEventListener("input", updateIssueInfo);
+
 whOpnameGudang?.addEventListener("change", () => {
   if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) whStockFilter = null;
   renderOpnameTable();
 });
 whOpnameSearch?.addEventListener("input", renderOpnameTable);
+whOpnameModeSmall?.addEventListener("change", renderOpnameTable);
 
 btnOpnameSaveAll?.addEventListener("click", saveOpnameAllVisible);
 
@@ -1845,7 +2020,7 @@ wasteSortDirBtn?.addEventListener("click", () => {
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
-// ✅ Week preset buttons
+// Week preset
 btnWeekThis?.addEventListener("click", () => setReportRangeByWeekOffset(0));
 btnWeekLast?.addEventListener("click", () => setReportRangeByWeekOffset(1));
 btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
@@ -1853,6 +2028,7 @@ btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
 // ===================== Boot =====================
 async function bootWarehouse() {
   ensureWasteDefaults();
+  fillWasteSelectPreset();
   fillWasteUnitOptions();
   setWasteButtonModeUpdate(false);
 
@@ -1861,14 +2037,13 @@ async function bootWarehouse() {
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
   if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
 
-  // default: minggu ini
   if (whReportStart && whReportEnd && (!whReportStart.value || !whReportEnd.value)) {
     setReportRangeByWeekOffset(0);
   }
 
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
-  fillWasteSelectPreset(); // butuh items loaded
+  fillIssueSelect();
 
   renderOpnameTable();
 
@@ -1878,6 +2053,7 @@ async function bootWarehouse() {
   bindStockCardClicks();
   updateDashboard();
   updateMoveInfo();
+  updateIssueInfo();
 }
 
 onAuthStateChanged(auth, async (u) => {
