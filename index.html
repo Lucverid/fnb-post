@@ -248,6 +248,28 @@
 
             <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">Transfer</button>
 
+            <!-- ✅ OPSI 2: Issue unit kecil dari W1 -->
+            <hr style="margin:14px 0; opacity:.25;">
+
+            <h3 style="margin:0 0 10px;">Ambil dari W1 (Unit Kecil)</h3>
+            <label>Pilih Item</label>
+            <select id="issueItemSelect"></select>
+
+            <div class="grid-2" style="gap:10px;">
+              <div>
+                <label>Qty Ambil (unit kecil)</label>
+                <input id="issueQty" type="number" min="1" step="1" placeholder="contoh: 25">
+              </div>
+              <div>
+                <label>Info</label>
+                <div id="issueInfo" style="margin-top:10px; font-size:12px; opacity:.8;"></div>
+              </div>
+            </div>
+
+            <button id="btnIssueW1" class="btn-secondary" type="button" style="margin-top:10px;">
+              Ambil dari Gudang 1
+            </button>
+
             <hr style="margin:14px 0; opacity:.25;">
 
             <h3 style="margin:0 0 10px;">Filter Opname</h3>
@@ -260,6 +282,12 @@
 
             <label>Cari Item</label>
             <input id="whOpnameSearch" type="text" placeholder="ketik nama / supplier / unit...">
+
+            <!-- ✅ OPSI 2: Opname mode unit kecil -->
+            <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
+              <input id="whOpnameModeSmall" type="checkbox" style="width:auto;">
+              Opname pakai unit kecil (pcs/ml/gram)
+            </label>
 
             <button id="btnOpnameSaveAll" class="btn-primary" type="button" style="margin-top:10px;">
               Simpan Opname Semua Item
