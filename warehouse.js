@@ -37,19 +37,23 @@ function todayKey(d = new Date()) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
 function parseDateOnly(value) {
   if (!value) return null;
   const d = new Date(value + "T00:00:00");
   return isNaN(d) ? null : d;
 }
+
 function daysDiff(a, b) {
   const ms = 1000 * 60 * 60 * 24;
   return Math.floor((a.getTime() - b.getTime()) / ms);
 }
+
 function clampInt(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
+
 function escapeHtml(str) {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -58,9 +62,11 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 function escapeHtmlAttr(str) {
   return escapeHtml(str).replaceAll("\n", " ");
 }
+
 function iconBtn(html, title, extraClass = "") {
   return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(
     title
@@ -72,6 +78,7 @@ function csvEscape(value) {
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
+
 function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -88,13 +95,13 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
 const colWhItems = collection(db, "wh_items");
 const colWhWaste = collection(db, "wh_waste");
 
-// ✅ NEW: penerimaan barang (riwayat masuk)
+// ✅ penerimaan barang (riwayat masuk)
 const colWhBatches = collection(db, "wh_batches");
 
-// ✅ NEW: log pergerakan stok (audit trail: IN / TRANSFER / ADJUST)
+// ✅ audit trail (IN / TRANSFER / ADJUST)
 const colWhTx = collection(db, "wh_tx");
 
-// ✅ NEW: histori opname (PER ITEM DETAIL) — untuk laporan opname mingguan
+// ✅ histori opname per item (untuk laporan mingguan)
 const colWhOpname = collection(db, "wh_opname_logs");
 
 // ===================== DOM =====================
@@ -131,7 +138,7 @@ const whItemUnitBig = $("whItemUnitBig");
 const whItemUnitSmall = $("whItemUnitSmall");
 const whItemPackQty = $("whItemPackQty");
 
-// ✅ sekarang: saat EDIT item, field ini dianggap "Tambah stok W1 (dus)" (bukan overwrite)
+// ✅ saat EDIT item: dianggap "Tambah stok W1 (dus)" (bukan overwrite)
 const whItemInitStockW1 = $("whItemInitStockW1");
 
 const whItemExp = $("whItemExp");
@@ -141,16 +148,19 @@ const whItemInfo = $("whItemInfo");
 const btnSaveItem = $("btnSaveItem");
 
 // Transfer
-const moveSearch = $("moveSearch");
+const moveSearch = $("moveSearch"); // opsional (kalau ga ada di HTML, aman)
 const moveItemSelect = $("moveItemSelect");
 const moveQty = $("moveQty");
-const moveInfo = $("moveInfo");
+const moveInfo = $("moveInfo"); // opsional
 const btnMove = $("btnMove");
 
 // Opname
 const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
+
+// ✅ tombol 1-klik simpan opname semua item (harus ada di HTML)
+const btnOpnameSaveAll = $("btnOpnameSaveAll");
 
 // Waste form
 const wasteItemSelect = $("wasteItemSelect");
@@ -176,7 +186,10 @@ const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
-const btnWhReportDownload = $("btnWhReportCsv");
+
+// ✅ FIX FINAL: harus match HTML: id="btnWhReportDownload"
+const btnWhReportDownload = $("btnWhReportDownload");
+
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
@@ -185,7 +198,7 @@ let currentUser = null;
 let items = [];
 let wasteLogs = [];
 let batchLogs = [];
-let opnameLogs = []; // ✅ histori opname cache
+let opnameLogs = [];
 
 const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
@@ -194,10 +207,7 @@ const EXP_SOON_DAYS = 7;
 let whExpiryFilter = null; // null | ok | soon | expired
 let whStockFilter = null; // null | { gudang, bucket }
 
-// Master edit mode
 let editingMasterId = null;
-
-// Waste edit mode
 let editingWasteFormId = null;
 
 let wasteSortByState = "dateKey";
@@ -229,6 +239,7 @@ function setActiveNav(btn) {
   document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
 }
+
 function showWhSection(which) {
   [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((sec) => {
     if (sec) sec.classList.add("hidden");
@@ -238,6 +249,7 @@ function showWhSection(which) {
   if (which === "waste" && whWasteSection) whWasteSection.classList.remove("hidden");
   if (which === "report" && whReportSection) whReportSection.classList.remove("hidden");
 }
+
 function resetOpnameFilters() {
   whExpiryFilter = null;
   whStockFilter = null;
@@ -248,15 +260,18 @@ navWhDashboard?.addEventListener("click", () => {
   setActiveNav(navWhDashboard);
   showWhSection("dashboard");
 });
+
 navWhOpname?.addEventListener("click", () => {
   setActiveNav(navWhOpname);
   showWhSection("opname");
   renderOpnameTable();
 });
+
 navWhWaste?.addEventListener("click", () => {
   setActiveNav(navWhWaste);
   showWhSection("waste");
 });
+
 navWhReport?.addEventListener("click", () => {
   setActiveNav(navWhReport);
   showWhSection("report");
@@ -295,7 +310,6 @@ async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
   }
 }
 
-// ✅ NEW: load histori opname (client-side filter)
 async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhOpname, orderBy("opnameDateKey", "desc"), limit(2000)));
   opnameLogs = [];
@@ -316,7 +330,6 @@ function getExpStatus(expStr) {
   const now = new Date();
   const exp = parseDateOnly(expStr);
   if (!exp) return "ok";
-
   const left = daysDiff(exp, now);
   if (left < 0) return "expired";
   if (left <= EXP_SOON_DAYS) return "soon";
@@ -526,10 +539,16 @@ async function logBatchIn({ itemId, itemName, supplier, receivedAt, expDate, qty
   }
 }
 
-// ✅ NEW: histori opname per item (buat laporan mingguan)
-async function logOpnameItem({ gudang, itemId, itemName, systemStock, physicalStock, diffPack }) {
-  const opnameDateKey = todayKey();
-  const sessionKey = `${opnameDateKey}:${gudang}`; // grouping ringan (1 sesi per gudang per hari)
+async function logOpnameItem({
+  sessionKey,
+  opnameDateKey,
+  gudang,
+  itemId,
+  itemName,
+  systemStock,
+  physicalStock,
+  diffPack,
+}) {
   try {
     await addDoc(colWhOpname, {
       sessionKey,
@@ -556,7 +575,7 @@ function fillMasterForm(it) {
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
 
-  // ✅ saat edit: field ini dipakai untuk tambah stok, kosongkan
+  // ✅ saat edit: field ini untuk tambah stok, jadi kosongkan
   if (whItemInitStockW1) whItemInitStockW1.value = "";
 
   if (whItemExp) whItemExp.value = it.expDate || "";
@@ -565,6 +584,7 @@ function fillMasterForm(it) {
   if (whItemInfo) whItemInfo.value = it.info || "";
   if (btnSaveItem) btnSaveItem.textContent = "Update";
 }
+
 function resetMasterForm() {
   if (whItemName) whItemName.value = "";
   if (whItemUnitBig) whItemUnitBig.value = "";
@@ -606,7 +626,7 @@ async function createMasterItem() {
     unitSmall,
     packQty,
 
-    // ini hanya "terakhir diinput" untuk UI, histori penerimaan ada di wh_batches
+    // hanya “last-known” untuk UI; histori penerimaan ada di wh_batches
     expDate: exp,
     receivedAt,
 
@@ -682,6 +702,7 @@ async function updateMasterItem(id) {
   if (!unitSmall) return showToast("Unit isi wajib diisi", "error");
   if (!packQty || packQty <= 0) return showToast("Isi per dus wajib > 0", "error");
 
+  // ✅ tambah stok (dus) saat edit
   const addQty = Number(whItemInitStockW1?.value || 0);
   const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
 
@@ -806,6 +827,7 @@ function applyExpiryFilter(list) {
   if (!whExpiryFilter) return list;
   return (list || []).filter((it) => getExpStatus(it.expDate || "") === whExpiryFilter);
 }
+
 function applyStockFilter(list) {
   if (!whStockFilter) return list;
   const { gudang, bucket } = whStockFilter;
@@ -814,15 +836,15 @@ function applyStockFilter(list) {
     return stockBucketCount(stock) === bucket;
   });
 }
+
 function applyGudangVisibility(list, gudang) {
   if (gudang === "w2") return (list || []).filter((it) => Number(it.stockW2 || 0) > 0);
   return list || [];
 }
 
-// ===================== Opname table =====================
-function renderOpnameTable() {
-  if (!whOpnameTableBody || !whOpnameGudang) return;
-
+// ✅ list item yang sedang tampil (sesuai filter + search + gudang)
+function getVisibleOpnameList() {
+  if (!whOpnameGudang) return [];
   const gudang = whOpnameGudang.value || "w1";
   const keyword = (whOpnameSearch?.value || "").trim().toLowerCase();
 
@@ -841,6 +863,16 @@ function renderOpnameTable() {
   list = applyGudangVisibility(list, gudang);
   list = applyExpiryFilter(list);
   list = applyStockFilter(list);
+
+  return list;
+}
+
+// ===================== Opname table =====================
+function renderOpnameTable() {
+  if (!whOpnameTableBody || !whOpnameGudang) return;
+
+  const gudang = whOpnameGudang.value || "w1";
+  const list = getVisibleOpnameList();
 
   whOpnameTableBody.innerHTML = "";
   if (!list.length) {
@@ -910,6 +942,7 @@ function renderOpnameTable() {
   });
 }
 
+// ✅ simpan opname per item (manual klik)
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -924,11 +957,17 @@ async function saveOpname(itemId) {
   if (!it) return showToast("Item tidak ditemukan", "error");
 
   const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
-  const diff = Math.trunc(physical) - Math.trunc(systemStock);
+
+  const physicalInt = Math.trunc(physical);
+  const systemInt = Math.trunc(systemStock);
+  const diff = physicalInt - systemInt;
 
   const payload = { updatedAt: serverTimestamp() };
-  if (gudang === "w1") payload.stockW1 = Math.trunc(physical);
-  else payload.stockW2 = Math.trunc(physical);
+  if (gudang === "w1") payload.stockW1 = physicalInt;
+  else payload.stockW2 = physicalInt;
+
+  const opnameDateKey = todayKey();
+  const sessionKey = `${opnameDateKey}:${gudang}`;
 
   try {
     // 1) update stok saat ini
@@ -940,20 +979,23 @@ async function saveOpname(itemId) {
       itemId,
       itemName: it.name || "",
       gudang,
-      systemStock: Math.trunc(systemStock),
-      physicalStock: Math.trunc(physical),
+      systemStock: systemInt,
+      physicalStock: physicalInt,
       diffPack: diff,
       note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
-      ref: `opname:${todayKey()}`,
+      ref: `opname:${opnameDateKey}`,
+      sessionKey,
     });
 
-    // 3) ✅ simpan HISTORI OPNAME per item (buat laporan mingguan)
+    // 3) histori opname (per item detail)
     await logOpnameItem({
+      sessionKey,
+      opnameDateKey,
       gudang,
       itemId,
       itemName: it.name || "",
-      systemStock: Math.trunc(systemStock),
-      physicalStock: Math.trunc(physical),
+      systemStock: systemInt,
+      physicalStock: physicalInt,
       diffPack: diff,
     });
 
@@ -971,6 +1013,95 @@ async function saveOpname(itemId) {
     console.error(e);
     showToast("Gagal simpan opname", "error");
   }
+}
+
+// ✅ simpan opname SEMUA item yang tampil (1 klik)
+async function saveOpnameAllVisible() {
+  if (!currentUser) return showToast("Harus login", "error");
+  if (!whOpnameTableBody || !whOpnameGudang) return;
+
+  const gudang = whOpnameGudang.value || "w1";
+  const list = getVisibleOpnameList();
+  if (!list.length) return showToast("Tidak ada item untuk disimpan.", "info");
+
+  const ok = confirm(
+    `Simpan opname untuk ${list.length} item (${gudang.toUpperCase()})?\n` +
+      `Ini akan update stok saat ini + simpan histori opname per item.`
+  );
+  if (!ok) return;
+
+  const opnameDateKey = todayKey();
+  const sessionKey = `${opnameDateKey}:${gudang}`;
+
+  let saved = 0;
+  let failed = 0;
+
+  for (const it of list) {
+    try {
+      const inp = whOpnameTableBody.querySelector(`input[data-opname-id="${it.id}"]`);
+      if (!inp) continue;
+
+      const physical = Number(inp.value || 0);
+      if (!Number.isFinite(physical) || physical < 0) throw new Error("Stok fisik tidak valid");
+
+      const systemStock = Number(gudang === "w1" ? it.stockW1 || 0 : it.stockW2 || 0);
+      const physicalInt = Math.trunc(physical);
+      const systemInt = Math.trunc(systemStock);
+      const diff = physicalInt - systemInt;
+
+      const payload = { updatedAt: serverTimestamp() };
+      if (gudang === "w1") payload.stockW1 = physicalInt;
+      else payload.stockW2 = physicalInt;
+
+      // 1) update stok
+      await updateDoc(doc(db, "wh_items", it.id), payload);
+
+      // 2) audit
+      await logTx({
+        type: "ADJUST",
+        itemId: it.id,
+        itemName: it.name || "",
+        gudang,
+        systemStock: systemInt,
+        physicalStock: physicalInt,
+        diffPack: diff,
+        note: diff === 0 ? "Opname (no change)" : "Opname koreksi stok",
+        ref: `opname:${opnameDateKey}`,
+        sessionKey,
+      });
+
+      // 3) histori opname
+      await logOpnameItem({
+        sessionKey,
+        opnameDateKey,
+        gudang,
+        itemId: it.id,
+        itemName: it.name || "",
+        systemStock: systemInt,
+        physicalStock: physicalInt,
+        diffPack: diff,
+      });
+
+      saved++;
+    } catch (e) {
+      console.error("Opname all error item:", it?.id, e);
+      failed++;
+    }
+  }
+
+  showToast(
+    failed === 0
+      ? `Opname selesai ✅ (${saved} item tersimpan)`
+      : `Opname selesai (${saved} tersimpan, ${failed} gagal)`,
+    failed === 0 ? "success" : "warning",
+    4000
+  );
+
+  await loadWhItems();
+  fillMoveSelect(moveSearch?.value || "");
+  renderOpnameTable();
+  updateDashboard();
+  updateMoveInfo();
 }
 
 async function deleteItem(id) {
@@ -1170,7 +1301,6 @@ function ensureWasteDefaults() {
   if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
   if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
 
-  // report default dates
   if (whReportStart && !whReportStart.value) whReportStart.value = val;
   if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
@@ -1185,6 +1315,7 @@ function fillWasteSelectPreset() {
     wasteItemSelect.appendChild(opt);
   });
 }
+
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
   const units = ["gram", "ml", "pcs", "unit"];
@@ -1200,6 +1331,7 @@ function fillWasteUnitOptions() {
 function getWasteFilterStart() {
   return parseDateOnly(wasteFilterStart?.value || "") || null;
 }
+
 function getWasteFilterEnd() {
   return parseDateOnly(wasteFilterEnd?.value || "") || null;
 }
@@ -1298,11 +1430,10 @@ async function deleteWaste(id) {
 }
 
 // ===================== REPORT (Generate + CSV Download) =====================
-// ✅ Kamu perlu pastikan <select id="whReportType"> di HTML ada opsi ini:
-// - <option value="opname_history_w1">Histori Opname W1</option>
-// - <option value="opname_history_w2">Histori Opname W2</option>
-// - <option value="receiving">Penerimaan Barang</option>
-
+// Pastikan <select id="whReportType"> punya opsi:
+// - opname_history_w1
+// - opname_history_w2
+// - receiving
 function reportTypeLabel(type) {
   if (type === "opname_w1") return "Opname Gudang 1 (Snapshot Stok Saat Ini)";
   if (type === "opname_w2") return "Opname Gudang 2 (Snapshot Stok Saat Ini)";
@@ -1444,22 +1575,13 @@ async function generateWarehouseReport() {
           b.createdBy || "",
         ]);
     } else if (type === "opname_history_w1" || type === "opname_history_w2") {
-      // ✅ INI yang dipakai untuk opname mingguan: filter by tanggal opname
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
       await loadOpnameLogs(s, e);
 
       const gudang = type === "opname_history_w2" ? "w2" : "w1";
 
-      header = [
-        "Tanggal Opname",
-        "Gudang",
-        "Item",
-        "Stok Sistem",
-        "Stok Fisik",
-        "Selisih",
-        "User",
-      ];
+      header = ["Tanggal Opname", "Gudang", "Item", "Stok Sistem", "Stok Fisik", "Selisih", "User"];
 
       rows = opnameLogs
         .slice()
@@ -1502,7 +1624,9 @@ function downloadLastReportCSV() {
     return showToast("Generate laporan dulu sebelum download.", "error");
   }
   const safeType = (lastReportMeta.type || "report").replaceAll(/[^\w-]+/g, "_");
-  const filename = `warehouse_${safeType}_${lastReportMeta.startKey || ""}_${lastReportMeta.endKey || ""}.csv`;
+  const filename = `warehouse_${safeType}_${lastReportMeta.startKey || ""}_${
+    lastReportMeta.endKey || ""
+  }.csv`;
   const csv = buildReportCSV(lastReportMeta, lastReportHeader, lastReportRows);
   downloadText(filename, csv, "text/csv;charset=utf-8");
   showToast("CSV didownload.", "success");
@@ -1520,7 +1644,11 @@ whOpnameGudang?.addEventListener("change", () => {
   if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) whStockFilter = null;
   renderOpnameTable();
 });
+
 whOpnameSearch?.addEventListener("input", renderOpnameTable);
+
+// ✅ 1-klik opname semua item
+btnOpnameSaveAll?.addEventListener("click", saveOpnameAllVisible);
 
 btnSaveWaste?.addEventListener("click", saveOrUpdateWaste);
 
@@ -1528,23 +1656,25 @@ wasteFilterStart?.addEventListener("change", async () => {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 });
+
 wasteFilterEnd?.addEventListener("change", async () => {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 });
+
 wasteHistorySearch?.addEventListener("input", renderWasteHistory);
 
 wasteSortBy?.addEventListener("change", () => {
   wasteSortByState = wasteSortBy.value || "dateKey";
   renderWasteHistory();
 });
+
 wasteSortDirBtn?.addEventListener("click", () => {
   wasteSortDirState = wasteSortDirState === "asc" ? "desc" : "asc";
   wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
   renderWasteHistory();
 });
 
-// Report buttons
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
@@ -1553,6 +1683,8 @@ async function bootWarehouse() {
   ensureWasteDefaults();
   fillWasteSelectPreset();
   fillWasteUnitOptions();
+  setWasteButtonModeUpdate(false);
+
   setReportDownloadEnabled(false);
 
   if (wasteSortBy) wasteSortBy.value = wasteSortByState;
