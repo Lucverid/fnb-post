@@ -13,6 +13,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc, // ✅ PATCH
   query,
   where,
   orderBy,
@@ -459,34 +460,80 @@ updateConnectionStatus(false);
 window.addEventListener("online", () => updateConnectionStatus(true));
 window.addEventListener("offline", () => updateConnectionStatus(true));
 
-// ================= ROLE =================
-async function getUserRole(uid) {
+// ================= ROLE (✅ PATCH FULL) =================
+const ROLE_KEYS = ["role", "userRole", "currentUserRole"];
+
+function clearRoleStorage() {
   try {
-    const qRole = query(colUsers, where("uid", "==", uid));
-    const snap = await getDocs(qRole);
-    if (snap.empty) return null;
-    let role;
-    snap.forEach((d) => {
-      const data = d.data();
-      if (data.role) role = data.role;
-    });
-    return role || "kasir";
-  } catch (e) {
-    console.error("getUserRole", e);
-    return "kasir";
+    ROLE_KEYS.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+  if (document?.body?.dataset) document.body.dataset.role = "";
+}
+
+function saveRole(role) {
+  const r = (role || "").toLowerCase();
+  try {
+    localStorage.setItem("role", r);
+    localStorage.setItem("userRole", r);
+    localStorage.setItem("currentUserRole", r);
+  } catch {}
+  if (document?.body?.dataset) document.body.dataset.role = r;
+}
+
+function getRoleFromStorage() {
+  try {
+    const a = (localStorage.getItem("role") || "").toLowerCase();
+    const b = (localStorage.getItem("userRole") || "").toLowerCase();
+    const c = (localStorage.getItem("currentUserRole") || "").toLowerCase();
+    return a || b || c || "";
+  } catch {
+    return "";
   }
 }
 
-function applyRoleUI(role) {
-  currentRole = role || "kasir";
+async function getUserRole(uid) {
+  try {
+    // 1) coba doc langsung: users/{uid}
+    const byId = await getDoc(doc(db, "users", uid));
+    if (byId.exists()) {
+      const r = (byId.data()?.role || "").toLowerCase();
+      if (r) return r;
+    }
+
+    // 2) fallback: query where uid == uid (struktur lama)
+    const qRole = query(colUsers, where("uid", "==", uid));
+    const snap = await getDocs(qRole);
+    let role = "";
+    snap.forEach((d) => {
+      if (!role && d.data()?.role) role = String(d.data().role).toLowerCase();
+    });
+
+    // 3) jangan default "kasir" di sini (biar UI gak salah duluan)
+    return role || "";
+  } catch (e) {
+    console.error("getUserRole error", e);
+    return "";
+  }
+}
+
+function applyRoleUI(roleRaw) {
+  const role = (roleRaw || "").toLowerCase();
+  currentRole = role || null;
+
+  // simpan ke storage & dataset untuk warehouse.js
+  if (role) saveRole(role);
 
   const adminEls = document.querySelectorAll(".admin-only");
   adminEls.forEach((el) => {
-    if (currentRole === "admin") el.classList.remove("hidden");
+    if (role === "admin" || role === "owner" || role === "superadmin") el.classList.remove("hidden");
     else el.classList.add("hidden");
   });
 
-  if (bannerRole) bannerRole.textContent = currentRole === "admin" ? "Administrator" : "Kasir";
+  if (bannerRole) {
+    bannerRole.textContent = role
+      ? (role === "admin" || role === "owner" || role === "superadmin" ? "Administrator" : "Kasir")
+      : "Memuat…";
+  }
 }
 
 // ================= NAV =================
@@ -666,6 +713,9 @@ if (productType) {
 if (btnLogin) {
   btnLogin.addEventListener("click", async () => {
     try {
+      // ✅ PATCH: buang role nyangkut sebelum login
+      clearRoleStorage();
+
       const email = (loginEmail?.value || "").trim();
       const pass = (loginPassword?.value || "").trim();
       if (!email || !pass) {
@@ -686,18 +736,31 @@ if (btnRegister) {
     try {
       const email = (registerEmail?.value || "").trim();
       const pass = (registerPassword?.value || "").trim();
-      const role = registerRole?.value || "kasir";
+      const role = (registerRole?.value || "kasir").toLowerCase();
       if (!email || !pass) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await addDoc(colUsers, {
-        uid: cred.user.uid,
-        email,
-        role,
-        createdAt: serverTimestamp(),
-      });
+
+      // ✅ prefer doc id = uid (biar getDoc cepat)
+      try {
+        await updateDoc(doc(db, "users", cred.user.uid), {
+          uid: cred.user.uid,
+          email,
+          role,
+          updatedAt: serverTimestamp(),
+        });
+      } catch {
+        // kalau doc belum ada, pakai addDoc seperti sebelumnya
+        await addDoc(colUsers, {
+          uid: cred.user.uid,
+          email,
+          role,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       showToast("User berhasil dibuat", "success");
       if (registerEmail) registerEmail.value = "";
       if (registerPassword) registerPassword.value = "";
@@ -912,6 +975,19 @@ if (btnSaveProduct) {
   });
 }
 
+/* ===========================
+   SISANYA (RESEP, POS, OPNAME, REPORT, dll)
+   ===========================
+   ⚠️ Karena file kamu sangat panjang, bagian setelah ini tetap sama seperti yang kamu kirim.
+   Tidak ada perubahan logika selain PATCH ROLE di atas.
+
+   👉 Tempelkan “lanjutan kode kamu” mulai dari:
+   // ================= RESEP / BOM (MENU) =================
+   sampai akhir file, TANPA DIUBAH.
+
+   Kalau kamu mau aku kirim 100% full sampai baris terakhir juga (tanpa dipotong),
+   bilang: “kirim full lanjutannya dari RESEP sampai akhir” — nanti aku paste full lanjutannya rapih 1 file.
+*/
 // ================= RESEP / BOM (MENU) =================
 function addBomRow(selectedId = "", qty = 1) {
   if (!isEnabled("recipe")) return;
