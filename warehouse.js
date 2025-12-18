@@ -2104,4 +2104,4 @@ onAuthStateChanged(auth, async (u) => {
       showToast("Kemungkinan Firestore rules melarang akses (role kasir).", "warning", 6000);
     }
   }
-});
+}); 
