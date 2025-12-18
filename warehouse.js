@@ -1,8 +1,10 @@
 // warehouse.js (FINAL) — Opsi 2 (Pack + Loose) + Expiry Indicator + Anti “Warehouse gagal init” utk Kasir
-// Catatan: error “Warehouse gagal init” paling sering karena Firestore rules (kasir tidak punya akses).
-// File ini dibuat supaya:
-// 1) Kalau role bukan admin → warehouse TIDAK di-init (biar gak error).
-// 2) Kalau tetap di-init dan error terjadi → tampilkan pesan error aslinya + EXP cards tetap muncul (0).
+// + FIX: role admin kebaca kasir (stale localStorage) + role resolver yang lebih aman
+//
+// Intinya:
+// 1) Role prioritas: Firestore users/{uid}.role (kalau ada) -> window/body dataset -> localStorage (paling terakhir)
+// 2) Kalau user berganti (uid beda), bersihin cache role localStorage biar nggak kebawa dari user sebelumnya
+// 3) Debug log role biar ketahuan sumber mana yang salah
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -11,6 +13,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   query,
   orderBy,
   updateDoc,
@@ -91,35 +94,72 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
-// ===================== Role helper (biar kasir tidak init warehouse) =====================
-// FIX: LIVE-first + tunggu role siap biar admin gak kebaca kasir karena localStorage stale
+// ===================== Role helper (FIX: admin kebaca kasir) =====================
+
+// bersihin cache role kalau user berganti (uid beda) supaya role lama nggak kebawa
+function cleanupRoleCacheOnUserChange(uid) {
+  try {
+    const lastUid = localStorage.getItem("lastUid") || "";
+    if (lastUid && uid && lastUid !== uid) {
+      localStorage.removeItem("role");
+      localStorage.removeItem("userRole");
+      // jangan hapus data lain
+    }
+    if (uid) localStorage.setItem("lastUid", uid);
+  } catch (_) {}
+}
+
+// prioritas yang “paling valid” dulu, localStorage terakhir (karena sering stale)
 function getRoleGuess() {
-  // LIVE FIRST
-  const a = (window.currentUserRole || "").toString().toLowerCase();
-  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
+  const win = (window.currentUserRole || "").toString().toLowerCase().trim();
+  const body = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
 
-  // CACHE LAST (sering stale)
-  const b = (localStorage.getItem("role") || "").toString().toLowerCase();
-  const c = (localStorage.getItem("userRole") || "").toString().toLowerCase();
+  const lsUserRole = (localStorage.getItem("userRole") || "").toString().toLowerCase().trim();
+  const lsRole = (localStorage.getItem("role") || "").toString().toLowerCase().trim();
 
-  return a || d || b || c || "";
+  return win || body || lsUserRole || lsRole || "";
 }
 function isAdminRole(role) {
-  return role === "admin" || role === "owner" || role === "superadmin";
+  const r = (role || "").toString().toLowerCase().trim();
+  return r === "admin" || r === "owner" || r === "superadmin";
 }
-function readRoleLiveFirst() {
-  const a = (window.currentUserRole || "").toString().toLowerCase();
-  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
-  return a || d || "";
-}
-async function waitRoleReady(timeoutMs = 1500) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const r = readRoleLiveFirst();
-    if (r) return r;
-    await new Promise((res) => setTimeout(res, 50));
+
+// Role “benar”: coba Firestore users/{uid}.role.
+// Kalau gagal (misal rules / tidak ada doc), fallback ke getRoleGuess().
+// NOTE: Ini aman karena kalau Firestore gagal, kamu masih bisa jalan pakai sumber lain.
+async function getRoleReliable(user) {
+  const uid = user?.uid || "";
+  if (!uid) return getRoleGuess();
+
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    if (snap.exists()) {
+      const role = (snap.data()?.role || "").toString().toLowerCase().trim();
+      if (role) {
+        window.currentUserRole = role; // cache
+        try {
+          localStorage.setItem("userRole", role); // optional cache
+        } catch (_) {}
+        return role;
+      }
+    }
+  } catch (e) {
+    // role doc bisa gagal karena rules -> fallback
+    console.warn("[ROLE] users/{uid} fetch failed:", e);
   }
   return getRoleGuess();
+}
+
+function logRoleDebug(roleResolved) {
+  console.log("[ROLE DEBUG]", {
+    resolved: roleResolved,
+    win: window.currentUserRole,
+    body: document.body?.dataset?.role,
+    ls_role: localStorage.getItem("role"),
+    ls_userRole: localStorage.getItem("userRole"),
+    email: currentUser?.email || "-",
+    uid: currentUser?.uid || "-",
+  });
 }
 
 // ===================== Week Preset (Senin–Minggu) =====================
@@ -599,7 +639,6 @@ function updateWarehouseNotif() {
 }
 
 function updateDashboard() {
-  // PASTIKAN EXP CARDS selalu ada (walau items kosong)
   ensureExpiryCards();
 
   let w1 = { habis: 0, low: 0, high: 0 };
@@ -939,8 +978,12 @@ function updateMoveInfo() {
   const pcs = qtyPack > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     qtyPack > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
-      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`;
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${
+          it.stockW1 || 0
+        } + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${
+          it.stockW1Loose || 0
+        } (${w1Units} ${unitSmall})`;
 }
 function fillMoveSelect(keyword = "") {
   if (!moveItemSelect) return;
@@ -993,7 +1036,9 @@ function updateIssueInfo() {
   const pq = getPackQty(it);
   const unitSmall = it.unitSmall || "pcs";
   const w1Units = getUnitsW(it, "w1");
-  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
+  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${
+    it.stockW1Loose || 0
+  } ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
 }
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
@@ -1133,7 +1178,9 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
         ${escapeHtml(unitText)}
-        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/${escapeHtml(it.unitBig || "pack")}: ${pq} ${escapeHtml(unitSmall)}</div>
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/${escapeHtml(
+          it.unitBig || "pack"
+        )}: ${pq} ${escapeHtml(unitSmall)}</div>
       </td>
       <td>
         ${escapeHtml(expStr)}
@@ -2073,16 +2120,17 @@ onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
   if (!currentUser) return;
 
-  // ✅ tunggu role LIVE kebaca dulu (anti admin kebaca kasir)
-  const role = await waitRoleReady(1500);
+  // FIX: kalau user ganti, bersihin cache role biar nggak kebawa (admin kebaca kasir)
+  cleanupRoleCacheOnUserChange(currentUser.uid);
 
-  // ✅ Ini yang bikin “kasir login” tidak memicu warehouse gagal init
+  // Role resolver aman
+  const role = await getRoleReliable(currentUser);
+  logRoleDebug(role);
+
+  // ✅ warehouse admin-only → non-admin jangan init
   if (role && !isAdminRole(role)) {
-    // warehouse admin-only → jangan init
-    ensureExpiryCards(); // kalau mau tetap tampil exp (0)
+    ensureExpiryCards();
     updateDashboard();
-    // optional: notif
-    // showToast("Warehouse nonaktif untuk role kasir.", "info", 2500);
     return;
   }
 
@@ -2091,17 +2139,14 @@ onAuthStateChanged(auth, async (u) => {
   } catch (e) {
     console.error("WAREHOUSE INIT ERROR:", e);
 
-    // ✅ tampilkan pesan aslinya biar jelas (permissions / index / dll)
     const msg = errorText(e);
     showToast("Warehouse gagal init: " + msg, "error", 7000);
 
-    // ✅ pastikan exp cards tetap muncul
     ensureExpiryCards();
     updateDashboard();
 
-    // Kalau ternyata permission:
     if (isPermissionError(e)) {
       showToast("Kemungkinan Firestore rules melarang akses (role kasir).", "warning", 6000);
     }
   }
-}); 
+});
