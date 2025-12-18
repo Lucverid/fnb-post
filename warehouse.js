@@ -92,16 +92,34 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
 }
 
 // ===================== Role helper (biar kasir tidak init warehouse) =====================
+// FIX: LIVE-first + tunggu role siap biar admin gak kebaca kasir karena localStorage stale
 function getRoleGuess() {
-  // dukung banyak kemungkinan sumber role
+  // LIVE FIRST
   const a = (window.currentUserRole || "").toString().toLowerCase();
+  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
+
+  // CACHE LAST (sering stale)
   const b = (localStorage.getItem("role") || "").toString().toLowerCase();
   const c = (localStorage.getItem("userRole") || "").toString().toLowerCase();
-  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
-  return a || b || c || d || "";
+
+  return a || d || b || c || "";
 }
 function isAdminRole(role) {
   return role === "admin" || role === "owner" || role === "superadmin";
+}
+function readRoleLiveFirst() {
+  const a = (window.currentUserRole || "").toString().toLowerCase();
+  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
+  return a || d || "";
+}
+async function waitRoleReady(timeoutMs = 1500) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const r = readRoleLiveFirst();
+    if (r) return r;
+    await new Promise((res) => setTimeout(res, 50));
+  }
+  return getRoleGuess();
 }
 
 // ===================== Week Preset (Senin–Minggu) =====================
@@ -2055,13 +2073,15 @@ onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
   if (!currentUser) return;
 
+  // ✅ tunggu role LIVE kebaca dulu (anti admin kebaca kasir)
+  const role = await waitRoleReady(1500);
+
   // ✅ Ini yang bikin “kasir login” tidak memicu warehouse gagal init
-  const role = getRoleGuess();
   if (role && !isAdminRole(role)) {
     // warehouse admin-only → jangan init
     ensureExpiryCards(); // kalau mau tetap tampil exp (0)
     updateDashboard();
-    // optional: kalau kamu mau notif
+    // optional: notif
     // showToast("Warehouse nonaktif untuk role kasir.", "info", 2500);
     return;
   }
