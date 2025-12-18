@@ -13,7 +13,7 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc,
+  getDoc,            // ✅ TAMBAH INI
   query,
   orderBy,
   updateDoc,
@@ -94,74 +94,69 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
-// ===================== Role helper (FIX: admin kebaca kasir) =====================
-
-// bersihin cache role kalau user berganti (uid beda) supaya role lama nggak kebawa
-function cleanupRoleCacheOnUserChange(uid) {
-  try {
-    const lastUid = localStorage.getItem("lastUid") || "";
-    if (lastUid && uid && lastUid !== uid) {
-      localStorage.removeItem("role");
-      localStorage.removeItem("userRole");
-      // jangan hapus data lain
-    }
-    if (uid) localStorage.setItem("lastUid", uid);
-  } catch (_) {}
-}
-
-// prioritas yang “paling valid” dulu, localStorage terakhir (karena sering stale)
-function getRoleGuess() {
-  const win = (window.currentUserRole || "").toString().toLowerCase().trim();
-  const body = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
-
-  const lsUserRole = (localStorage.getItem("userRole") || "").toString().toLowerCase().trim();
-  const lsRole = (localStorage.getItem("role") || "").toString().toLowerCase().trim();
-
-  return win || body || lsUserRole || lsRole || "";
-}
+// ===================== Role helper (FIX: anti admin kebaca kasir) =====================
 function isAdminRole(role) {
   const r = (role || "").toString().toLowerCase().trim();
   return r === "admin" || r === "owner" || r === "superadmin";
 }
 
-// Role “benar”: coba Firestore users/{uid}.role.
-// Kalau gagal (misal rules / tidak ada doc), fallback ke getRoleGuess().
-// NOTE: Ini aman karena kalau Firestore gagal, kamu masih bisa jalan pakai sumber lain.
-async function getRoleReliable(user) {
-  const uid = user?.uid || "";
-  if (!uid) return getRoleGuess();
-
+function clearRoleCacheIfUserChanged(user) {
   try {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (snap.exists()) {
-      const role = (snap.data()?.role || "").toString().toLowerCase().trim();
-      if (role) {
-        window.currentUserRole = role; // cache
-        try {
-          localStorage.setItem("userRole", role); // optional cache
-        } catch (_) {}
-        return role;
-      }
+    const uid = user?.uid || "";
+    if (!uid) return;
+
+    const lastUid = localStorage.getItem("lastUid") || "";
+    if (lastUid && lastUid !== uid) {
+      // ✅ role nyangkut dari user lama -> bersihin
+      localStorage.removeItem("role");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("currentUserRole");
+      // kalau kamu punya key lain terkait role, hapus juga di sini
     }
+    localStorage.setItem("lastUid", uid);
+  } catch (_) {}
+}
+
+async function getRoleFromFirestore(user) {
+  try {
+    const uid = user?.uid || "";
+    if (!uid) return "";
+    // ✅ pastikan kamu punya doc: users/{uid} dengan field role
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    const role = snap.exists() ? (snap.data()?.role || "") : "";
+    return (role || "").toString().toLowerCase().trim();
   } catch (e) {
-    // role doc bisa gagal karena rules -> fallback
-    console.warn("[ROLE] users/{uid} fetch failed:", e);
+    // gak fatal: cuma fallback
+    return "";
   }
-  return getRoleGuess();
 }
 
-function logRoleDebug(roleResolved) {
-  console.log("[ROLE DEBUG]", {
-    resolved: roleResolved,
-    win: window.currentUserRole,
-    body: document.body?.dataset?.role,
-    ls_role: localStorage.getItem("role"),
-    ls_userRole: localStorage.getItem("userRole"),
-    email: currentUser?.email || "-",
-    uid: currentUser?.uid || "-",
-  });
+function getRoleFromRuntime() {
+  const a = (window.currentUserRole || "").toString().toLowerCase().trim();
+  const b = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
+  return a || b || "";
 }
 
+function getRoleFromLocalStorage() {
+  const b = (localStorage.getItem("role") || "").toString().toLowerCase().trim();
+  const c = (localStorage.getItem("userRole") || "").toString().toLowerCase().trim();
+  const d = (localStorage.getItem("currentUserRole") || "").toString().toLowerCase().trim();
+  return b || c || d || "";
+}
+
+async function resolveUserRole(user) {
+  // 1) Firestore (paling valid)
+  const fsRole = await getRoleFromFirestore(user);
+  if (fsRole) return fsRole;
+
+  // 2) Runtime (window/body dataset)
+  const rtRole = getRoleFromRuntime();
+  if (rtRole) return rtRole;
+
+  // 3) LocalStorage (paling terakhir)
+  return getRoleFromLocalStorage();
+}
 // ===================== Week Preset (Senin–Minggu) =====================
 function toDateInputValue(d) {
   const y = d.getFullYear();
@@ -2120,14 +2115,22 @@ onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
   if (!currentUser) return;
 
-  // FIX: kalau user ganti, bersihin cache role biar nggak kebawa (admin kebaca kasir)
-  cleanupRoleCacheOnUserChange(currentUser.uid);
+  // ✅ penting: bersihin role cache kalau user berganti
+  clearRoleCacheIfUserChanged(currentUser);
 
-  // Role resolver aman
-  const role = await getRoleReliable(currentUser);
-  logRoleDebug(role);
+  // ✅ resolve role yang paling valid (Firestore dulu)
+  const role = await resolveUserRole(currentUser);
 
-  // ✅ warehouse admin-only → non-admin jangan init
+  // 🔎 debug biar keliatan sumbernya kalau masih salah
+  console.log("[ROLE DEBUG]", {
+    uid: currentUser.uid,
+    email: currentUser.email,
+    resolvedRole: role,
+    runtimeRole: getRoleFromRuntime(),
+    lsRole: getRoleFromLocalStorage(),
+  });
+
+  // warehouse admin-only → jangan init kalau bukan admin
   if (role && !isAdminRole(role)) {
     ensureExpiryCards();
     updateDashboard();
@@ -2138,7 +2141,6 @@ onAuthStateChanged(auth, async (u) => {
     await bootWarehouse();
   } catch (e) {
     console.error("WAREHOUSE INIT ERROR:", e);
-
     const msg = errorText(e);
     showToast("Warehouse gagal init: " + msg, "error", 7000);
 
