@@ -1,12 +1,8 @@
-/* ============================================================
-   warehouse.js — FINAL (Opsi 2: Pack + Loose + Issue Unit Kecil)
-   - Stock disimpan: Pack + Loose per gudang
-   - Transfer W1 -> W2: PACK saja (loose tetap di W1)
-   - Issue dari W1: ambil UNIT KECIL (otomatis pecah pack/loose)
-   - Opname: bisa mode PACK atau mode UNIT KECIL (checkbox)
-   - Laporan: opname snapshot & histori (unit), waste, receiving
-   - FIX: Guard DOM + Expiry cards aman (tidak bikin init gagal)
-   ============================================================ */
+// warehouse.js (FINAL) — Opsi 2 (Pack + Loose) + Expiry Indicator + Anti “Warehouse gagal init” utk Kasir
+// Catatan: error “Warehouse gagal init” paling sering karena Firestore rules (kasir tidak punya akses).
+// File ini dibuat supaya:
+// 1) Kalau role bukan admin → warehouse TIDAK di-init (biar gak error).
+// 2) Kalau tetap di-init dan error terjadi → tampilkan pesan error aslinya + EXP cards tetap muncul (0).
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -95,6 +91,19 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
+// ===================== Role helper (biar kasir tidak init warehouse) =====================
+function getRoleGuess() {
+  // dukung banyak kemungkinan sumber role
+  const a = (window.currentUserRole || "").toString().toLowerCase();
+  const b = (localStorage.getItem("role") || "").toString().toLowerCase();
+  const c = (localStorage.getItem("userRole") || "").toString().toLowerCase();
+  const d = (document.body?.dataset?.role || "").toString().toLowerCase();
+  return a || b || c || d || "";
+}
+function isAdminRole(role) {
+  return role === "admin" || role === "owner" || role === "superadmin";
+}
+
 // ===================== Week Preset (Senin–Minggu) =====================
 function toDateInputValue(d) {
   const y = d.getFullYear();
@@ -123,8 +132,8 @@ function setReportRangeByWeekOffset(weekOffset = 0) {
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
 
-  $("whReportStart") && ($("whReportStart").value = toDateInputValue(start));
-  $("whReportEnd") && ($("whReportEnd").value = toDateInputValue(end));
+  if ($("whReportStart")) $("whReportStart").value = toDateInputValue(start);
+  if ($("whReportEnd")) $("whReportEnd").value = toDateInputValue(end);
 
   showToast(
     weekOffset === 0
@@ -200,7 +209,7 @@ const navWhOpname = $("navWhOpname");
 const navWhWaste = $("navWhWaste");
 const navWhReport = $("navWhReport");
 
-// Dashboard cards
+// Dashboard
 const w1Habis = $("w1Habis");
 const w1Lumayan = $("w1Lumayan");
 const w1Banyak = $("w1Banyak");
@@ -236,7 +245,7 @@ const moveQty = $("moveQty");
 const moveInfo = $("moveInfo");
 const btnMove = $("btnMove");
 
-// Issue
+// Issue (unit kecil dari W1)
 const issueItemSelect = $("issueItemSelect");
 const issueQty = $("issueQty");
 const issueInfo = $("issueInfo");
@@ -264,7 +273,6 @@ const wasteHistoryBody = $("wasteHistoryBody");
 const wasteSortBy = $("wasteSortBy");
 const wasteSortDirBtn = $("wasteSortDir");
 
-// Notif topbar
 const notifBadge = $("notifBadge");
 const notifList = $("notifList");
 
@@ -274,11 +282,14 @@ const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
+
+// download btn: dukung dua id (biar gak kejebak mismatch)
 const btnWhReportDownload = $("btnWhReportDownload") || $("btnWhReportCsv");
+
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
-// Week preset
+// Week preset buttons
 const btnWeekThis = $("btnWeekThis");
 const btnWeekLast = $("btnWeekLast");
 const btnWeekPrev2 = $("btnWeekPrev2");
@@ -319,7 +330,7 @@ const WASTE_PRESET_ITEMS = [
   "Pendamping lemon",
 ];
 
-// Last report cache
+// Last report cache (for download)
 let lastReportMeta = null;
 let lastReportHeader = [];
 let lastReportRows = [];
@@ -327,16 +338,16 @@ let lastReportRows = [];
 // ===================== Navigation =====================
 function setActiveNav(btn) {
   document.querySelectorAll(".side-item").forEach((b) => b.classList.remove("active"));
-  btn && btn.classList.add("active");
+  if (btn) btn.classList.add("active");
 }
 function showWhSection(which) {
   [whDashboardSection, whOpnameSection, whWasteSection, whReportSection].forEach((sec) => {
-    sec && sec.classList.add("hidden");
+    if (sec) sec.classList.add("hidden");
   });
-  if (which === "dashboard") whDashboardSection && whDashboardSection.classList.remove("hidden");
-  if (which === "opname") whOpnameSection && whOpnameSection.classList.remove("hidden");
-  if (which === "waste") whWasteSection && whWasteSection.classList.remove("hidden");
-  if (which === "report") whReportSection && whReportSection.classList.remove("hidden");
+  if (which === "dashboard" && whDashboardSection) whDashboardSection.classList.remove("hidden");
+  if (which === "opname" && whOpnameSection) whOpnameSection.classList.remove("hidden");
+  if (which === "waste" && whWasteSection) whWasteSection.classList.remove("hidden");
+  if (which === "report" && whReportSection) whReportSection.classList.remove("hidden");
 }
 function resetOpnameFilters() {
   whExpiryFilter = null;
@@ -361,6 +372,16 @@ navWhReport?.addEventListener("click", () => {
   setActiveNav(navWhReport);
   showWhSection("report");
 });
+
+// ===================== Safe Firestore error helper =====================
+function isPermissionError(e) {
+  const msg = String(e?.message || e || "").toLowerCase();
+  const code = String(e?.code || "").toLowerCase();
+  return code.includes("permission") || msg.includes("insufficient permissions") || msg.includes("permission");
+}
+function errorText(e) {
+  return String(e?.message || e || "Unknown error");
+}
 
 // ===================== Load =====================
 async function loadWhItems() {
@@ -439,15 +460,11 @@ function stockBucketCount(packEqFloat) {
   return "mid";
 }
 
-// ===================== Dashboard expiry cards (FIX: guard DOM) =====================
+// ===================== Dashboard expiry cards =====================
 function ensureExpiryCards() {
-  const section = document.getElementById("whDashboardSection");
-  if (!section) {
-    console.warn("whDashboardSection belum siap, skip expiry cards");
-    return;
-  }
+  if (!whDashboardSection) return;
 
-  let wrap = document.getElementById(dashboardExpiryWrapId);
+  let wrap = $(dashboardExpiryWrapId);
   if (wrap) return;
 
   wrap = document.createElement("div");
@@ -469,11 +486,11 @@ function ensureExpiryCards() {
       </div>
     </div>
   `;
-  section.appendChild(wrap);
+  whDashboardSection.appendChild(wrap);
 
-  document.getElementById("cardExpOk")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("ok"));
-  document.getElementById("cardExpSoon")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("soon"));
-  document.getElementById("cardExpBad")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("expired"));
+  $("cardExpOk")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("ok"));
+  $("cardExpSoon")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("soon"));
+  $("cardExpBad")?.addEventListener("click", () => gotoOpnameWithExpiryFilter("expired"));
 }
 
 function gotoOpnameWithExpiryFilter(type) {
@@ -564,6 +581,9 @@ function updateWarehouseNotif() {
 }
 
 function updateDashboard() {
+  // PASTIKAN EXP CARDS selalu ada (walau items kosong)
+  ensureExpiryCards();
+
   let w1 = { habis: 0, low: 0, high: 0 };
   let w2 = { habis: 0, low: 0, high: 0 };
 
@@ -580,16 +600,17 @@ function updateDashboard() {
     if (s2 === "high") w2.high++;
   });
 
-  w1Habis && (w1Habis.textContent = w1.habis);
-  w1Lumayan && (w1Lumayan.textContent = w1.low);
-  w1Banyak && (w1Banyak.textContent = w1.high);
-  w2Habis && (w2Habis.textContent = w2.habis);
-  w2Lumayan && (w2Lumayan.textContent = w2.low);
-  w2Banyak && (w2Banyak.textContent = w2.high);
+  if (w1Habis) w1Habis.textContent = w1.habis;
+  if (w1Lumayan) w1Lumayan.textContent = w1.low;
+  if (w1Banyak) w1Banyak.textContent = w1.high;
+  if (w2Habis) w2Habis.textContent = w2.habis;
+  if (w2Lumayan) w2Lumayan.textContent = w2.low;
+  if (w2Banyak) w2Banyak.textContent = w2.high;
 
-  ensureExpiryCards();
+  let expOk = 0,
+    expSoon = 0,
+    expBad = 0;
 
-  let expOk = 0, expSoon = 0, expBad = 0;
   items.forEach((it) => {
     const st = getExpStatus(it.expDate || "");
     if (st === "ok") expOk++;
@@ -604,7 +625,7 @@ function updateDashboard() {
   updateWarehouseNotif();
 }
 
-// ===================== Audit helpers =====================
+// ===================== Stock Audit Helpers =====================
 async function logTx(payload) {
   try {
     await addDoc(colWhTx, {
@@ -616,7 +637,6 @@ async function logTx(payload) {
     console.warn("TX log gagal (tidak fatal):", e);
   }
 }
-
 async function logBatchIn({ itemId, itemName, supplier, receivedAt, expDate, qtyPack, note }) {
   try {
     await addDoc(colWhBatches, {
@@ -634,7 +654,6 @@ async function logBatchIn({ itemId, itemName, supplier, receivedAt, expDate, qty
     console.warn("Batch log gagal (tidak fatal):", e);
   }
 }
-
 async function logOpnameItem({
   sessionKey,
   opnameDateKey,
@@ -671,32 +690,32 @@ async function logOpnameItem({
   }
 }
 
-// ===================== Master helpers =====================
+// ===================== Master Form helpers =====================
 function fillMasterForm(it) {
   if (!it) return;
-  whItemName && (whItemName.value = it.name || "");
-  whItemUnitBig && (whItemUnitBig.value = it.unitBig || "");
-  whItemUnitSmall && (whItemUnitSmall.value = it.unitSmall || "");
-  whItemPackQty && (whItemPackQty.value = String(clampInt(it.packQty, 0)));
-  whItemInitStockW1 && (whItemInitStockW1.value = ""); // add stock when edit
-  whItemExp && (whItemExp.value = it.expDate || "");
-  whItemReceivedAt && (whItemReceivedAt.value = it.receivedAt || "");
-  whItemSupplier && (whItemSupplier.value = it.supplier || "");
-  whItemInfo && (whItemInfo.value = it.info || "");
-  btnSaveItem && (btnSaveItem.textContent = "Update");
+  if (whItemName) whItemName.value = it.name || "";
+  if (whItemUnitBig) whItemUnitBig.value = it.unitBig || "";
+  if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
+  if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
+  if (whItemExp) whItemExp.value = it.expDate || "";
+  if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
+  if (whItemSupplier) whItemSupplier.value = it.supplier || "";
+  if (whItemInfo) whItemInfo.value = it.info || "";
+  if (btnSaveItem) btnSaveItem.textContent = "Update";
 }
 function resetMasterForm() {
-  whItemName && (whItemName.value = "");
-  whItemUnitBig && (whItemUnitBig.value = "");
-  whItemUnitSmall && (whItemUnitSmall.value = "");
-  whItemPackQty && (whItemPackQty.value = "");
-  whItemInitStockW1 && (whItemInitStockW1.value = "");
-  whItemExp && (whItemExp.value = "");
-  whItemReceivedAt && (whItemReceivedAt.value = "");
-  whItemSupplier && (whItemSupplier.value = "");
-  whItemInfo && (whItemInfo.value = "");
+  if (whItemName) whItemName.value = "";
+  if (whItemUnitBig) whItemUnitBig.value = "";
+  if (whItemUnitSmall) whItemUnitSmall.value = "";
+  if (whItemPackQty) whItemPackQty.value = "";
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
+  if (whItemExp) whItemExp.value = "";
+  if (whItemReceivedAt) whItemReceivedAt.value = "";
+  if (whItemSupplier) whItemSupplier.value = "";
+  if (whItemInfo) whItemInfo.value = "";
   editingMasterId = null;
-  btnSaveItem && (btnSaveItem.textContent = "Simpan Item");
+  if (btnSaveItem) btnSaveItem.textContent = "Simpan Item";
 }
 
 async function createMasterItem() {
@@ -777,7 +796,7 @@ async function createMasterItem() {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan master item", "error");
+    showToast("Gagal simpan master item: " + errorText(e), "error", 6000);
   }
 }
 
@@ -806,9 +825,6 @@ async function updateMasterItem(id) {
   const addQty = Number(whItemInitStockW1?.value || 0);
   const addPack = Number.isFinite(addQty) && addQty > 0 ? Math.trunc(addQty) : 0;
 
-  // normalisasi dulu (aman jika packQty berubah)
-  const normOld = normalizeItemStock(itOld);
-
   const payload = {
     name,
     unitBig,
@@ -819,11 +835,20 @@ async function updateMasterItem(id) {
     supplier,
     info,
     updatedAt: serverTimestamp(),
-    stockW1: clampInt(normOld.stockW1, 0) + (addPack > 0 ? addPack : 0),
-    stockW1Loose: clampInt(normOld.stockW1Loose, 0),
-    stockW2: clampInt(normOld.stockW2, 0),
-    stockW2Loose: clampInt(normOld.stockW2Loose, 0),
   };
+
+  const normOld = normalizeItemStock(itOld);
+
+  if (addPack > 0) {
+    payload.stockW1 = clampInt(normOld.stockW1, 0) + addPack;
+    payload.stockW1Loose = clampInt(normOld.stockW1Loose, 0);
+  } else {
+    payload.stockW1 = clampInt(normOld.stockW1, 0);
+    payload.stockW1Loose = clampInt(normOld.stockW1Loose, 0);
+  }
+
+  payload.stockW2 = clampInt(normOld.stockW2, 0);
+  payload.stockW2Loose = clampInt(normOld.stockW2Loose, 0);
 
   try {
     await updateDoc(doc(db, "wh_items", id), payload);
@@ -864,7 +889,7 @@ async function updateMasterItem(id) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update master item", "error");
+    showToast("Gagal update master item: " + errorText(e), "error", 6000);
   }
 }
 
@@ -873,7 +898,7 @@ async function saveOrUpdateMasterItem() {
   return await createMasterItem();
 }
 
-// ===================== Transfer =====================
+// ===================== Transfer helpers =====================
 function currentTransferItem() {
   const id = moveItemSelect?.value || "";
   return items.find((x) => x.id === id) || null;
@@ -883,7 +908,10 @@ function updateMoveInfo() {
   const it = currentTransferItem();
   const qtyPack = Number(moveQty?.value || 0);
 
-  if (!it) return (moveInfo.textContent = "");
+  if (!it) {
+    moveInfo.textContent = "";
+    return;
+  }
 
   const packQty = getPackQty(it);
   const unitBig = it.unitBig || "dus";
@@ -919,62 +947,6 @@ function fillMoveSelect(keyword = "") {
   updateMoveInfo();
 }
 
-async function transferW1toW2() {
-  if (!currentUser) return showToast("Harus login", "error");
-
-  const itemId = moveItemSelect?.value || "";
-  const qtyPack = Number(moveQty?.value || 0);
-
-  if (!itemId) return showToast("Pilih item dulu", "error");
-  if (!qtyPack || qtyPack <= 0) return showToast("Qty transfer harus > 0", "error");
-
-  const it = items.find((x) => x.id === itemId);
-  if (!it) return showToast("Item tidak ditemukan", "error");
-
-  const s1 = clampInt(it.stockW1, 0);
-  const loose1 = clampInt(it.stockW1Loose, 0);
-  if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (pack: ${s1})`, "error");
-
-  try {
-    const nextW1 = Math.trunc(s1 - qtyPack);
-    const nextW2 = Math.trunc(clampInt(it.stockW2, 0) + qtyPack);
-
-    await updateDoc(doc(db, "wh_items", itemId), {
-      stockW1: nextW1,
-      stockW1Loose: loose1,
-      stockW2: nextW2,
-      stockW2Loose: clampInt(it.stockW2Loose, 0),
-      updatedAt: serverTimestamp(),
-    });
-
-    await logTx({
-      type: "TRANSFER_PACK",
-      itemId,
-      itemName: it.name || "",
-      qtyPack: Math.trunc(qtyPack),
-      from: "w1",
-      to: "w2",
-      note: "Transfer W1 → W2 (pack saja)",
-      ref: `wh_items:${itemId}`,
-    });
-
-    showToast("Transfer berhasil", "success");
-    moveQty && (moveQty.value = "");
-    updateMoveInfo();
-
-    await loadWhItems();
-    fillMoveSelect(moveSearch?.value || "");
-    fillIssueSelect();
-    renderOpnameTable();
-    updateDashboard();
-    updateMoveInfo();
-    updateIssueInfo();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal transfer", "error");
-  }
-}
-
 // ===================== Issue (ambil unit kecil dari W1) =====================
 function currentIssueItem() {
   const id = issueItemSelect?.value || "";
@@ -996,14 +968,15 @@ function fillIssueSelect() {
 function updateIssueInfo() {
   if (!issueInfo) return;
   const it = currentIssueItem();
-  if (!it) return (issueInfo.textContent = "");
-
+  if (!it) {
+    issueInfo.textContent = "";
+    return;
+  }
   const pq = getPackQty(it);
   const unitSmall = it.unitSmall || "pcs";
   const w1Units = getUnitsW(it, "w1");
-  issueInfo.textContent = `Stok W1: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
+  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
 }
-
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
   const it = currentIssueItem();
@@ -1016,7 +989,9 @@ async function issueFromW1Units() {
   const unitSmall = it.unitSmall || "pcs";
 
   const beforeUnits = getUnitsW(it, "w1");
-  if (qty > beforeUnits) return showToast(`Stok W1 tidak cukup. Stok: ${beforeUnits} ${unitSmall}`, "error");
+  if (qty > beforeUnits) {
+    return showToast(`Stok W1 tidak cukup. Stok: ${beforeUnits} ${unitSmall}`, "error");
+  }
 
   const afterUnits = beforeUnits - qty;
   const next = splitUnitsToPackLoose(afterUnits, pq);
@@ -1042,8 +1017,7 @@ async function issueFromW1Units() {
     });
 
     showToast(`Ambil ${qty} ${unitSmall} dari W1 ✅`, "success");
-    issueQty && (issueQty.value = "");
-
+    if (issueQty) issueQty.value = "";
     await loadWhItems();
     fillMoveSelect(moveSearch?.value || "");
     fillIssueSelect();
@@ -1053,7 +1027,7 @@ async function issueFromW1Units() {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal ambil dari W1", "error");
+    showToast("Gagal ambil dari W1: " + errorText(e), "error", 6000);
   }
 }
 
@@ -1071,7 +1045,6 @@ function applyGudangVisibility(list, gudang) {
   if (gudang === "w2") return (list || []).filter((it) => getUnitsW(it, "w2") > 0);
   return list || [];
 }
-
 function getVisibleOpnameList() {
   if (!whOpnameGudang) return [];
   const gudang = whOpnameGudang.value || "w1";
@@ -1132,10 +1105,8 @@ function renderOpnameTable() {
       ? `${systemUnits} ${unitSmall}`
       : `${systemPack} ${it.unitBig || "pack"} + ${systemLoose} ${unitSmall}`;
 
-    const inputValue = modeSmall ? systemUnits : systemPack; // default = sistem
-    const inputHint = modeSmall
-      ? `Input fisik (${unitSmall})`
-      : `Input fisik (${it.unitBig || "pack"})`;
+    const inputValue = modeSmall ? systemUnits : systemPack;
+    const inputHint = modeSmall ? `Input fisik (${unitSmall})` : `Input fisik (${it.unitBig || "pack"})`;
 
     const tr = document.createElement("tr");
     tr.dataset.itemId = it.id;
@@ -1180,7 +1151,7 @@ function renderOpnameTable() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
-      el && el.addEventListener("click", fn);
+      if (el) el.addEventListener("click", fn);
     };
 
     bind("saveOpname", async () => await saveOpname(it.id));
@@ -1216,13 +1187,12 @@ async function saveOpname(itemId) {
   const inputVal = Number(inp.value || 0);
   if (!Number.isFinite(inputVal) || inputVal < 0) return showToast("Stok fisik tidak valid", "error");
 
-  // fisik: mode UNIT KECIL atau mode PACK (loose dianggap 0 biar eksplisit)
   let physicalUnits = 0;
   if (modeSmall) physicalUnits = Math.trunc(inputVal);
   else physicalUnits = Math.trunc(inputVal) * pq;
 
   const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
-  const diffUnits = physicalUnits - systemUnits;
+  const diffUnits = clampInt(physicalUnits - systemUnits, 0);
 
   const payload = { updatedAt: serverTimestamp() };
   if (gudang === "w1") {
@@ -1288,7 +1258,7 @@ async function saveOpname(itemId) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan opname", "error");
+    showToast("Gagal simpan opname: " + errorText(e), "error", 6000);
   }
 }
 
@@ -1301,6 +1271,7 @@ async function saveOpnameAllVisible() {
   if (!list.length) return showToast("Tidak ada item untuk disimpan.", "info");
 
   const modeSmall = !!whOpnameModeSmall?.checked;
+
   const ok = confirm(
     `Simpan opname untuk ${list.length} item (${gudang.toUpperCase()})?\n` +
       `Mode: ${modeSmall ? "UNIT KECIL" : "PACK"}`
@@ -1333,7 +1304,7 @@ async function saveOpnameAllVisible() {
       else physicalUnits = Math.trunc(inputVal) * pq;
 
       const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
-      const diffUnits = physicalUnits - systemUnits;
+      const diffUnits = clampInt(physicalUnits - systemUnits, 0);
 
       const payload = { updatedAt: serverTimestamp() };
       if (gudang === "w1") {
@@ -1424,33 +1395,92 @@ async function deleteItem(id) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal hapus item", "error");
+    showToast("Gagal hapus item: " + errorText(e), "error", 6000);
+  }
+}
+
+async function transferW1toW2() {
+  if (!currentUser) return showToast("Harus login", "error");
+
+  const itemId = moveItemSelect?.value || "";
+  const qtyPack = Number(moveQty?.value || 0);
+
+  if (!itemId) return showToast("Pilih item dulu", "error");
+  if (!qtyPack || qtyPack <= 0) return showToast("Qty transfer harus > 0", "error");
+
+  const it = items.find((x) => x.id === itemId);
+  if (!it) return showToast("Item tidak ditemukan", "error");
+
+  const s1 = clampInt(it.stockW1, 0);
+  const loose1 = clampInt(it.stockW1Loose, 0);
+
+  if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (pack: ${s1})`, "error");
+
+  try {
+    const nextW1 = Math.trunc(s1 - qtyPack);
+    const nextW2 = Math.trunc(clampInt(it.stockW2, 0) + qtyPack);
+
+    await updateDoc(doc(db, "wh_items", itemId), {
+      stockW1: nextW1,
+      stockW1Loose: loose1,
+      stockW2: nextW2,
+      stockW2Loose: clampInt(it.stockW2Loose, 0),
+      updatedAt: serverTimestamp(),
+    });
+
+    await logTx({
+      type: "TRANSFER_PACK",
+      itemId,
+      itemName: it.name || "",
+      qtyPack: Math.trunc(qtyPack),
+      from: "w1",
+      to: "w2",
+      note: "Transfer W1 → W2 (pack saja)",
+      ref: `wh_items:${itemId}`,
+    });
+
+    showToast("Transfer berhasil", "success");
+    if (moveQty) moveQty.value = "";
+    updateMoveInfo();
+
+    await loadWhItems();
+    fillMoveSelect(moveSearch?.value || "");
+    fillIssueSelect();
+    renderOpnameTable();
+    updateDashboard();
+    updateMoveInfo();
+    updateIssueInfo();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal transfer: " + errorText(e), "error", 6000);
   }
 }
 
 // ===================== Waste =====================
 function setWasteButtonModeUpdate(on) {
-  btnSaveWaste && (btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste");
+  if (!btnSaveWaste) return;
+  btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste";
 }
 function resetWasteForm() {
-  wasteItemSelect && (wasteItemSelect.value = "");
-  wasteQty && (wasteQty.value = "");
-  wasteNote && (wasteNote.value = "");
-  wasteUnit && (wasteUnit.value = "gram");
+  if (wasteItemSelect) wasteItemSelect.value = "";
+  if (wasteQty) wasteQty.value = "";
+  if (wasteNote) wasteNote.value = "";
+  if (wasteUnit) wasteUnit.value = "gram";
 
-  const val = toDateInputValue(new Date());
-  wasteDate && (wasteDate.value = val);
+  const today = new Date();
+  const val = toDateInputValue(today);
+  if (wasteDate) wasteDate.value = val;
 
   editingWasteFormId = null;
   setWasteButtonModeUpdate(false);
 }
 function fillWasteFormFromRow(w) {
   if (!w) return;
-  wasteItemSelect && (wasteItemSelect.value = w.itemName || "");
-  wasteDate && (wasteDate.value = w.dateKey || "");
-  wasteUnit && (wasteUnit.value = w.unit || "gram");
-  wasteQty && (wasteQty.value = String(clampInt(w.qty, 0)));
-  wasteNote && (wasteNote.value = w.note || "");
+  if (wasteItemSelect) wasteItemSelect.value = w.itemName || "";
+  if (wasteDate) wasteDate.value = w.dateKey || "";
+  if (wasteUnit) wasteUnit.value = w.unit || "gram";
+  if (wasteQty) wasteQty.value = String(clampInt(w.qty, 0));
+  if (wasteNote) wasteNote.value = w.note || "";
   setWasteButtonModeUpdate(true);
 }
 async function createWaste() {
@@ -1489,7 +1519,7 @@ async function createWaste() {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan waste", "error");
+    showToast("Gagal simpan waste: " + errorText(e), "error", 6000);
   }
 }
 async function updateWaste(id) {
@@ -1526,7 +1556,7 @@ async function updateWaste(id) {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update waste", "error");
+    showToast("Gagal update waste: " + errorText(e), "error", 6000);
   }
 }
 async function saveOrUpdateWaste() {
@@ -1536,11 +1566,12 @@ async function saveOrUpdateWaste() {
 
 function ensureWasteDefaults() {
   const val = toDateInputValue(new Date());
-  wasteDate && !wasteDate.value && (wasteDate.value = val);
-  wasteFilterStart && !wasteFilterStart.value && (wasteFilterStart.value = val);
-  wasteFilterEnd && !wasteFilterEnd.value && (wasteFilterEnd.value = val);
-  whReportStart && !whReportStart.value && (whReportStart.value = val);
-  whReportEnd && !whReportEnd.value && (whReportEnd.value = val);
+  if (wasteDate && !wasteDate.value) wasteDate.value = val;
+  if (wasteFilterStart && !wasteFilterStart.value) wasteFilterStart.value = val;
+  if (wasteFilterEnd && !wasteFilterEnd.value) wasteFilterEnd.value = val;
+
+  if (whReportStart && !whReportStart.value) whReportStart.value = val;
+  if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
@@ -1627,7 +1658,7 @@ function renderWasteHistory() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-wbtn="${key}"] > button`);
-      el && el.addEventListener("click", fn);
+      if (el) el.addEventListener("click", fn);
     };
 
     bind("edit", () => {
@@ -1637,6 +1668,7 @@ function renderWasteHistory() {
     });
 
     bind("delete", async () => await deleteWaste(w.id));
+
     wasteHistoryBody.appendChild(tr);
   });
 }
@@ -1655,7 +1687,7 @@ async function deleteWaste(id) {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal hapus waste", "error");
+    showToast("Gagal hapus waste: " + errorText(e), "error", 6000);
   }
 }
 
@@ -1683,6 +1715,8 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
       itemId: it.id,
       itemName: it.name || "",
       supplier: it.supplier || "",
+      unitBig: it.unitBig || "",
+      unitSmall: it.unitSmall || "",
       packQty: clampInt(it.packQty, 0),
       stockW1: clampInt(it.stockW1, 0),
       stockW1Loose: clampInt(it.stockW1Loose, 0),
@@ -1754,6 +1788,7 @@ function buildReportCSV(meta, header, rows) {
   lines.push(`${csvEscape("Dibuat")},${csvEscape(meta?.generatedAt || "")}`);
   lines.push(`${csvEscape("Catatan")},${csvEscape(meta?.note || "")}`);
   lines.push("");
+
   lines.push(header.map(csvEscape).join(","));
   for (const row of rows) lines.push(row.map(csvEscape).join(","));
   return lines.join("\n");
@@ -1768,6 +1803,7 @@ function validateReportRange(startKey, endKey) {
   if (startKey > endKey) return "Tanggal mulai tidak boleh lebih besar dari tanggal akhir.";
   return null;
 }
+
 async function generateWarehouseReport() {
   if (!currentUser) return showToast("Harus login", "error");
   if (!whReportType) return showToast("Elemen laporan tidak lengkap (whReportType).", "error");
@@ -1826,8 +1862,8 @@ async function generateWarehouseReport() {
       await loadOpnameLogs(s, e);
 
       const gudang = type === "opname_history_w2" ? "w2" : "w1";
-
       header = ["Tanggal", "Gudang", "Item", "Sistem (unit)", "Fisik (unit)", "Selisih (unit)", "User"];
+
       rows = opnameLogs
         .slice()
         .filter((o) => (o.gudang || "") === gudang)
@@ -1848,7 +1884,6 @@ async function generateWarehouseReport() {
         ]);
     } else if (type === "opname_w1" || type === "opname_w2") {
       const gudang = type === "opname_w2" ? "w2" : "w1";
-
       const useWeekly = isFullCalendarWeekRange(startKey, endKey);
       let snapRows = null;
 
@@ -1917,7 +1952,7 @@ async function generateWarehouseReport() {
     showToast("Laporan berhasil digenerate.", "success");
   } catch (e) {
     console.error(e);
-    showToast("Gagal generate laporan.", "error");
+    showToast("Gagal generate laporan: " + errorText(e), "error", 6000);
   }
 }
 function downloadLastReportCSV() {
@@ -1983,19 +2018,26 @@ btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
 
 // ===================== Boot =====================
 async function bootWarehouse() {
+  // Bikin indikator EXP muncul WALAU gagal load data
+  ensureExpiryCards();
+  bindStockCardClicks();
+  updateDashboard();
+
   ensureWasteDefaults();
   fillWasteSelectPreset();
   fillWasteUnitOptions();
   setWasteButtonModeUpdate(false);
 
   setReportDownloadEnabled(false);
-  wasteSortBy && (wasteSortBy.value = wasteSortByState);
-  wasteSortDirBtn && (wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase());
+
+  if (wasteSortBy) wasteSortBy.value = wasteSortByState;
+  if (wasteSortDirBtn) wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
 
   if (whReportStart && whReportEnd && (!whReportStart.value || !whReportEnd.value)) {
     setReportRangeByWeekOffset(0);
   }
 
+  // Data loads
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
   fillIssueSelect();
@@ -2004,7 +2046,6 @@ async function bootWarehouse() {
   await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
   renderWasteHistory();
 
-  bindStockCardClicks();
   updateDashboard();
   updateMoveInfo();
   updateIssueInfo();
@@ -2014,10 +2055,33 @@ onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
   if (!currentUser) return;
 
+  // ✅ Ini yang bikin “kasir login” tidak memicu warehouse gagal init
+  const role = getRoleGuess();
+  if (role && !isAdminRole(role)) {
+    // warehouse admin-only → jangan init
+    ensureExpiryCards(); // kalau mau tetap tampil exp (0)
+    updateDashboard();
+    // optional: kalau kamu mau notif
+    // showToast("Warehouse nonaktif untuk role kasir.", "info", 2500);
+    return;
+  }
+
   try {
     await bootWarehouse();
   } catch (e) {
-    console.error(e);
-    showToast("Warehouse gagal init", "error");
+    console.error("WAREHOUSE INIT ERROR:", e);
+
+    // ✅ tampilkan pesan aslinya biar jelas (permissions / index / dll)
+    const msg = errorText(e);
+    showToast("Warehouse gagal init: " + msg, "error", 7000);
+
+    // ✅ pastikan exp cards tetap muncul
+    ensureExpiryCards();
+    updateDashboard();
+
+    // Kalau ternyata permission:
+    if (isPermissionError(e)) {
+      showToast("Kemungkinan Firestore rules melarang akses (role kasir).", "warning", 6000);
+    }
   }
 });
