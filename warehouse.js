@@ -1,10 +1,8 @@
-// warehouse.js (FINAL) — Opsi 2 (Pack + Loose) + Expiry Indicator + Anti “Warehouse gagal init” utk Kasir
-// + FIX: role admin kebaca kasir (stale localStorage) + role resolver yang lebih aman
-//
-// Intinya:
-// 1) Role prioritas: Firestore users/{uid}.role (kalau ada) -> window/body dataset -> localStorage (paling terakhir)
-// 2) Kalau user berganti (uid beda), bersihin cache role localStorage biar nggak kebawa dari user sebelumnya
-// 3) Debug log role biar ketahuan sumber mana yang salah
+// warehouse.js (FINAL FIX) — Opsi 2 (Pack + Loose) + Expiry Indicator + Anti “Warehouse gagal init”
+// FIX UTAMA:
+// 1) Kalau role kosong / belum kebaca => dianggap BUKAN admin (jadi tidak init Firestore warehouse).
+// 2) Role di-resolve lebih kuat: cek window/localStorage/body dataset, lalu coba Firestore users/{uid} (kalau diizinkan rules).
+// 3) Kalau Firestore users/{uid} tidak bisa dibaca => fallback aman (kasir) dan warehouse tidak init.
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -13,7 +11,7 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc,            // ✅ TAMBAH INI
+  getDoc,
   query,
   orderBy,
   updateDoc,
@@ -40,7 +38,6 @@ function showToast(msg, type = "info", time = 3000) {
   container.appendChild(div);
   setTimeout(() => div.remove(), time);
 }
-
 function todayKey(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -76,7 +73,6 @@ function iconBtn(html, title, extraClass = "") {
     title
   )}">${html}</button>`;
 }
-
 function csvEscape(value) {
   const s = String(value ?? "");
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
@@ -94,69 +90,53 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
-// ===================== Role helper (FIX: anti admin kebaca kasir) =====================
-function isAdminRole(role) {
-  const r = (role || "").toString().toLowerCase().trim();
-  return r === "admin" || r === "owner" || r === "superadmin";
-}
-
-function clearRoleCacheIfUserChanged(user) {
-  try {
-    const uid = user?.uid || "";
-    if (!uid) return;
-
-    const lastUid = localStorage.getItem("lastUid") || "";
-    if (lastUid && lastUid !== uid) {
-      // ✅ role nyangkut dari user lama -> bersihin
-      localStorage.removeItem("role");
-      localStorage.removeItem("userRole");
-      localStorage.removeItem("currentUserRole");
-      // kalau kamu punya key lain terkait role, hapus juga di sini
-    }
-    localStorage.setItem("lastUid", uid);
-  } catch (_) {}
-}
-
-async function getRoleFromFirestore(user) {
-  try {
-    const uid = user?.uid || "";
-    if (!uid) return "";
-    // ✅ pastikan kamu punya doc: users/{uid} dengan field role
-    const ref = doc(db, "users", uid);
-    const snap = await getDoc(ref);
-    const role = snap.exists() ? (snap.data()?.role || "") : "";
-    return (role || "").toString().toLowerCase().trim();
-  } catch (e) {
-    // gak fatal: cuma fallback
-    return "";
-  }
-}
-
-function getRoleFromRuntime() {
+// ===================== Role helper (ANTI ROLE NYANGKUT) =====================
+// sumber role yang mungkin
+function getRoleGuessRaw() {
   const a = (window.currentUserRole || "").toString().toLowerCase().trim();
-  const b = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
-  return a || b || "";
-}
-
-function getRoleFromLocalStorage() {
   const b = (localStorage.getItem("role") || "").toString().toLowerCase().trim();
   const c = (localStorage.getItem("userRole") || "").toString().toLowerCase().trim();
   const d = (localStorage.getItem("currentUserRole") || "").toString().toLowerCase().trim();
-  return b || c || d || "";
+  const e = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
+  return a || b || c || d || e || "";
+}
+function isAdminRole(role) {
+  const r = (role || "").toLowerCase().trim();
+  return r === "admin" || r === "owner" || r === "superadmin";
+}
+function setRoleEverywhere(role) {
+  const r = (role || "").toLowerCase().trim();
+  window.currentUserRole = r;
+  if (document.body?.dataset) document.body.dataset.role = r;
+
+  // NOTE: ini sengaja supaya UI lain juga konsisten
+  try {
+    localStorage.setItem("role", r);
+    localStorage.setItem("userRole", r);
+    localStorage.setItem("currentUserRole", r);
+  } catch (_) {}
 }
 
+// resolve role: cek cache dulu -> kalau kosong/aneh, coba ambil dari Firestore users/{uid}
 async function resolveUserRole(user) {
-  // 1) Firestore (paling valid)
-  const fsRole = await getRoleFromFirestore(user);
-  if (fsRole) return fsRole;
+  const guessed = getRoleGuessRaw();
+  if (guessed) return guessed;
 
-  // 2) Runtime (window/body dataset)
-  const rtRole = getRoleFromRuntime();
-  if (rtRole) return rtRole;
-
-  // 3) LocalStorage (paling terakhir)
-  return getRoleFromLocalStorage();
+  // role belum ada => coba Firestore (kalau rules mengizinkan)
+  try {
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data() || {};
+      const role = String(data.role || "").toLowerCase().trim();
+      if (role) return role;
+    }
+  } catch (e) {
+    // kalau gak bisa baca users doc (permission), ya wajar untuk kasir
+  }
+  return ""; // kosong = dianggap non-admin (AMAN)
 }
+
 // ===================== Week Preset (Senin–Minggu) =====================
 function toDateInputValue(d) {
   const y = d.getFullYear();
@@ -335,10 +315,7 @@ const whReportStart = $("whReportStart");
 const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
-
-// download btn: dukung dua id (biar gak kejebak mismatch)
 const btnWhReportDownload = $("btnWhReportDownload") || $("btnWhReportCsv");
-
 const whReportHead = $("whReportHead");
 const whReportBody = $("whReportBody");
 
@@ -430,7 +407,12 @@ navWhReport?.addEventListener("click", () => {
 function isPermissionError(e) {
   const msg = String(e?.message || e || "").toLowerCase();
   const code = String(e?.code || "").toLowerCase();
-  return code.includes("permission") || msg.includes("insufficient permissions") || msg.includes("permission");
+  return (
+    code.includes("permission") ||
+    msg.includes("insufficient permissions") ||
+    msg.includes("permission") ||
+    msg.includes("missing or insufficient permissions")
+  );
 }
 function errorText(e) {
   return String(e?.message || e || "Unknown error");
@@ -446,7 +428,6 @@ async function loadWhItems() {
     items.push({ id: d.id, ...data, ...norm });
   });
 }
-
 async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(200)));
   wasteLogs = [];
@@ -458,7 +439,6 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
     wasteLogs = wasteLogs.filter((w) => (w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey);
   }
 }
-
 async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhBatches, orderBy("receivedAt", "desc"), limit(500)));
   batchLogs = [];
@@ -467,12 +447,9 @@ async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
   if (rangeStart && rangeEnd) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
-    batchLogs = batchLogs.filter(
-      (b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey
-    );
+    batchLogs = batchLogs.filter((b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey);
   }
 }
-
 async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhOpname, orderBy("opnameDateKey", "desc"), limit(2000)));
   opnameLogs = [];
@@ -481,9 +458,7 @@ async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
   if (rangeStart && rangeEnd) {
     const sKey = todayKey(rangeStart);
     const eKey = todayKey(rangeEnd);
-    opnameLogs = opnameLogs.filter(
-      (o) => (o.opnameDateKey || "") >= sKey && (o.opnameDateKey || "") <= eKey
-    );
+    opnameLogs = opnameLogs.filter((o) => (o.opnameDateKey || "") >= sKey && (o.opnameDateKey || "") <= eKey);
   }
 }
 
@@ -499,11 +474,11 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===================== Stock bucket (pakai “pack ekuivalen”) =====================
+// ===================== Stock bucket =====================
 function packsEquivalent(it, gudang) {
   const pq = getPackQty(it);
   const units = getUnitsW(it, gudang);
-  return units / pq; // float
+  return units / pq;
 }
 function stockBucketCount(packEqFloat) {
   const n = Number(packEqFloat || 0);
@@ -553,7 +528,6 @@ function gotoOpnameWithExpiryFilter(type) {
   showWhSection("opname");
   renderOpnameTable();
 }
-
 function gotoOpnameWithStockFilter(gudang, bucket) {
   whStockFilter = { gudang, bucket };
   whExpiryFilter = null;
@@ -563,12 +537,9 @@ function gotoOpnameWithStockFilter(gudang, bucket) {
   if (whOpnameGudang) whOpnameGudang.value = gudang;
   renderOpnameTable();
 }
-
 function bindStockCardClicks() {
   const setCursor = (el) => el && (el.style.cursor = "pointer");
-  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(
-    setCursor
-  );
+  [cardW1Habis, cardW1Lumayan, cardW1Banyak, cardW2Habis, cardW2Lumayan, cardW2Banyak].forEach(setCursor);
 
   cardW1Habis?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "habis"));
   cardW1Lumayan?.addEventListener("click", () => gotoOpnameWithStockFilter("w1", "low"));
@@ -585,10 +556,7 @@ function updateWarehouseNotif() {
   let count = 0;
   const now = new Date();
 
-  const expiredItems = items
-    .filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || ""))
-    .slice(0, 10);
-
+  const expiredItems = items.filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || "")).slice(0, 10);
   expiredItems.forEach((it) => {
     const li = document.createElement("li");
     li.textContent = `EXPIRED: ${it.name} (EXP ${it.expDate})`;
@@ -596,10 +564,7 @@ function updateWarehouseNotif() {
     count++;
   });
 
-  const expSoonItems = items
-    .filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || ""))
-    .slice(0, 10);
-
+  const expSoonItems = items.filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || "")).slice(0, 10);
   expSoonItems.forEach((it) => {
     const exp = parseDateOnly(it.expDate);
     const left = exp ? daysDiff(exp, now) : 0;
@@ -629,7 +594,6 @@ function updateWarehouseNotif() {
     li.textContent = "Tidak ada notifikasi gudang.";
     notifList.appendChild(li);
   }
-
   notifBadge.textContent = String(count);
 }
 
@@ -973,12 +937,8 @@ function updateMoveInfo() {
   const pcs = qtyPack > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     qtyPack > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${
-          it.stockW1 || 0
-        } + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
-      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${
-          it.stockW1Loose || 0
-        } (${w1Units} ${unitSmall})`;
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
+      : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`;
 }
 function fillMoveSelect(keyword = "") {
   if (!moveItemSelect) return;
@@ -1031,9 +991,7 @@ function updateIssueInfo() {
   const pq = getPackQty(it);
   const unitSmall = it.unitSmall || "pcs";
   const w1Units = getUnitsW(it, "w1");
-  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${
-    it.stockW1Loose || 0
-  } ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
+  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
 }
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
@@ -1173,9 +1131,7 @@ function renderOpnameTable() {
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
         ${escapeHtml(unitText)}
-        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/${escapeHtml(
-          it.unitBig || "pack"
-        )}: ${pq} ${escapeHtml(unitSmall)}</div>
+        <div style="opacity:.75;font-size:12px;margin-top:4px;">Isi/${escapeHtml(it.unitBig || "pack")}: ${pq} ${escapeHtml(unitSmall)}</div>
       </td>
       <td>
         ${escapeHtml(expStr)}
@@ -1303,9 +1259,7 @@ async function saveOpname(itemId) {
     });
 
     showToast(
-      diffUnits === 0
-        ? `Opname tersimpan (${gudang.toUpperCase()})`
-        : `Opname OK (selisih ${diffUnits} ${unitSmall})`,
+      diffUnits === 0 ? `Opname tersimpan (${gudang.toUpperCase()})` : `Opname OK (selisih ${diffUnits} ${unitSmall})`,
       "success"
     );
 
@@ -1333,8 +1287,7 @@ async function saveOpnameAllVisible() {
   const modeSmall = !!whOpnameModeSmall?.checked;
 
   const ok = confirm(
-    `Simpan opname untuk ${list.length} item (${gudang.toUpperCase()})?\n` +
-      `Mode: ${modeSmall ? "UNIT KECIL" : "PACK"}`
+    `Simpan opname untuk ${list.length} item (${gudang.toUpperCase()})?\n` + `Mode: ${modeSmall ? "UNIT KECIL" : "PACK"}`
   );
   if (!ok) return;
 
@@ -1418,9 +1371,7 @@ async function saveOpnameAllVisible() {
   }
 
   showToast(
-    failed === 0
-      ? `Opname selesai ✅ (${saved} item tersimpan)`
-      : `Opname selesai (${saved} tersimpan, ${failed} gagal)`,
+    failed === 0 ? `Opname selesai ✅ (${saved} item tersimpan)` : `Opname selesai (${saved} tersimpan, ${failed} gagal)`,
     failed === 0 ? "success" : "warning",
     4000
   );
@@ -1753,9 +1704,7 @@ async function deleteWaste(id) {
 
 // ===================== WEEKLY SNAPSHOT =====================
 async function getWeeklySnapshotItems(weekKey, gudang) {
-  const snap = await getDocs(
-    query(colWhWeeklySnap, where("weekKey", "==", weekKey), where("gudang", "==", gudang))
-  );
+  const snap = await getDocs(query(colWhWeeklySnap, where("weekKey", "==", weekKey), where("gudang", "==", gudang)));
   const rows = [];
   snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
   return rows;
@@ -1890,14 +1839,7 @@ async function generateWarehouseReport() {
       rows = wasteLogs
         .slice()
         .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
-        .map((w) => [
-          w.dateKey || "",
-          w.itemName || "",
-          String(clampInt(w.qty, 0)),
-          w.unit || "",
-          w.note || "",
-          w.createdBy || "",
-        ]);
+        .map((w) => [w.dateKey || "", w.itemName || "", String(clampInt(w.qty, 0)), w.unit || "", w.note || "", w.createdBy || ""]);
     } else if (type === "receiving") {
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
@@ -1907,15 +1849,7 @@ async function generateWarehouseReport() {
       rows = batchLogs
         .slice()
         .sort((a, b) => (a.receivedAt || "").localeCompare(b.receivedAt || ""))
-        .map((b) => [
-          b.receivedAt || "",
-          b.itemName || "",
-          b.supplier || "",
-          b.expDate || "",
-          String(clampInt(b.qtyPack, 0)),
-          b.note || "",
-          b.createdBy || "",
-        ]);
+        .map((b) => [b.receivedAt || "", b.itemName || "", b.supplier || "", b.expDate || "", String(clampInt(b.qtyPack, 0)), b.note || "", b.createdBy || ""]);
     } else if (type === "opname_history_w1" || type === "opname_history_w2") {
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
@@ -2078,7 +2012,6 @@ btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
 
 // ===================== Boot =====================
 async function bootWarehouse() {
-  // Bikin indikator EXP muncul WALAU gagal load data
   ensureExpiryCards();
   bindStockCardClicks();
   updateDashboard();
@@ -2097,7 +2030,6 @@ async function bootWarehouse() {
     setReportRangeByWeekOffset(0);
   }
 
-  // Data loads
   await loadWhItems();
   fillMoveSelect(moveSearch?.value || "");
   fillIssueSelect();
@@ -2115,32 +2047,27 @@ onAuthStateChanged(auth, async (u) => {
   currentUser = u || null;
   if (!currentUser) return;
 
-  // ✅ penting: bersihin role cache kalau user berganti
-  clearRoleCacheIfUserChanged(currentUser);
-
-  // ✅ resolve role yang paling valid (Firestore dulu)
+  // ====== ROLE RESOLVE (FIX) ======
   const role = await resolveUserRole(currentUser);
 
-  // 🔎 debug biar keliatan sumbernya kalau masih salah
-  console.log("[ROLE DEBUG]", {
-    uid: currentUser.uid,
-    email: currentUser.email,
-    resolvedRole: role,
-    runtimeRole: getRoleFromRuntime(),
-    lsRole: getRoleFromLocalStorage(),
-  });
+  // simpan role kalau ada (biar UI lain gak nyangkut "kasir" lagi)
+  if (role) setRoleEverywhere(role);
 
-  // warehouse admin-only → jangan init kalau bukan admin
-  if (role && !isAdminRole(role)) {
+  // ✅ FIX PALING PENTING:
+  // Kalau role kosong / bukan admin => JANGAN init warehouse sama sekali (anti permission denied)
+  if (!isAdminRole(role)) {
     ensureExpiryCards();
     updateDashboard();
+    // showToast(`Warehouse nonaktif untuk role: ${role || "(unknown)"}`, "info", 2500);
     return;
   }
 
+  // admin => init normal
   try {
     await bootWarehouse();
   } catch (e) {
     console.error("WAREHOUSE INIT ERROR:", e);
+
     const msg = errorText(e);
     showToast("Warehouse gagal init: " + msg, "error", 7000);
 
@@ -2148,7 +2075,7 @@ onAuthStateChanged(auth, async (u) => {
     updateDashboard();
 
     if (isPermissionError(e)) {
-      showToast("Kemungkinan Firestore rules melarang akses (role kasir).", "warning", 6000);
+      showToast("Kemungkinan Firestore rules melarang akses (cek rules admin).", "warning", 6000);
     }
   }
 });
