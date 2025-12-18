@@ -1,5 +1,12 @@
-import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+// ===================== Firebase (SAFE INIT) =====================
+import {
+  initializeApp,
+  getApps,
+  getApp,
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
 import {
   getFirestore,
   collection,
@@ -15,7 +22,19 @@ import {
   where,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
-const app = getApp();
+/**
+ * ✅ Wajib diset sebelum warehouse.js load:
+ * window.__FIREBASE_CONFIG__ = { apiKey, authDomain, projectId, ... }
+ * Biasanya taruh di firebase-core.js atau script.js (type="module") yang load lebih dulu.
+ */
+const firebaseConfig = window.__FIREBASE_CONFIG__;
+if (!firebaseConfig) {
+  throw new Error(
+    "firebaseConfig belum diset. Set window.__FIREBASE_CONFIG__ sebelum warehouse.js (mis: di firebase-core.js)."
+  );
+}
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -158,7 +177,6 @@ function splitUnitsToPackLoose(totalUnits, packQty) {
   return { packs, loose };
 }
 function normalizeItemStock(it) {
-  // jaga-jaga jika data lama punya loose > packQty
   const pq = getPackQty(it);
   const w1u = getUnitsW(it, "w1");
   const w2u = getUnitsW(it, "w2");
@@ -178,8 +196,6 @@ const colWhWaste = collection(db, "wh_waste");
 const colWhBatches = collection(db, "wh_batches");
 const colWhTx = collection(db, "wh_tx");
 const colWhOpname = collection(db, "wh_opname_logs");
-
-// Snapshot mingguan per item
 const colWhWeeklySnap = collection(db, "wh_weekly_snapshot_items");
 
 // ===================== DOM =====================
@@ -229,7 +245,7 @@ const moveQty = $("moveQty");
 const moveInfo = $("moveInfo");
 const btnMove = $("btnMove");
 
-// ✅ Issue (ambil unit kecil dari W1)
+// ✅ Issue
 const issueItemSelect = $("issueItemSelect");
 const issueQty = $("issueQty");
 const issueInfo = $("issueInfo");
@@ -240,7 +256,7 @@ const whOpnameGudang = $("whOpnameGudang");
 const whOpnameSearch = $("whOpnameSearch");
 const whOpnameTableBody = $("whOpnameTableBody");
 const btnOpnameSaveAll = $("btnOpnameSaveAll");
-const whOpnameModeSmall = $("whOpnameModeSmall"); // checkbox
+const whOpnameModeSmall = $("whOpnameModeSmall");
 
 // Waste
 const wasteItemSelect = $("wasteItemSelect");
@@ -267,7 +283,7 @@ const whReportEnd = $("whReportEnd");
 const whReportNote = $("whReportNote");
 const btnWhReport = $("btnWhReport");
 
-// download btn: dukung dua id (biar gak kejebak mismatch)
+// download btn: dukung dua id
 const btnWhReportDownload = $("btnWhReportDownload") || $("btnWhReportCsv");
 
 const whReportHead = $("whReportHead");
@@ -289,8 +305,8 @@ const LOW_STOCK_LT = 10;
 const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
 
-let whExpiryFilter = null; // null | ok | soon | expired
-let whStockFilter = null; // null | { gudang, bucket }
+let whExpiryFilter = null;
+let whStockFilter = null;
 
 let editingMasterId = null;
 let editingWasteFormId = null;
@@ -314,7 +330,6 @@ const WASTE_PRESET_ITEMS = [
   "Pendamping lemon",
 ];
 
-// Last report cache (for download)
 let lastReportMeta = null;
 let lastReportHeader = [];
 let lastReportRows = [];
@@ -363,13 +378,8 @@ async function loadWhItems() {
   items = [];
   snap.forEach((d) => {
     const data = d.data() || {};
-    // normalize on read (supaya data lama aman)
     const norm = normalizeItemStock(data);
-    items.push({
-      id: d.id,
-      ...data,
-      ...norm,
-    });
+    items.push({ id: d.id, ...data, ...norm });
   });
 }
 
@@ -425,11 +435,11 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===================== Stock bucket (pakai “pack ekuivalen”) =====================
+// ===================== Stock bucket =====================
 function packsEquivalent(it, gudang) {
   const pq = getPackQty(it);
   const units = getUnitsW(it, gudang);
-  return units / pq; // float
+  return units / pq;
 }
 function stockBucketCount(packEqFloat) {
   const n = Number(packEqFloat || 0);
@@ -535,7 +545,6 @@ function updateWarehouseNotif() {
     count++;
   });
 
-  // low stock pakai pack ekuivalen (biar loose keitung)
   const lowStock = items
     .filter((it) => {
       const w1eq = packsEquivalent(it, "w1");
@@ -655,7 +664,6 @@ async function logOpnameItem({
       gudang,
       itemId,
       itemName,
-      // ✅ eksplisit (unit kecil + pack/loose)
       systemUnits: clampInt(systemUnits, 0),
       physicalUnits: clampInt(physicalUnits, 0),
       diffUnits: clampInt(diffUnits, 0),
@@ -679,7 +687,7 @@ function fillMasterForm(it) {
   if (whItemUnitSmall) whItemUnitSmall.value = it.unitSmall || "";
   if (whItemPackQty) whItemPackQty.value = String(clampInt(it.packQty, 0));
 
-  if (whItemInitStockW1) whItemInitStockW1.value = ""; // tambah stok saat edit
+  if (whItemInitStockW1) whItemInitStockW1.value = "";
 
   if (whItemExp) whItemExp.value = it.expDate || "";
   if (whItemReceivedAt) whItemReceivedAt.value = it.receivedAt || "";
@@ -731,7 +739,6 @@ async function createMasterItem() {
     receivedAt,
     supplier,
     info,
-    // ✅ Opsi 2: pack + loose
     stockW1: safeInit,
     stockW1Loose: 0,
     stockW2: 0,
@@ -780,7 +787,7 @@ async function createMasterItem() {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan master item", "error");
+    showToast(`Gagal simpan master item: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -821,7 +828,6 @@ async function updateMasterItem(id) {
     updatedAt: serverTimestamp(),
   };
 
-  // ✅ normalisasi dulu, supaya loose aman kalau packQty berubah
   const normOld = normalizeItemStock(itOld);
 
   if (addPack > 0) {
@@ -874,7 +880,7 @@ async function updateMasterItem(id) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update master item", "error");
+    showToast(`Gagal update master item: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -1017,7 +1023,7 @@ async function issueFromW1Units() {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal ambil dari W1", "error");
+    showToast(`Gagal ambil dari W1: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -1035,7 +1041,6 @@ function applyGudangVisibility(list, gudang) {
   if (gudang === "w2") return (list || []).filter((it) => getUnitsW(it, "w2") > 0);
   return list || [];
 }
-
 function getVisibleOpnameList() {
   if (!whOpnameGudang) return [];
   const gudang = whOpnameGudang.value || "w1";
@@ -1096,7 +1101,7 @@ function renderOpnameTable() {
       ? `${systemUnits} ${unitSmall}`
       : `${systemPack} ${it.unitBig || "pack"} + ${systemLoose} ${unitSmall}`;
 
-    const inputValue = modeSmall ? systemUnits : systemPack; // default: isi sama sistem
+    const inputValue = modeSmall ? systemUnits : systemPack;
     const inputHint = modeSmall
       ? `Input fisik (${unitSmall})`
       : `Input fisik (${it.unitBig || "pack"})`;
@@ -1180,17 +1185,16 @@ async function saveOpname(itemId) {
   const inputVal = Number(inp.value || 0);
   if (!Number.isFinite(inputVal) || inputVal < 0) return showToast("Stok fisik tidak valid", "error");
 
-  // ✅ fisik bisa ditulis sebagai unit kecil (modeSmall) atau pack (mode pack)
   let physicalUnits = 0;
   if (modeSmall) {
     physicalUnits = Math.trunc(inputVal);
   } else {
     const physicalPack = Math.trunc(inputVal);
-    physicalUnits = physicalPack * pq; // mode pack: loose dianggap 0 (biar eksplisit & gak ambiguous)
+    physicalUnits = physicalPack * pq;
   }
 
   const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
-  const diffUnits = clampInt(physicalUnits - systemUnits, 0);
+  const diffUnits = physicalUnits - systemUnits;
 
   const payload = { updatedAt: serverTimestamp() };
   if (gudang === "w1") {
@@ -1256,7 +1260,7 @@ async function saveOpname(itemId) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan opname", "error");
+    showToast(`Gagal simpan opname: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -1302,7 +1306,7 @@ async function saveOpnameAllVisible() {
       else physicalUnits = Math.trunc(inputVal) * pq;
 
       const physicalSplit = splitUnitsToPackLoose(physicalUnits, pq);
-      const diffUnits = clampInt(physicalUnits - systemUnits, 0);
+      const diffUnits = physicalUnits - systemUnits;
 
       const payload = { updatedAt: serverTimestamp() };
       if (gudang === "w1") {
@@ -1393,7 +1397,7 @@ async function deleteItem(id) {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal hapus item", "error");
+    showToast(`Gagal hapus item: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -1414,7 +1418,6 @@ async function transferW1toW2() {
 
   if (qtyPack > s1) return showToast(`Stok W1 tidak cukup (pack: ${s1})`, "error");
 
-  // ✅ Transfer hanya pack (loose tetap di W1 biar jelas)
   try {
     const nextW1 = Math.trunc(s1 - qtyPack);
     const nextW2 = Math.trunc(clampInt(it.stockW2, 0) + qtyPack);
@@ -1451,11 +1454,13 @@ async function transferW1toW2() {
     updateIssueInfo();
   } catch (e) {
     console.error(e);
-    showToast("Gagal transfer", "error");
+    showToast(`Gagal transfer: ${e?.message || e}`, "error", 7000);
   }
 }
 
-// ===================== Waste (tetap) =====================
+
+
+// ===================== Waste =====================
 function setWasteButtonModeUpdate(on) {
   if (!btnSaveWaste) return;
   btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste";
@@ -1482,6 +1487,7 @@ function fillWasteFormFromRow(w) {
   if (wasteNote) wasteNote.value = w.note || "";
   setWasteButtonModeUpdate(true);
 }
+
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -1518,9 +1524,10 @@ async function createWaste() {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal simpan waste", "error");
+    showToast(`Gagal simpan waste: ${e?.message || e}`, "error", 7000);
   }
 }
+
 async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!id) return;
@@ -1555,13 +1562,15 @@ async function updateWaste(id) {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal update waste", "error");
+    showToast(`Gagal update waste: ${e?.message || e}`, "error", 7000);
   }
 }
+
 async function saveOrUpdateWaste() {
   if (editingWasteFormId) return await updateWaste(editingWasteFormId);
   return await createWaste();
 }
+
 function ensureWasteDefaults() {
   const val = toDateInputValue(new Date());
   if (wasteDate && !wasteDate.value) wasteDate.value = val;
@@ -1571,6 +1580,7 @@ function ensureWasteDefaults() {
   if (whReportStart && !whReportStart.value) whReportStart.value = val;
   if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
+
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
@@ -1581,6 +1591,7 @@ function fillWasteSelectPreset() {
     wasteItemSelect.appendChild(opt);
   });
 }
+
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
   const units = ["gram", "ml", "pcs", "unit"];
@@ -1592,12 +1603,14 @@ function fillWasteUnitOptions() {
     wasteUnit.appendChild(opt);
   });
 }
+
 function getWasteFilterStart() {
   return parseDateOnly(wasteFilterStart?.value || "") || null;
 }
 function getWasteFilterEnd() {
   return parseDateOnly(wasteFilterEnd?.value || "") || null;
 }
+
 function sortWasteList(list) {
   const by = wasteSortByState;
   const dir = wasteSortDirState;
@@ -1612,6 +1625,7 @@ function sortWasteList(list) {
 
   return dir === "asc" ? sorted : sorted.reverse();
 }
+
 function renderWasteHistory() {
   if (!wasteHistoryBody) return;
 
@@ -1670,6 +1684,7 @@ function renderWasteHistory() {
     wasteHistoryBody.appendChild(tr);
   });
 }
+
 async function deleteWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   const ok = confirm("Hapus data waste ini?");
@@ -1685,7 +1700,7 @@ async function deleteWaste(id) {
     renderWasteHistory();
   } catch (e) {
     console.error(e);
-    showToast("Gagal hapus waste", "error");
+    showToast(`Gagal hapus waste: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -1710,14 +1725,13 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
   for (const it of items) {
     const row = {
       weekKey,
-      gudang, // "w1" | "w2"
+      gudang,
       itemId: it.id,
       itemName: it.name || "",
       supplier: it.supplier || "",
       unitBig: it.unitBig || "",
       unitSmall: it.unitSmall || "",
       packQty: clampInt(it.packQty, 0),
-      // ✅ simpan pack + loose juga
       stockW1: clampInt(it.stockW1, 0),
       stockW1Loose: clampInt(it.stockW1Loose, 0),
       stockW2: clampInt(it.stockW2, 0),
@@ -1866,7 +1880,6 @@ async function generateWarehouseReport() {
       await loadOpnameLogs(s, e);
 
       const gudang = type === "opname_history_w2" ? "w2" : "w1";
-
       header = ["Tanggal", "Gudang", "Item", "Sistem (unit)", "Fisik (unit)", "Selisih (unit)", "User"];
 
       rows = opnameLogs
@@ -1900,7 +1913,17 @@ async function generateWarehouseReport() {
 
       header =
         type === "opname_w2"
-          ? ["Item", "Supplier", "Isi/Dus", "W1 Pack", "W1 Loose", "W1 Total(unit)", "W2 Pack", "W2 Loose", "W2 Total(unit)"]
+          ? [
+              "Item",
+              "Supplier",
+              "Isi/Dus",
+              "W1 Pack",
+              "W1 Loose",
+              "W1 Total(unit)",
+              "W2 Pack",
+              "W2 Loose",
+              "W2 Total(unit)",
+            ]
           : ["Item", "Supplier", "Isi/Dus", "W1 Pack", "W1 Loose", "W1 Total(unit)"];
 
       const dataSource = snapRows?.length
@@ -1958,7 +1981,7 @@ async function generateWarehouseReport() {
     showToast("Laporan berhasil digenerate.", "success");
   } catch (e) {
     console.error(e);
-    showToast("Gagal generate laporan.", "error");
+    showToast(`Gagal generate laporan: ${e?.message || e}`, "error", 7000);
   }
 }
 
@@ -2063,7 +2086,7 @@ onAuthStateChanged(auth, async (u) => {
   try {
     await bootWarehouse();
   } catch (e) {
-    console.error(e);
-    showToast("Warehouse gagal init", "error");
+    console.error("WAREHOUSE INIT ERROR:", e);
+    showToast(`Warehouse gagal init: ${e?.message || e}`, "error", 7000);
   }
 });
