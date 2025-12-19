@@ -1,5 +1,11 @@
-// script.js (offline-ready + BOM / Resep + Opname offline)
-// =======================================================
+// script.js (FINAL — offline-ready + role fix + no duplicate listeners)
+// ================================================================
+// ✅ FIX UTAMA:
+// 1) HANYA 1x onAuthStateChanged (tidak dobel)
+// 2) HANYA 1x attachRupiahFormatter (tidak dobel)
+// 3) getUserRole() auto-create users/{uid} jika belum ada → tidak “memuat” terus
+// 4) applyRoleUI() tidak bikin banner “memuat” selamanya
+// 5) sidebar lama tetap di-disable (FEATURES false), warehouse button di-skip (data-wh-nav="1")
 
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -64,11 +70,13 @@ function cleanNumber(val) {
   const num = parseInt(val.toString().replace(/\D/g, ""), 10);
   return isNaN(num) ? 0 : num;
 }
+
 function formatRupiahInput(val) {
   const n = cleanNumber(val);
   if (!n) return "";
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
+
 function attachRupiahFormatter(ids) {
   ids.forEach((id) => {
     const el = $(id);
@@ -103,7 +111,7 @@ function formatDateTime(d) {
   )}:${pad(d.getMinutes())}`;
 }
 
-// ================= OFFLINE QUEUE =================
+// ================= OFFLINE QUEUE + SNAPSHOT =================
 const OFFLINE_SALES_KEY = "fnb_offline_sales_v1";
 const OFFLINE_OPNAME_KEY = "fnb_offline_opname_v1";
 
@@ -119,6 +127,7 @@ function saveSnapshot(key, data) {
     console.warn("Gagal simpan snapshot", key, e);
   }
 }
+
 function loadSnapshot(key) {
   try {
     const raw = localStorage.getItem(key);
@@ -132,7 +141,6 @@ function loadSnapshot(key) {
   }
 }
 
-// sales queue
 function loadOfflineQueue() {
   try {
     const raw = localStorage.getItem(OFFLINE_SALES_KEY);
@@ -154,7 +162,7 @@ function queueOfflineSale(saleDoc) {
   saveOfflineQueue(list);
 }
 
-// opname queue
+// OFFLINE OPNAME
 function loadOfflineOpnameQueue() {
   try {
     const raw = localStorage.getItem(OFFLINE_OPNAME_KEY);
@@ -259,17 +267,19 @@ const bomModalClose = $("bomModalClose");
 const metricEmptyCount = $("metricEmptyCount");
 const metricLowCount = $("metricLowCount");
 const metricOkCount = $("metricOkCount");
+
 const metricEmptyCard = $("metricEmpty");
 const metricLowCard = $("metricLow");
 const metricOkCard = $("metricOk");
+
 const dailyChartCanvas = $("dailyChart");
 const monthlyChartCanvas = $("monthlyChart");
 const dailyTotalLabel = $("dailyTotalLabel");
 const monthlyTotalLabel = $("monthlyTotalLabel");
+
 let dailyChart = null;
 let monthlyChart = null;
 
-// filter + top menu + history
 const filterStart = $("filterStart");
 const filterEnd = $("filterEnd");
 const btnFilterApply = $("btnFilterApply");
@@ -282,7 +292,7 @@ const historySearch = $("historySearch");
 const opnameTable = $("opnameTable");
 const opnameSearch = $("opnameSearch");
 
-// REPORT
+// REPORT DOM
 const reportType = $("reportType");
 const reportStart = $("reportStart");
 const reportEnd = $("reportEnd");
@@ -311,10 +321,10 @@ let editingRecipeId = null;
 let currentReportRows = [];
 let currentReportKind = "sales_day";
 
-// filter status untuk opname (null = semua)
+// filter status untuk tampilan opname (null = semua)
 let opnameStatusFilter = null;
 
-// flag supaya metric listener tidak dobel
+// flag supaya listener metric tidak dobel
 let metricClickInited = false;
 
 // ===== FEATURE FLAGS (OPS1: hide) =====
@@ -331,13 +341,16 @@ function isEnabled(section) {
 }
 
 /**
- * ✅ PATCH: skip tombol warehouse (data-wh-nav="1") supaya tidak ikut disable/event internal
+ * ✅ skip tombol warehouse (data-wh-nav="1")
+ * - tidak ikut disabled
+ * - tidak ikut event nav internal
  */
 function applyDisabledSidebarUI() {
   document.querySelectorAll(".side-item").forEach((btn) => {
     if (btn.matches("[data-wh-nav='1']")) return;
     const section = btn.dataset.section;
     if (!section) return;
+
     if (!isEnabled(section)) btn.classList.add("disabled");
     else btn.classList.remove("disabled");
   });
@@ -414,7 +427,11 @@ function updateConnectionStatus(showNotif = false) {
 
   if (showNotif && isOnline !== lastOnlineState) {
     if (!isOnline) {
-      showToast("Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).", "error", 4000);
+      showToast(
+        "Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
+        "error",
+        4000
+      );
     } else {
       showToast("Koneksi kembali online. Menyinkronkan data offline...", "info", 4000);
 
@@ -440,7 +457,7 @@ updateConnectionStatus(false);
 window.addEventListener("online", () => updateConnectionStatus(true));
 window.addEventListener("offline", () => updateConnectionStatus(true));
 
-// ================= ROLE (PATCH FULL) =================
+// ================= ROLE (FIX FINAL) =================
 const ROLE_KEYS = ["role", "userRole", "currentUserRole"];
 
 function clearRoleStorage() {
@@ -472,9 +489,10 @@ function getRoleFromStorage() {
   }
 }
 
+// ✅ FIX: Auto-create users/{uid} kalau belum ada → nggak “memuat” terus
 async function getUserRole(uid) {
   try {
-    // 0) cache dulu
+    // 0) cache
     const cached = getRoleFromStorage();
     if (cached) return cached;
 
@@ -484,21 +502,36 @@ async function getUserRole(uid) {
     if (bodyRole) return bodyRole;
 
     // 1) users/{uid}
-    const byId = await getDoc(doc(db, "users", uid));
+    const ref = doc(db, "users", uid);
+    const byId = await getDoc(ref);
     if (byId.exists()) {
       const r = (byId.data()?.role || "").toLowerCase().trim();
       if (r) return r;
     }
 
-    // 2) fallback legacy: where uid == uid
+    // 2) fallback query where uid == uid
     const qRole = query(colUsers, where("uid", "==", uid));
     const snap = await getDocs(qRole);
     let role = "";
     snap.forEach((d) => {
       if (!role && d.data()?.role) role = String(d.data().role).toLowerCase().trim();
     });
+    if (role) return role;
 
-    return role || "";
+    // 3) auto-create
+    const fallbackRole = "kasir";
+    await setDoc(
+      ref,
+      {
+        uid,
+        email: auth.currentUser?.email || "",
+        role: fallbackRole,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return fallbackRole;
   } catch (e) {
     console.error("getUserRole error", e);
     return "";
@@ -519,14 +552,12 @@ function applyRoleUI(roleRaw) {
 
   if (bannerRole) {
     bannerRole.textContent = role
-      ? role === "admin" || role === "owner" || role === "superadmin"
-        ? "Administrator"
-        : "Kasir"
-      : "Memuat…";
+      ? (role === "admin" || role === "owner" || role === "superadmin" ? "Administrator" : "Kasir")
+      : "Kasir";
   }
 }
 
-// ================= NAV =================
+// ================= NAV (LAMA) =================
 function showSection(name) {
   if (!isEnabled(name)) {
     showToast(`Fitur "${name}" sedang dinonaktifkan.`, "info", 2500);
@@ -546,7 +577,7 @@ function showSection(name) {
 }
 
 /**
- * ✅ PATCH: nav internal hanya untuk side-item yang BUKAN warehouse (data-wh-nav="1")
+ * ✅ nav internal hanya untuk side-item yang BUKAN warehouse (data-wh-nav="1")
  */
 document.querySelectorAll(".side-item:not([data-wh-nav='1'])").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -558,7 +589,9 @@ document.querySelectorAll(".side-item:not([data-wh-nav='1'])").forEach((btn) => 
       return;
     }
 
-    document.querySelectorAll(".side-item:not([data-wh-nav='1'])").forEach((b) => b.classList.remove("active"));
+    document
+      .querySelectorAll(".side-item:not([data-wh-nav='1'])")
+      .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
 
     if (section === "opname") {
@@ -592,7 +625,7 @@ if (burgerBtn && sidebar) {
   });
 }
 
-// ================= CLICK METRIC -> OPNAME FILTER =================
+// ================= CLICK METRIC -> OPNAME (LAMA) =================
 function initMetricClickToOpname() {
   if (metricClickInited) return;
   if (!isEnabled("opname")) return;
@@ -612,6 +645,7 @@ function initMetricClickToOpname() {
 
       showSection("opname");
       renderOpnameTable();
+
       if (opnameSection) opnameSection.scrollIntoView({ behavior: "smooth" });
     });
   });
@@ -619,7 +653,7 @@ function initMetricClickToOpname() {
   metricClickInited = true;
 }
 
-// ================= NOTIF STOK =================
+// ================= NOTIF STOK (LAMA) =================
 function productStatus(prod) {
   if (prod.type !== "bahan_baku") return { label: "-", cls: "" };
   const stock = Number(prod.stock || 0);
@@ -692,60 +726,35 @@ function updateInventoryFormVisibility() {
     if (productMinStock) productMinStock.value = "";
   }
 }
-
 if (productType) {
   productType.addEventListener("change", updateInventoryFormVisibility);
   updateInventoryFormVisibility();
 }
 
-// ================= AUTH BTN (FIX LOGIN NOT CLICKABLE) =================
-function guardButtonType(el) {
-  // kalau tombol ada di <form>, defaultnya submit → reload.
-  // ini "guard" agar tidak submit.
-  if (!el) return;
-  try {
-    if (!el.getAttribute("type")) el.setAttribute("type", "button");
-  } catch {}
-}
-
-guardButtonType(btnLogin);
-guardButtonType(btnRegister);
-guardButtonType(btnLogout);
-
+// ================= AUTH BTN =================
 if (btnLogin) {
-  btnLogin.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  btnLogin.addEventListener("click", async () => {
     try {
       clearRoleStorage();
 
       const email = (loginEmail?.value || "").trim();
       const pass = (loginPassword?.value || "").trim();
-
       if (!email || !pass) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
-
-      btnLogin.disabled = true;
       await signInWithEmailAndPassword(auth, email, pass);
       showToast("Login berhasil", "success");
     } catch (err) {
       console.error(err);
       showToast("Login gagal: " + (err.message || err.code), "error");
-    } finally {
-      btnLogin.disabled = false;
     }
   });
 }
 
-// ✅ PATCH REGISTER: setDoc users/{uid}
+// REGISTER: setDoc users/{uid}
 if (btnRegister) {
-  btnRegister.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  btnRegister.addEventListener("click", async () => {
     try {
       const email = (registerEmail?.value || "").trim();
       const pass = (registerPassword?.value || "").trim();
@@ -755,8 +764,6 @@ if (btnRegister) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
-
-      btnRegister.disabled = true;
 
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
 
@@ -781,17 +788,15 @@ if (btnRegister) {
     } catch (err) {
       console.error(err);
       showToast("Register gagal: " + (err.message || err.code), "error");
-    } finally {
-      btnRegister.disabled = false;
     }
   });
 }
 
 if (btnLogout) {
-  btnLogout.addEventListener("click", async (e) => {
-    e.preventDefault();
+  btnLogout.addEventListener("click", async () => {
     try {
       await signOut(auth);
+      clearRoleStorage();
     } catch (err) {
       console.error(err);
       showToast("Logout gagal: " + (err.message || err.code), "error");
@@ -816,7 +821,6 @@ async function loadProducts() {
       updateStockMetrics();
       updateStockNotif();
     }
-
     if (isEnabled("opname")) renderOpnameTable();
   } catch (err) {
     console.error("loadProducts error:", err);
@@ -833,7 +837,6 @@ async function loadProducts() {
         updateStockMetrics();
         updateStockNotif();
       }
-
       if (isEnabled("opname")) renderOpnameTable();
 
       showToast("Memuat data produk dari cache offline", "info");
@@ -856,7 +859,9 @@ function renderProductTable() {
   const q = (inventorySearch?.value || "").trim().toLowerCase();
   if (q) {
     bahanList = bahanList.filter(
-      (p) => (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)
+      (p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -869,6 +874,7 @@ function renderProductTable() {
 
   bahanList.forEach((p) => {
     const st = productStatus(p);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.name || "-"}</td>
@@ -878,8 +884,8 @@ function renderProductTable() {
       <td>${Number(p.stock || 0).toLocaleString("id-ID")}</td>
       <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}" type="button">Edit</button>
-        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}" type="button">Hapus</button>
+        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>
+        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>
       </td>
     `;
     productTable.appendChild(tr);
@@ -935,9 +941,11 @@ async function deleteProduct(id) {
 }
 
 if (btnSaveProduct) {
-  btnSaveProduct.addEventListener("click", async (e) => {
-    e.preventDefault();
-    if (!isEnabled("inventory")) return showToast("Fitur inventory nonaktif", "info");
+  btnSaveProduct.addEventListener("click", async () => {
+    if (!isEnabled("inventory")) {
+      showToast("Fitur inventory nonaktif", "info");
+      return;
+    }
 
     try {
       const name = (productName?.value || "").trim();
@@ -953,9 +961,16 @@ if (btnSaveProduct) {
         return;
       }
 
-      const payload = { name, type, category, price, stock, minStock, unit, updatedAt: serverTimestamp() };
-
-      btnSaveProduct.disabled = true;
+      const payload = {
+        name,
+        type,
+        category,
+        price,
+        stock,
+        minStock,
+        unit,
+        updatedAt: serverTimestamp(),
+      };
 
       if (editingProductId) {
         await updateDoc(doc(db, "products", editingProductId), payload);
@@ -975,8 +990,6 @@ if (btnSaveProduct) {
     } catch (err) {
       console.error(err);
       showToast("Gagal menyimpan produk", "error");
-    } finally {
-      btnSaveProduct.disabled = false;
     }
   });
 }
@@ -1013,9 +1026,9 @@ function addBomRow(selectedId = "", qty = 1) {
   const removeBtn = row.querySelector(".bom-remove");
 
   if (selectedBahan) {
-    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString("id-ID")} ${
-      selectedBahan.unit || ""
-    })`;
+    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString(
+      "id-ID"
+    )} ${selectedBahan.unit || ""})`;
   }
 
   function renderSuggest(keyword) {
@@ -1054,7 +1067,9 @@ function addBomRow(selectedId = "", qty = 1) {
       item.addEventListener("click", () => {
         const bahan = allBahan.find((b) => b.id === id);
         hiddenId.value = id;
-        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString("id-ID")} ${bahan.unit || ""})`;
+        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString(
+          "id-ID"
+        )} ${bahan.unit || ""})`;
         suggestBox.classList.add("hidden");
       });
     });
@@ -1062,7 +1077,9 @@ function addBomRow(selectedId = "", qty = 1) {
     if (list.length === 1) {
       const b = list[0];
       hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})`;
+      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${
+        b.unit || ""
+      })`;
       suggestBox.classList.add("hidden");
     }
   }
@@ -1071,7 +1088,10 @@ function addBomRow(selectedId = "", qty = 1) {
     hiddenId.value = "";
     renderSuggest(searchInput.value);
   });
-  searchInput.addEventListener("focus", () => renderSuggest(searchInput.value));
+
+  searchInput.addEventListener("focus", () => {
+    renderSuggest(searchInput.value);
+  });
 
   document.addEventListener("click", (e) => {
     if (!row.contains(e.target)) suggestBox.classList.add("hidden");
@@ -1081,8 +1101,7 @@ function addBomRow(selectedId = "", qty = 1) {
 }
 
 if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", (e) => {
-    e.preventDefault();
+  btnAddBomRow.addEventListener("click", () => {
     if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
     addBomRow();
   });
@@ -1111,7 +1130,9 @@ function openBomModal(menuId) {
       <div class="modal-section">
         <div class="modal-sec-title">Bahan per 1 porsi</div>
         <ul class="modal-bom-list">
-          ${m.bom.map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`).join("")}
+          ${m.bom
+            .map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`)
+            .join("")}
         </ul>
       </div>
     `;
@@ -1139,10 +1160,13 @@ function renderRecipeTable() {
   recipeTable.innerHTML = "";
 
   let menus = productsCache.filter((p) => p.type === "menu");
+
   const q = (recipeSearch?.value || "").trim().toLowerCase();
   if (q) {
     menus = menus.filter(
-      (m) => (m.name || "").toLowerCase().includes(q) || (m.category || "").toLowerCase().includes(q)
+      (m) =>
+        (m.name || "").toLowerCase().includes(q) ||
+        (m.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -1160,13 +1184,13 @@ function renderRecipeTable() {
       <td>${m.category || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
       <td class="bom-eye-cell">
-        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom" type="button">
+        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
           <i class="lucide-eye"></i>
         </button>
       </td>
       <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe" type="button">Edit</button>
-        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe" type="button">Hapus</button>
+        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
+        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
       </td>
     `;
     recipeTable.appendChild(tr);
@@ -1223,9 +1247,11 @@ async function deleteRecipe(id) {
 }
 
 if (btnSaveRecipe) {
-  btnSaveRecipe.addEventListener("click", async (e) => {
-    e.preventDefault();
-    if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
+  btnSaveRecipe.addEventListener("click", async () => {
+    if (!isEnabled("recipe")) {
+      showToast("Fitur recipe nonaktif", "info");
+      return;
+    }
 
     try {
       const name = (recipeName?.value || "").trim();
@@ -1266,8 +1292,6 @@ if (btnSaveRecipe) {
         updatedAt: serverTimestamp(),
       };
 
-      btnSaveRecipe.disabled = true;
-
       if (editingRecipeId) {
         await updateDoc(doc(db, "products", editingRecipeId), payload);
         showToast("Resep diupdate", "success");
@@ -1286,8 +1310,6 @@ if (btnSaveRecipe) {
     } catch (err) {
       console.error(err);
       showToast("Gagal menyimpan resep", "error");
-    } finally {
-      btnSaveRecipe.disabled = false;
     }
   });
 }
@@ -1299,7 +1321,6 @@ function renderSaleMenu() {
 
   saleMenuBody.innerHTML = "";
   let list = productsCache.filter((p) => p.type === "menu");
-
   const q = (saleSearch?.value || "").trim().toLowerCase();
   if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
 
@@ -1308,7 +1329,7 @@ function renderSaleMenu() {
     tr.innerHTML = `
       <td>${m.name || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
-      <td><button class="btn-table small" data-id="${m.id}" type="button">Tambah</button></td>
+      <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>
     `;
     saleMenuBody.appendChild(tr);
   });
@@ -1358,7 +1379,7 @@ function renderCart() {
       <td>${it.name}</td>
       <td>${it.qty}</td>
       <td>${formatCurrency(it.subtotal)}</td>
-      <td><button class="btn-table small" data-idx="${idx}" type="button">x</button></td>
+      <td><button class="btn-table small" data-idx="${idx}">x</button></td>
     `;
     cartBody.appendChild(tr);
   });
@@ -1378,7 +1399,6 @@ function updateCartSummary() {
   if (!isEnabled("sales")) return;
 
   const subtotal = currentCart.reduce((sum, it) => sum + Number(it.subtotal || 0), 0);
-
   if (cartSubtotalLabel) cartSubtotalLabel.textContent = formatCurrency(subtotal);
 
   const discPct = Number(saleDiscount?.value || 0);
@@ -1468,10 +1488,9 @@ function updatePrintAreaFromSale(saleDoc) {
   `;
 }
 
-// ================= PRINT STRUK – JENDELA TERPISAH (THERMAL 58mm) =================
+// ================= PRINT STRUK – WINDOW =================
 if (btnPrint) {
-  btnPrint.addEventListener("click", (e) => {
-    e.preventDefault();
+  btnPrint.addEventListener("click", () => {
     if (!printArea) return;
 
     const receiptHtml = printArea.innerHTML.trim();
@@ -1608,10 +1627,8 @@ async function applyBomForSale(saleDoc) {
 
 // ================== SAVE SALE (ONLINE + OFFLINE) ==================
 if (btnSaveSale) {
-  btnSaveSale.addEventListener("click", async (e) => {
-    e.preventDefault();
+  btnSaveSale.addEventListener("click", async () => {
     if (!isEnabled("sales")) return showToast("Fitur sales nonaktif", "info");
-
     try {
       if (!currentCart.length) return showToast("Keranjang kosong", "error");
 
@@ -1647,8 +1664,6 @@ if (btnSaveSale) {
         createdByUid: currentUser?.uid || null,
       };
 
-      btnSaveSale.disabled = true;
-
       if (!navigator.onLine) {
         queueOfflineSale(saleDoc);
         showToast("Transaksi disimpan di perangkat (offline). Akan disinkron saat online.", "info", 4000);
@@ -1676,11 +1691,9 @@ if (btnSaveSale) {
 
       updatePrintAreaFromSale(saleDoc);
       await loadSales();
-    } catch (e2) {
-      console.error(e2);
+    } catch (e) {
+      console.error(e);
       showToast("Gagal menyimpan transaksi", "error");
-    } finally {
-      btnSaveSale.disabled = false;
     }
   });
 }
@@ -1736,7 +1749,7 @@ async function syncOfflineOpname() {
   }
 }
 
-// ================= SALES / CHART / TOP MENU / HISTORY =================
+// ================= SALES LOAD (UNTUK DASHBOARD/REPORT) =================
 async function loadSales() {
   try {
     const snap = await getDocs(query(colSales, orderBy("createdAt", "desc")));
@@ -1786,6 +1799,7 @@ async function loadSales() {
   }
 }
 
+// ================= DASHBOARD (LAMA) =================
 function getFilteredSales() {
   if (!salesCache.length) return [];
   let list = [...salesCache];
@@ -1812,7 +1826,7 @@ function updateCharts() {
   const src = getFilteredSales();
   const today = new Date();
 
-  // harian 7 hari
+  // HARIAN: 7 hari terakhir
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
@@ -1824,7 +1838,7 @@ function updateCharts() {
     dayData.push(sum);
   }
 
-  // bulanan 6 bulan
+  // BULANAN: 6 bulan terakhir
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
@@ -1842,9 +1856,7 @@ function updateCharts() {
   const ymRef = `${refDate.getFullYear()}-${String(refDate.getMonth() + 1).padStart(2, "0")}`;
 
   const todayTotal = src.filter((s) => s.dateKey === refKey).reduce((n, s) => n + Number(s.total || 0), 0);
-  const thisMonthTotal = src
-    .filter((s) => (s.dateKey || "").startsWith(ymRef))
-    .reduce((n, s) => n + Number(s.total || 0), 0);
+  const thisMonthTotal = src.filter((s) => (s.dateKey || "").startsWith(ymRef)).reduce((n, s) => n + Number(s.total || 0), 0);
 
   if (dailyTotalLabel) dailyTotalLabel.textContent = formatCurrency(todayTotal);
   if (monthlyTotalLabel) monthlyTotalLabel.textContent = formatCurrency(thisMonthTotal);
@@ -1946,18 +1958,9 @@ function updateHistoryTable() {
   });
 }
 
-if (btnFilterApply)
-  btnFilterApply.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (!isEnabled("dashboard")) return;
-    updateCharts();
-    updateTopMenu();
-    updateHistoryTable();
-  });
-
+if (btnFilterApply) btnFilterApply.addEventListener("click", () => isEnabled("dashboard") && (updateCharts(), updateTopMenu(), updateHistoryTable()));
 if (btnFilterReset)
-  btnFilterReset.addEventListener("click", (e) => {
-    e.preventDefault();
+  btnFilterReset.addEventListener("click", () => {
     if (!isEnabled("dashboard")) return;
     if (filterStart) filterStart.value = "";
     if (filterEnd) filterEnd.value = "";
@@ -1965,7 +1968,6 @@ if (btnFilterReset)
     updateTopMenu();
     updateHistoryTable();
   });
-
 if (filterStart)
   filterStart.addEventListener("change", () => {
     if (!isEnabled("dashboard")) return;
@@ -1973,7 +1975,6 @@ if (filterStart)
     updateTopMenu();
     updateHistoryTable();
   });
-
 if (filterEnd)
   filterEnd.addEventListener("change", () => {
     if (!isEnabled("dashboard")) return;
@@ -1981,7 +1982,6 @@ if (filterEnd)
     updateTopMenu();
     updateHistoryTable();
   });
-
 if (historySearch) historySearch.addEventListener("input", () => isEnabled("dashboard") && updateHistoryTable());
 
 // ================= METRIC STOK =================
@@ -2019,7 +2019,9 @@ function renderOpnameTable() {
   const q = (opnameSearch?.value || "").trim().toLowerCase();
   if (q) {
     bahan = bahan.filter(
-      (p) => (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)
+      (p) =>
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -2047,7 +2049,7 @@ function renderOpnameTable() {
       <td><span data-id="${p.id}-diff">0</span></td>
       <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
-        <button class="btn-table btn-table-delete small" data-id="${p.id}" type="button">Simpan</button>
+        <button class="btn-table btn-table-delete small" data-id="${p.id}">Simpan</button>
       </td>
     `;
     opnameTable.appendChild(tr);
@@ -2079,7 +2081,10 @@ if (opnameSearch) {
 }
 
 async function saveOpnameRow(id) {
-  if (!isEnabled("opname")) return showToast("Fitur opname nonaktif", "info");
+  if (!isEnabled("opname")) {
+    showToast("Fitur opname nonaktif", "info");
+    return;
+  }
 
   try {
     const prod = productsCache.find((p) => p.id === id);
@@ -2108,7 +2113,6 @@ async function saveOpnameRow(id) {
 
     if (!navigator.onLine) {
       queueOfflineOpname(opDoc);
-
       prod.stock = fisik;
 
       showToast(`Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`, "info", 3500);
@@ -2406,10 +2410,10 @@ if (reportType) {
     ensureReportDateDefaults();
   });
 }
-if (btnReportGenerate) btnReportGenerate.addEventListener("click", (e) => (e.preventDefault(), generateReport()));
-if (btnReportDownload) btnReportDownload.addEventListener("click", (e) => (e.preventDefault(), downloadReportCSV()));
+if (btnReportGenerate) btnReportGenerate.addEventListener("click", generateReport);
+if (btnReportDownload) btnReportDownload.addEventListener("click", downloadReportCSV);
 
-// ================= AKTIFKAN FORMAT RUPIAH DI INPUT (ONCE) =================
+// ================= AKTIFKAN FORMAT RUPIAH DI INPUT (1x SAJA) =================
 attachRupiahFormatter([
   "saleVoucher",
   "salePay",
@@ -2421,7 +2425,7 @@ attachRupiahFormatter([
   "recipePrice",
 ]);
 
-// ================= AUTH STATE (SINGLE - NO DUPLICATE) =================
+// ================= AUTH STATE (1x SAJA — FIX FINAL) =================
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
 
@@ -2429,10 +2433,14 @@ onAuthStateChanged(auth, async (user) => {
     if (authCard) authCard.classList.add("hidden");
     if (appShell) appShell.classList.remove("hidden");
 
+    // tampilkan dulu email
+    if (topbarEmail) topbarEmail.textContent = `${user.email} (memuat)`;
+
+    // ambil role (auto-create kalau kosong)
     const role = await getUserRole(user.uid);
     applyRoleUI(role);
 
-    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role || "memuat"})`;
+    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role || "kasir"})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
     const needProducts =
@@ -2467,9 +2475,10 @@ onAuthStateChanged(auth, async (user) => {
 
     ensureReportDateDefaults();
     applyDisabledSidebarUI();
+
     if (isEnabled("opname")) initMetricClickToOpname();
 
-    showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
+    showToast("Login berhasil. Menu lama dinonaktifkan (warehouse tetap aktif).", "info", 2500);
   } else {
     currentRole = null;
     productsCache = [];
