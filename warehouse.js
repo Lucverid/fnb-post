@@ -1,8 +1,10 @@
-// warehouse.js (FINAL FIX) — Opsi 2 (Pack + Loose) + Expiry Indicator + Anti “Warehouse gagal init”
-// FIX UTAMA:
-// 1) Kalau role kosong / belum kebaca => dianggap BUKAN admin (jadi tidak init Firestore warehouse).
-// 2) Role di-resolve lebih kuat: cek window/localStorage/body dataset, lalu coba Firestore users/{uid} (kalau diizinkan rules).
-// 3) Kalau Firestore users/{uid} tidak bisa dibaca => fallback aman (kasir) dan warehouse tidak init.
+// warehouse.js (FULL) — Role FIX (docId random OK) + Pack/Loose + Expiry + Anti init error
+// ========================================================
+// FIX UTAMA ROLE:
+// - resolve role dari window/localStorage/body dataset
+// - coba users/{uid} (kalau kamu pakai docId = uid)
+// - fallback query users where("uid"=="uid") (untuk docId random seperti data kamu sekarang)
+// ========================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -108,8 +110,6 @@ function setRoleEverywhere(role) {
   const r = (role || "").toLowerCase().trim();
   window.currentUserRole = r;
   if (document.body?.dataset) document.body.dataset.role = r;
-
-  // NOTE: ini sengaja supaya UI lain juga konsisten
   try {
     localStorage.setItem("role", r);
     localStorage.setItem("userRole", r);
@@ -117,24 +117,34 @@ function setRoleEverywhere(role) {
   } catch (_) {}
 }
 
-// resolve role: cek cache dulu -> kalau kosong/aneh, coba ambil dari Firestore users/{uid}
+// resolve role: cache -> users/{uid} -> query where uid
 async function resolveUserRole(user) {
   const guessed = getRoleGuessRaw();
   if (guessed) return guessed;
 
-  // role belum ada => coba Firestore (kalau rules mengizinkan)
+  // 1) coba docId = uid
   try {
     const ref = doc(db, "users", user.uid);
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      const data = snap.data() || {};
-      const role = String(data.role || "").toLowerCase().trim();
+      const role = String(snap.data()?.role || "").toLowerCase().trim();
       if (role) return role;
     }
-  } catch (e) {
-    // kalau gak bisa baca users doc (permission), ya wajar untuk kasir
-  }
-  return ""; // kosong = dianggap non-admin (AMAN)
+  } catch (_) {}
+
+  // 2) fallback: docId random, cari field uid
+  try {
+    const q = query(collection(db, "users"), where("uid", "==", user.uid), limit(3));
+    const qs = await getDocs(q);
+    let role = "";
+    qs.forEach((d) => {
+      if (!role) role = String(d.data()?.role || "").toLowerCase().trim();
+    });
+    if (role) return role;
+  } catch (_) {}
+
+  // kosong = non-admin (AMAN)
+  return "";
 }
 
 // ===================== Week Preset (Senin–Minggu) =====================
@@ -556,7 +566,9 @@ function updateWarehouseNotif() {
   let count = 0;
   const now = new Date();
 
-  const expiredItems = items.filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || "")).slice(0, 10);
+  const expiredItems = items
+    .filter((it) => getExpStatus(it.expDate || "") === "expired" && (it.expDate || ""))
+    .slice(0, 10);
   expiredItems.forEach((it) => {
     const li = document.createElement("li");
     li.textContent = `EXPIRED: ${it.name} (EXP ${it.expDate})`;
@@ -564,7 +576,9 @@ function updateWarehouseNotif() {
     count++;
   });
 
-  const expSoonItems = items.filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || "")).slice(0, 10);
+  const expSoonItems = items
+    .filter((it) => getExpStatus(it.expDate || "") === "soon" && (it.expDate || ""))
+    .slice(0, 10);
   expSoonItems.forEach((it) => {
     const exp = parseDateOnly(it.expDate);
     const left = exp ? daysDiff(exp, now) : 0;
@@ -584,7 +598,9 @@ function updateWarehouseNotif() {
 
   lowStock.forEach((it) => {
     const li = document.createElement("li");
-    li.textContent = `Stok rendah: ${it.name} (W1 ${it.stockW1 || 0}+${it.stockW1Loose || 0}, W2 ${it.stockW2 || 0}+${it.stockW2Loose || 0})`;
+    li.textContent = `Stok rendah: ${it.name} (W1 ${it.stockW1 || 0}+${it.stockW1Loose || 0}, W2 ${
+      it.stockW2 || 0
+    }+${it.stockW2Loose || 0})`;
     notifList.appendChild(li);
     count++;
   });
@@ -937,7 +953,9 @@ function updateMoveInfo() {
   const pcs = qtyPack > 0 ? qtyPack * packQty : 0;
   moveInfo.textContent =
     qtyPack > 0
-      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`
+      ? `${qtyPack} ${unitBig} = ${pcs} ${unitSmall} (isi/${unitBig}: ${packQty}) | Stok W1: ${it.stockW1 || 0} + ${
+          it.stockW1Loose || 0
+        } (${w1Units} ${unitSmall})`
       : `Isi/${unitBig}: ${packQty} ${unitSmall} | Stok W1: ${it.stockW1 || 0} + ${it.stockW1Loose || 0} (${w1Units} ${unitSmall})`;
 }
 function fillMoveSelect(keyword = "") {
@@ -991,7 +1009,9 @@ function updateIssueInfo() {
   const pq = getPackQty(it);
   const unitSmall = it.unitSmall || "pcs";
   const w1Units = getUnitsW(it, "w1");
-  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${it.stockW1Loose || 0} ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
+  issueInfo.textContent = `Stok W1 sekarang: ${it.stockW1 || 0} ${it.unitBig || "pack"} + ${
+    it.stockW1Loose || 0
+  } ${unitSmall} (total ${w1Units} ${unitSmall}) | Isi/${it.unitBig || "pack"}: ${pq} ${unitSmall}`;
 }
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
@@ -2050,11 +2070,10 @@ onAuthStateChanged(auth, async (u) => {
   // ====== ROLE RESOLVE (FIX) ======
   const role = await resolveUserRole(currentUser);
 
-  // simpan role kalau ada (biar UI lain gak nyangkut "kasir" lagi)
+  // simpan role kalau ada
   if (role) setRoleEverywhere(role);
 
-  // ✅ FIX PALING PENTING:
-  // Kalau role kosong / bukan admin => JANGAN init warehouse sama sekali (anti permission denied)
+  // Kalau role kosong / bukan admin => JANGAN init warehouse
   if (!isAdminRole(role)) {
     ensureExpiryCards();
     updateDashboard();
