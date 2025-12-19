@@ -1,19 +1,18 @@
-// warehouse.js (FULL FINAL) — AUTH/ROLE dari script.js (ANTI “memuat terus”)
-// ========================================================
-// INTI FIX:
-// - warehouse.js TIDAK boleh resolve role sendiri via Firestore/users
-// - warehouse.js TIDAK pakai onAuthStateChanged
-// - warehouse.js nunggu event AUTH_READY dari script.js
-//   (script.js yang set window.currentUser & window.currentUserRole)
-// ========================================================
+// warehouse.js (FULL) — ALL ACCESS (Kasir/Admin bisa akses semuanya) + Pack/Loose + Expiry + Anti init error
+// =====================================================================================
+// NOTE:
+// - Semua user yang sudah login akan bisa akses Warehouse (tanpa cek role).
+// - Data akan muncul kalau Firestore Rules mengizinkan READ koleksi:
+//   wh_items, wh_waste, wh_batches, wh_tx, wh_opname_logs, wh_weekly_snapshot_items
+// =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
   addDoc,
   getDocs,
-  getDoc,
   query,
   orderBy,
   updateDoc,
@@ -25,6 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 const app = getApp();
+const auth = getAuth(app);
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
@@ -39,25 +39,30 @@ function showToast(msg, type = "info", time = 3000) {
   container.appendChild(div);
   setTimeout(() => div.remove(), time);
 }
+
 function todayKey(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
 function parseDateOnly(value) {
   if (!value) return null;
   const d = new Date(value + "T00:00:00");
   return isNaN(d) ? null : d;
 }
+
 function daysDiff(a, b) {
   const ms = 1000 * 60 * 60 * 24;
   return Math.floor((a.getTime() - b.getTime()) / ms);
 }
+
 function clampInt(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
+
 function escapeHtml(str) {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -66,19 +71,23 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
 function escapeHtmlAttr(str) {
   return escapeHtml(str).replaceAll("\n", " ");
 }
+
 function iconBtn(html, title, extraClass = "") {
   return `<button class="btn-icon-mini ${extraClass}" type="button" title="${escapeHtmlAttr(
     title
   )}">${html}</button>`;
 }
+
 function csvEscape(value) {
   const s = String(value ?? "");
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
+
 function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -89,12 +98,6 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-}
-
-// ===================== Role helper (dari script.js) =====================
-function isAdminRole(role) {
-  const r = (role || "").toLowerCase().trim();
-  return r === "admin" || r === "owner" || r === "superadmin";
 }
 
 // ===================== Week Preset (Senin–Minggu) =====================
@@ -151,7 +154,7 @@ function weekKeyFromStartKey(startKey) {
   return startKey; // startKey = Senin
 }
 
-// ===================== Opsi 2: Pack + Loose (UNIT KECIL) =====================
+// ===================== Pack + Loose (UNIT KECIL) =====================
 function getPackQty(it) {
   const pq = clampInt(it?.packQty, 0);
   return pq > 0 ? pq : 1;
@@ -286,8 +289,6 @@ const btnWeekPrev2 = $("btnWeekPrev2");
 
 // ===================== State =====================
 let currentUser = null;
-let currentRole = "kasir";
-
 let items = [];
 let wasteLogs = [];
 let batchLogs = [];
@@ -390,6 +391,7 @@ async function loadWhItems() {
     items.push({ id: d.id, ...data, ...norm });
   });
 }
+
 async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(200)));
   wasteLogs = [];
@@ -401,6 +403,7 @@ async function loadWasteLogs(rangeStart = null, rangeEnd = null) {
     wasteLogs = wasteLogs.filter((w) => (w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey);
   }
 }
+
 async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhBatches, orderBy("receivedAt", "desc"), limit(500)));
   batchLogs = [];
@@ -412,6 +415,7 @@ async function loadBatchLogs(rangeStart = null, rangeEnd = null) {
     batchLogs = batchLogs.filter((b) => (b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey);
   }
 }
+
 async function loadOpnameLogs(rangeStart = null, rangeEnd = null) {
   const snap = await getDocs(query(colWhOpname, orderBy("opnameDateKey", "desc"), limit(2000)));
   opnameLogs = [];
@@ -704,7 +708,6 @@ function resetMasterForm() {
 
 async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const name = (whItemName?.value || "").trim();
   const unitBig = (whItemUnitBig?.value || "").trim();
@@ -787,7 +790,6 @@ async function createMasterItem() {
 
 async function updateMasterItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!id) return;
 
   const itOld = items.find((x) => x.id === id);
@@ -969,8 +971,6 @@ function updateIssueInfo() {
 }
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
-
   const it = currentIssueItem();
   if (!it) return showToast("Pilih item dulu", "error");
 
@@ -1103,9 +1103,6 @@ function renderOpnameTable() {
     const tr = document.createElement("tr");
     tr.dataset.itemId = it.id;
 
-    // kalau non-admin => disable tombol action (tetap tampil)
-    const disabledAttr = isAdminRole(currentRole) ? "" : "disabled";
-
     tr.innerHTML = `
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
@@ -1132,7 +1129,6 @@ function renderOpnameTable() {
           value="${inputValue}"
           style="min-width:110px;"
           placeholder="${escapeHtmlAttr(inputHint)}"
-          ${disabledAttr}
         />
         <div style="opacity:.7;font-size:12px;margin-top:4px;">${escapeHtml(inputHint)}</div>
       </td>
@@ -1147,14 +1143,7 @@ function renderOpnameTable() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
-      if (!el) return;
-      if (!isAdminRole(currentRole)) {
-        el.disabled = true;
-        el.style.opacity = "0.5";
-        el.style.pointerEvents = "none";
-        return;
-      }
-      el.addEventListener("click", fn);
+      if (el) el.addEventListener("click", fn);
     };
 
     bind("saveOpname", async () => await saveOpname(it.id));
@@ -1171,7 +1160,6 @@ function renderOpnameTable() {
 
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const gudang = whOpnameGudang?.value || "w1";
   const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
@@ -1266,7 +1254,6 @@ async function saveOpname(itemId) {
 
 async function saveOpnameAllVisible() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!whOpnameTableBody || !whOpnameGudang) return;
 
   const gudang = whOpnameGudang.value || "w1";
@@ -1376,8 +1363,6 @@ async function saveOpnameAllVisible() {
 
 async function deleteItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
-
   const it = items.find((x) => x.id === id);
   const ok = confirm(`Hapus ${it?.name || "item ini"}?`);
   if (!ok) return;
@@ -1403,7 +1388,6 @@ async function deleteItem(id) {
 
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const itemId = moveItemSelect?.value || "";
   const qtyPack = Number(moveQty?.value || 0);
@@ -1488,7 +1472,6 @@ function fillWasteFormFromRow(w) {
 }
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const itemName = (wasteItemSelect?.value || "").trim();
   if (!itemName) return showToast("Pilih item waste dulu", "error");
@@ -1528,7 +1511,6 @@ async function createWaste() {
 }
 async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!id) return;
 
   const itemName = (wasteItemSelect?.value || "").trim();
@@ -1646,8 +1628,6 @@ function renderWasteHistory() {
     const tr = document.createElement("tr");
     tr.dataset.wasteId = w.id;
 
-    const disabledAttr = isAdminRole(currentRole) ? "" : "disabled";
-
     tr.innerHTML = `
       <td>${escapeHtml(w.dateKey || "-")}</td>
       <td>${escapeHtml(w.itemName || "-")}</td>
@@ -1665,14 +1645,7 @@ function renderWasteHistory() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-wbtn="${key}"] > button`);
-      if (!el) return;
-      if (!isAdminRole(currentRole)) {
-        el.disabled = true;
-        el.style.opacity = "0.5";
-        el.style.pointerEvents = "none";
-        return;
-      }
-      el.addEventListener("click", fn);
+      if (el) el.addEventListener("click", fn);
     };
 
     bind("edit", () => {
@@ -1688,8 +1661,6 @@ function renderWasteHistory() {
 }
 async function deleteWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
-  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
-
   const ok = confirm("Hapus data waste ini?");
   if (!ok) return;
 
@@ -1965,7 +1936,7 @@ function downloadLastReportCSV() {
   showToast("CSV didownload.", "success");
 }
 
-// ===================== Events (bind sekali, aman) =====================
+// ===================== Events =====================
 btnSaveItem?.addEventListener("click", saveOrUpdateMasterItem);
 
 btnMove?.addEventListener("click", transferW1toW2);
@@ -2047,51 +2018,24 @@ async function bootWarehouse() {
   updateIssueInfo();
 }
 
-// ===================== AUTH BRIDGE (dari script.js) =====================
-async function startWarehouseFromAuth(user, role) {
-  currentUser = user || null;
-  currentRole = (role || "kasir").toLowerCase();
-
+onAuthStateChanged(auth, async (u) => {
+  currentUser = u || null;
   if (!currentUser) return;
 
-  // selalu coba load item agar dashboard tidak kosong
+  // ALL ACCESS: semua user login init warehouse
   try {
-    await loadWhItems();
-    updateDashboard();
+    await bootWarehouse();
   } catch (e) {
-    console.error("Load items error:", e);
-    if (isPermissionError(e)) showToast("Firestore rules menolak akses wh_items.", "warning", 6000);
-  }
+    console.error("WAREHOUSE INIT ERROR:", e);
 
-  // admin => init full
-  if (isAdminRole(currentRole)) {
-    try {
-      await bootWarehouse();
-    } catch (e) {
-      console.error("WAREHOUSE INIT ERROR:", e);
-      showToast("Warehouse gagal init: " + errorText(e), "error", 7000);
-      if (isPermissionError(e)) showToast("Kemungkinan Firestore rules melarang akses (cek rules admin).", "warning", 6000);
+    const msg = errorText(e);
+    showToast("Warehouse gagal init: " + msg, "error", 7000);
+
+    ensureExpiryCards();
+    updateDashboard();
+
+    if (isPermissionError(e)) {
+      showToast("Firestore rules kemungkinan melarang akses. Buka allow read untuk user login.", "warning", 6000);
     }
-  } else {
-    // non-admin => tetap render UI read-only
-    renderOpnameTable();
-    updateMoveInfo();
-    updateIssueInfo();
   }
-}
-
-window.addEventListener("AUTH_READY", (e) => {
-  const user = e?.detail?.user || window.currentUser || null;
-  const role = e?.detail?.role || window.currentUserRole || document.body?.dataset?.role || "kasir";
-  startWarehouseFromAuth(user, role);
 });
-
-// fallback kalau event keburu lewat
-setTimeout(() => {
-  if (!currentUser && window.currentUser) {
-    startWarehouseFromAuth(
-      window.currentUser,
-      window.currentUserRole || document.body?.dataset?.role || "kasir"
-    );
-  }
-}, 0);
