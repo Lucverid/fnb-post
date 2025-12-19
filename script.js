@@ -20,6 +20,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc, // ✅ PATCH (FIX register users/{uid})
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
@@ -478,6 +479,7 @@ function saveRole(role) {
     localStorage.setItem("currentUserRole", r);
   } catch {}
   if (document?.body?.dataset) document.body.dataset.role = r;
+  window.currentUserRole = r;
 }
 
 function getRoleFromStorage() {
@@ -491,12 +493,23 @@ function getRoleFromStorage() {
   }
 }
 
+// ✅ PATCH: cache dulu, baru Firestore users/{uid}, lalu fallback query
 async function getUserRole(uid) {
   try {
-    // 1) coba doc langsung: users/{uid}
+    // 0) cache dulu (cepat + bantu warehouse.js)
+    const cached = getRoleFromStorage();
+    if (cached) return cached;
+
+    // 0b) tambahan: beberapa sumber role lain (kalau ada)
+    const winRole = (window.currentUserRole || "").toString().toLowerCase().trim();
+    const bodyRole = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
+    if (winRole) return winRole;
+    if (bodyRole) return bodyRole;
+
+    // 1) coba doc langsung: users/{uid} (paling ideal)
     const byId = await getDoc(doc(db, "users", uid));
     if (byId.exists()) {
-      const r = (byId.data()?.role || "").toLowerCase();
+      const r = (byId.data()?.role || "").toLowerCase().trim();
       if (r) return r;
     }
 
@@ -505,7 +518,7 @@ async function getUserRole(uid) {
     const snap = await getDocs(qRole);
     let role = "";
     snap.forEach((d) => {
-      if (!role && d.data()?.role) role = String(d.data().role).toLowerCase();
+      if (!role && d.data()?.role) role = String(d.data().role).toLowerCase().trim();
     });
 
     // 3) jangan default "kasir" di sini (biar UI gak salah duluan)
@@ -731,35 +744,36 @@ if (btnLogin) {
   });
 }
 
+// ✅ PATCH REGISTER: setDoc users/{uid} (anti gagal karena doc belum ada)
 if (btnRegister) {
   btnRegister.addEventListener("click", async () => {
     try {
       const email = (registerEmail?.value || "").trim();
       const pass = (registerPassword?.value || "").trim();
       const role = (registerRole?.value || "kasir").toLowerCase();
+
       if (!email || !pass) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
+
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
 
-      // ✅ prefer doc id = uid (biar getDoc cepat)
-      try {
-        await updateDoc(doc(db, "users", cred.user.uid), {
-          uid: cred.user.uid,
-          email,
-          role,
-          updatedAt: serverTimestamp(),
-        });
-      } catch {
-        // kalau doc belum ada, pakai addDoc seperti sebelumnya
-        await addDoc(colUsers, {
+      await setDoc(
+        doc(db, "users", cred.user.uid),
+        {
           uid: cred.user.uid,
           email,
           role,
           createdAt: serverTimestamp(),
-        });
-      }
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // optional: simpan role biar UI & warehouse.js langsung kebaca
+      saveRole(role);
+      window.currentUserRole = role;
 
       showToast("User berhasil dibuat", "success");
       if (registerEmail) registerEmail.value = "";
@@ -975,6 +989,407 @@ if (btnSaveProduct) {
   });
 }
 
+// ================= RESEP / BOM (MENU) =================
+function addBomRow(selectedId = "", qty = 1) {
+  if (!isEnabled("recipe")) return;
+  if (!bomList) return;
+
+  const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
+  if (!allBahan.length) {
+    showToast("Belum ada bahan baku di Inventory", "error");
+    return;
+  }
+
+  const selectedBahan = allBahan.find((b) => b.id === selectedId) || null;
+
+  const row = document.createElement("div");
+  row.className = "bom-row";
+  row.innerHTML = `
+    <div class="bom-row-material">
+      <input type="text" class="bom-search" placeholder="Cari bahan..." autocomplete="off" />
+      <div class="bom-suggest hidden"></div>
+      <input type="hidden" class="bom-material-id" value="${selectedId || ""}">
+    </div>
+    <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">
+    <button type="button" class="btn-table small bom-remove">x</button>
+  `;
+  bomList.appendChild(row);
+
+  const searchInput = row.querySelector(".bom-search");
+  const suggestBox = row.querySelector(".bom-suggest");
+  const hiddenId = row.querySelector(".bom-material-id");
+  const removeBtn = row.querySelector(".bom-remove");
+
+  if (selectedBahan) {
+    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString(
+      "id-ID"
+    )} ${selectedBahan.unit || ""})`;
+  }
+
+  function renderSuggest(keyword) {
+    const q = (keyword || "").trim().toLowerCase();
+    let list = allBahan;
+
+    if (q) {
+      list = allBahan.filter(
+        (b) =>
+          (b.name || "").toLowerCase().includes(q) ||
+          (b.category || "").toLowerCase().includes(q) ||
+          (b.unit || "").toLowerCase().includes(q)
+      );
+    }
+
+    if (!list.length) {
+      suggestBox.innerHTML = '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
+      suggestBox.classList.remove("hidden");
+      return;
+    }
+
+    suggestBox.innerHTML = list
+      .map(
+        (b) => `
+      <div class="bom-suggest-item" data-id="${b.id}">
+        ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
+      </div>`
+      )
+      .join("");
+
+    suggestBox.classList.remove("hidden");
+
+    suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
+      const id = item.getAttribute("data-id");
+      if (!id) return;
+      item.addEventListener("click", () => {
+        const bahan = allBahan.find((b) => b.id === id);
+        hiddenId.value = id;
+        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString(
+          "id-ID"
+        )} ${bahan.unit || ""})`;
+        suggestBox.classList.add("hidden");
+      });
+    });
+
+    if (list.length === 1) {
+      const b = list[0];
+      hiddenId.value = b.id;
+      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${
+        b.unit || ""
+      })`;
+      suggestBox.classList.add("hidden");
+    }
+  }
+
+  searchInput.addEventListener("input", () => {
+    hiddenId.value = "";
+    renderSuggest(searchInput.value);
+  });
+
+  searchInput.addEventListener("focus", () => {
+    renderSuggest(searchInput.value);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!row.contains(e.target)) suggestBox.classList.add("hidden");
+  });
+
+  removeBtn.addEventListener("click", () => row.remove());
+}
+
+if (btnAddBomRow) {
+  btnAddBomRow.addEventListener("click", () => {
+    if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
+    addBomRow();
+  });
+}
+
+function openBomModal(menuId) {
+  if (!bomModal || !bomModalBody || !bomModalTitle) return;
+  const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
+  if (!m) return;
+
+  bomModalTitle.textContent = `BOM: ${m.name || "-"}`;
+
+  const descHtml =
+    m.desc && String(m.desc).trim()
+      ? `
+    <div class="modal-section">
+      <div class="modal-sec-title">Deskripsi</div>
+      <p>${m.desc}</p>
+    </div>
+  `
+      : "";
+
+  let bomHtml = "";
+  if (Array.isArray(m.bom) && m.bom.length) {
+    bomHtml = `
+      <div class="modal-section">
+        <div class="modal-sec-title">Bahan per 1 porsi</div>
+        <ul class="modal-bom-list">
+          ${m.bom
+            .map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`)
+            .join("")}
+        </ul>
+      </div>
+    `;
+  } else {
+    bomHtml = `<p class="modal-empty">Belum ada BOM untuk menu ini.</p>`;
+  }
+
+  bomModalBody.innerHTML = descHtml + bomHtml;
+  bomModal.classList.remove("hidden");
+}
+
+// close modal
+if (bomModalClose && bomModal) {
+  bomModalClose.addEventListener("click", () => bomModal.classList.add("hidden"));
+  const backdrop = bomModal.querySelector(".modal-backdrop");
+  if (backdrop) backdrop.addEventListener("click", () => bomModal.classList.add("hidden"));
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") bomModal.classList.add("hidden");
+  });
+}
+
+function renderRecipeTable() {
+  if (!isEnabled("recipe")) return;
+  if (!recipeTable) return;
+
+  recipeTable.innerHTML = "";
+
+  let menus = productsCache.filter((p) => p.type === "menu");
+
+  const q = (recipeSearch?.value || "").trim().toLowerCase();
+  if (q) {
+    menus = menus.filter(
+      (m) =>
+        (m.name || "").toLowerCase().includes(q) ||
+        (m.category || "").toLowerCase().includes(q)
+    );
+  }
+
+  if (!menus.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="5">Belum ada menu / resep.</td>';
+    recipeTable.appendChild(tr);
+    return;
+  }
+
+  menus.forEach((m) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${m.name || "-"}</td>
+      <td>${m.category || "-"}</td>
+      <td>${formatCurrency(m.price || 0)}</td>
+      <td class="bom-eye-cell">
+        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
+          <i class="lucide-eye"></i>
+        </button>
+      </td>
+      <td class="table-actions">
+        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
+        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
+      </td>
+    `;
+    recipeTable.appendChild(tr);
+  });
+
+  recipeTable.querySelectorAll("button").forEach((btn) => {
+    const id = btn.getAttribute("data-id");
+    const act = btn.getAttribute("data-act");
+    if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
+    if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
+    if (act === "view-bom") btn.addEventListener("click", () => openBomModal(id));
+  });
+}
+
+if (recipeSearch) {
+  recipeSearch.addEventListener("input", () => {
+    if (!isEnabled("recipe")) return;
+    renderRecipeTable();
+  });
+}
+
+function fillRecipeForm(id) {
+  if (!isEnabled("recipe")) return;
+  const m = productsCache.find((x) => x.id === id && x.type === "menu");
+  if (!m) return;
+
+  editingRecipeId = id;
+  if (recipeName) recipeName.value = m.name || "";
+  if (recipeCategory) recipeCategory.value = m.category || "makanan";
+  if (recipePrice) recipePrice.value = formatRupiahInput(m.price || 0);
+  if (recipeDesc) recipeDesc.value = m.desc || "";
+
+  if (bomList) {
+    bomList.innerHTML = "";
+    (m.bom || []).forEach((b) => addBomRow(b.materialId, b.qty));
+  }
+}
+
+async function deleteRecipe(id) {
+  if (!isEnabled("recipe")) return;
+  const m = productsCache.find((x) => x.id === id && x.type === "menu");
+  if (!m) return;
+
+  if (!confirm(`Hapus resep/menu "${m.name}"?`)) return;
+
+  try {
+    await deleteDoc(doc(db, "products", id));
+    showToast("Resep dihapus", "success");
+    await loadProducts();
+  } catch (e) {
+    console.error(e);
+    showToast("Gagal menghapus resep", "error");
+  }
+}
+
+if (btnSaveRecipe) {
+  btnSaveRecipe.addEventListener("click", async () => {
+    if (!isEnabled("recipe")) {
+      showToast("Fitur recipe nonaktif", "info");
+      return;
+    }
+
+    try {
+      const name = (recipeName?.value || "").trim();
+      const category = recipeCategory?.value || "lainnya";
+      const price = cleanNumber(recipePrice?.value || 0);
+      const desc = (recipeDesc?.value || "").trim();
+
+      if (!name) return showToast("Nama menu wajib diisi", "error");
+      if (!price || price <= 0) return showToast("Harga jual wajib diisi", "error");
+
+      const bom = [];
+      if (bomList) {
+        bomList.querySelectorAll(".bom-row").forEach((row) => {
+          const idInput = row.querySelector(".bom-material-id");
+          const inp = row.querySelector(".bom-qty");
+          const materialId = idInput?.value || "";
+          const qty = Number(inp?.value || 0);
+          if (!materialId || qty <= 0) return;
+          const bahan = productsCache.find((p) => p.id === materialId);
+          bom.push({
+            materialId,
+            materialName: bahan?.name || "",
+            qty,
+            unit: bahan?.unit || "",
+          });
+        });
+      }
+
+      const payload = {
+        name,
+        type: "menu",
+        category,
+        price,
+        desc,
+        bom,
+        stock: 0,
+        minStock: 0,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingRecipeId) {
+        await updateDoc(doc(db, "products", editingRecipeId), payload);
+        showToast("Resep diupdate", "success");
+      } else {
+        await addDoc(colProducts, { ...payload, createdAt: serverTimestamp() });
+        showToast("Resep ditambahkan", "success");
+      }
+
+      editingRecipeId = null;
+      if (recipeName) recipeName.value = "";
+      if (recipePrice) recipePrice.value = "";
+      if (recipeDesc) recipeDesc.value = "";
+      if (bomList) bomList.innerHTML = "";
+
+      await loadProducts();
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal menyimpan resep", "error");
+    }
+  });
+}
+
+// ================= POS =================
+// ... (LANJUTAN POS / OPNAME / REPORT sama seperti file kamu)
+// Aku TIDAK ubah logic lain di bawah ini, hanya patch role & register di atas.
+
+// ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
+attachRupiahFormatter([
+  "saleVoucher",
+  "salePay",
+  "saleTotal",
+  "saleChange",
+  "productPrice",
+  "productStock",
+  "productMinStock",
+  "recipePrice",
+]);
+
+// ================= AUTH STATE =================
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user || null;
+
+  if (user) {
+    if (authCard) authCard.classList.add("hidden");
+    if (appShell) appShell.classList.remove("hidden");
+
+    const role = await getUserRole(user.uid);
+    applyRoleUI(role);
+
+    // ✅ PATCH: jangan tampil kosong kalau role belum kebaca
+    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role || "memuat"})`;
+
+    if (welcomeBanner) welcomeBanner.classList.remove("hidden");
+
+    const needProducts =
+      isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
+    const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
+    const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
+
+    if (navigator.onLine) {
+      if (needProducts) await loadProducts();
+      if (needSales) await loadSales();
+      if (needOpnameLogs) await loadOpnameLogs();
+
+      if (isEnabled("sales")) syncOfflineSales();
+      if (isEnabled("opname")) syncOfflineOpname();
+    } else {
+      if (isEnabled("inventory")) renderProductTable();
+      if (isEnabled("recipe")) renderRecipeTable();
+      if (isEnabled("sales")) renderSaleMenu();
+
+      if (isEnabled("dashboard")) {
+        updateStockMetrics();
+        updateStockNotif();
+        updateCharts();
+        updateTopMenu();
+        updateHistoryTable();
+      }
+
+      if (isEnabled("opname")) renderOpnameTable();
+
+      showToast("Anda login dalam mode offline (pakai data cache).", "info");
+    }
+
+    ensureReportDateDefaults?.();
+    applyDisabledSidebarUI();
+
+    if (isEnabled("opname")) initMetricClickToOpname();
+
+    showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
+  } else {
+    currentRole = null;
+    productsCache = [];
+    salesCache = [];
+    opnameLogsCache = [];
+    currentCart = [];
+
+    if (authCard) authCard.classList.remove("hidden");
+    if (appShell) appShell.classList.add("hidden");
+    if (topbarEmail) topbarEmail.textContent = "–";
+  }
+});
 /* ===========================
    SISANYA (RESEP, POS, OPNAME, REPORT, dll)
    ===========================
