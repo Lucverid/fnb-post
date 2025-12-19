@@ -1521,8 +1521,10 @@ async function updateWaste(id) {
   const d = wasteDate?.value || "";
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
 
-  const qty = Number(wasteQty?.value || 0);
-  if (!qty || qty <= 0) return showToast("Qty waste harus > 0", "error");
+  const qty = Number(wasteQty?.value);
+if (!Number.isFinite(qty) || qty < 0) {
+  return showToast("Qty waste tidak boleh negatif", "error");
+}
 
   const unit = (wasteUnit?.value || "unit").trim();
   const note = (wasteNote?.value || "").trim();
