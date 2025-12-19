@@ -1,4 +1,6 @@
 // script.js (offline-ready + BOM / Resep + Opname offline)
+// =======================================================
+
 // ================= FIREBASE =================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import {
@@ -13,14 +15,14 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc, // ✅ PATCH
+  getDoc,
   query,
   where,
   orderBy,
   updateDoc,
   deleteDoc,
   doc,
-  setDoc, // ✅ PATCH (FIX register users/{uid})
+  setDoc,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
@@ -62,13 +64,11 @@ function cleanNumber(val) {
   const num = parseInt(val.toString().replace(/\D/g, ""), 10);
   return isNaN(num) ? 0 : num;
 }
-
 function formatRupiahInput(val) {
   const n = cleanNumber(val);
   if (!n) return "";
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
-
 function attachRupiahFormatter(ids) {
   ids.forEach((id) => {
     const el = $(id);
@@ -119,7 +119,6 @@ function saveSnapshot(key, data) {
     console.warn("Gagal simpan snapshot", key, e);
   }
 }
-
 function loadSnapshot(key) {
   try {
     const raw = localStorage.getItem(key);
@@ -133,6 +132,7 @@ function loadSnapshot(key) {
   }
 }
 
+// sales queue
 function loadOfflineQueue() {
   try {
     const raw = localStorage.getItem(OFFLINE_SALES_KEY);
@@ -146,9 +146,7 @@ function loadOfflineQueue() {
 function saveOfflineQueue(list) {
   try {
     localStorage.setItem(OFFLINE_SALES_KEY, JSON.stringify(list || []));
-  } catch {
-    // abaikan
-  }
+  } catch {}
 }
 function queueOfflineSale(saleDoc) {
   const list = loadOfflineQueue();
@@ -156,7 +154,7 @@ function queueOfflineSale(saleDoc) {
   saveOfflineQueue(list);
 }
 
-// ==== OFFLINE OPNAME ====
+// opname queue
 function loadOfflineOpnameQueue() {
   try {
     const raw = localStorage.getItem(OFFLINE_OPNAME_KEY);
@@ -170,9 +168,7 @@ function loadOfflineOpnameQueue() {
 function saveOfflineOpnameQueue(list) {
   try {
     localStorage.setItem(OFFLINE_OPNAME_KEY, JSON.stringify(list || []));
-  } catch {
-    // abaikan
-  }
+  } catch {}
 }
 function queueOfflineOpname(opDoc) {
   const list = loadOfflineOpnameQueue();
@@ -205,7 +201,6 @@ const dashboardSection = $("dashboardSection");
 const opnameSection = $("opnameSection");
 const reportsSection = $("reportsSection");
 
-// (warehouseSection ditangani di warehouse.js)
 const sidebar = $("sidebar");
 const burgerBtn = $("burgerBtn");
 const notifBtn = $("notifBtn");
@@ -264,23 +259,17 @@ const bomModalClose = $("bomModalClose");
 const metricEmptyCount = $("metricEmptyCount");
 const metricLowCount = $("metricLowCount");
 const metricOkCount = $("metricOkCount");
-
-// kartu metric (klik -> opname)
 const metricEmptyCard = $("metricEmpty");
 const metricLowCard = $("metricLow");
 const metricOkCard = $("metricOk");
-
 const dailyChartCanvas = $("dailyChart");
 const monthlyChartCanvas = $("monthlyChart");
-
-// 🔢 label total omzet
 const dailyTotalLabel = $("dailyTotalLabel");
 const monthlyTotalLabel = $("monthlyTotalLabel");
-
 let dailyChart = null;
 let monthlyChart = null;
 
-// filter + menu terlaris + riwayat
+// filter + top menu + history
 const filterStart = $("filterStart");
 const filterEnd = $("filterEnd");
 const btnFilterApply = $("btnFilterApply");
@@ -293,7 +282,7 @@ const historySearch = $("historySearch");
 const opnameTable = $("opnameTable");
 const opnameSearch = $("opnameSearch");
 
-// REPORT DOM
+// REPORT
 const reportType = $("reportType");
 const reportStart = $("reportStart");
 const reportEnd = $("reportEnd");
@@ -322,10 +311,10 @@ let editingRecipeId = null;
 let currentReportRows = [];
 let currentReportKind = "sales_day";
 
-// filter status untuk tampilan opname (null = semua)
+// filter status untuk opname (null = semua)
 let opnameStatusFilter = null;
 
-// flag supaya listener metric tidak dobel
+// flag supaya metric listener tidak dobel
 let metricClickInited = false;
 
 // ===== FEATURE FLAGS (OPS1: hide) =====
@@ -342,18 +331,13 @@ function isEnabled(section) {
 }
 
 /**
- * ✅ PATCH: skip tombol warehouse (yang punya data-wh-nav="1")
- * supaya:
- * - tidak ikut disabled
- * - tidak ikut event .side-item internal
+ * ✅ PATCH: skip tombol warehouse (data-wh-nav="1") supaya tidak ikut disable/event internal
  */
 function applyDisabledSidebarUI() {
   document.querySelectorAll(".side-item").forEach((btn) => {
-    if (btn.matches("[data-wh-nav='1']")) return; // ✅ PATCH: skip warehouse
-
+    if (btn.matches("[data-wh-nav='1']")) return;
     const section = btn.dataset.section;
     if (!section) return;
-
     if (!isEnabled(section)) btn.classList.add("disabled");
     else btn.classList.remove("disabled");
   });
@@ -410,7 +394,7 @@ function initFromSnapshotsIfOffline() {
 }
 initFromSnapshotsIfOffline();
 
-// ================= CONNECTION LABEL + NOTIF =================
+// ================= CONNECTION LABEL =================
 let lastOnlineState = navigator.onLine;
 
 function updateConnectionStatus(showNotif = false) {
@@ -430,11 +414,7 @@ function updateConnectionStatus(showNotif = false) {
 
   if (showNotif && isOnline !== lastOnlineState) {
     if (!isOnline) {
-      showToast(
-        "Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).",
-        "error",
-        4000
-      );
+      showToast("Koneksi terputus. Transaksi baru akan disimpan di perangkat (offline).", "error", 4000);
     } else {
       showToast("Koneksi kembali online. Menyinkronkan data offline...", "info", 4000);
 
@@ -457,11 +437,10 @@ function updateConnectionStatus(showNotif = false) {
   lastOnlineState = isOnline;
 }
 updateConnectionStatus(false);
-
 window.addEventListener("online", () => updateConnectionStatus(true));
 window.addEventListener("offline", () => updateConnectionStatus(true));
 
-// ================= ROLE (✅ PATCH FULL) =================
+// ================= ROLE (PATCH FULL) =================
 const ROLE_KEYS = ["role", "userRole", "currentUserRole"];
 
 function clearRoleStorage() {
@@ -493,27 +472,25 @@ function getRoleFromStorage() {
   }
 }
 
-// ✅ PATCH: cache dulu, baru Firestore users/{uid}, lalu fallback query
 async function getUserRole(uid) {
   try {
-    // 0) cache dulu (cepat + bantu warehouse.js)
+    // 0) cache dulu
     const cached = getRoleFromStorage();
     if (cached) return cached;
 
-    // 0b) tambahan: beberapa sumber role lain (kalau ada)
     const winRole = (window.currentUserRole || "").toString().toLowerCase().trim();
     const bodyRole = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
     if (winRole) return winRole;
     if (bodyRole) return bodyRole;
 
-    // 1) coba doc langsung: users/{uid} (paling ideal)
+    // 1) users/{uid}
     const byId = await getDoc(doc(db, "users", uid));
     if (byId.exists()) {
       const r = (byId.data()?.role || "").toLowerCase().trim();
       if (r) return r;
     }
 
-    // 2) fallback: query where uid == uid (struktur lama)
+    // 2) fallback legacy: where uid == uid
     const qRole = query(colUsers, where("uid", "==", uid));
     const snap = await getDocs(qRole);
     let role = "";
@@ -521,7 +498,6 @@ async function getUserRole(uid) {
       if (!role && d.data()?.role) role = String(d.data().role).toLowerCase().trim();
     });
 
-    // 3) jangan default "kasir" di sini (biar UI gak salah duluan)
     return role || "";
   } catch (e) {
     console.error("getUserRole error", e);
@@ -533,7 +509,6 @@ function applyRoleUI(roleRaw) {
   const role = (roleRaw || "").toLowerCase();
   currentRole = role || null;
 
-  // simpan ke storage & dataset untuk warehouse.js
   if (role) saveRole(role);
 
   const adminEls = document.querySelectorAll(".admin-only");
@@ -544,7 +519,9 @@ function applyRoleUI(roleRaw) {
 
   if (bannerRole) {
     bannerRole.textContent = role
-      ? (role === "admin" || role === "owner" || role === "superadmin" ? "Administrator" : "Kasir")
+      ? role === "admin" || role === "owner" || role === "superadmin"
+        ? "Administrator"
+        : "Kasir"
       : "Memuat…";
   }
 }
@@ -615,7 +592,7 @@ if (burgerBtn && sidebar) {
   });
 }
 
-// ================= CLICK METRIC -> BUKA OPNAME + FILTER =================
+// ================= CLICK METRIC -> OPNAME FILTER =================
 function initMetricClickToOpname() {
   if (metricClickInited) return;
   if (!isEnabled("opname")) return;
@@ -635,7 +612,6 @@ function initMetricClickToOpname() {
 
       showSection("opname");
       renderOpnameTable();
-
       if (opnameSection) opnameSection.scrollIntoView({ behavior: "smooth" });
     });
   });
@@ -722,23 +698,37 @@ if (productType) {
   updateInventoryFormVisibility();
 }
 
-// ================= AUTH BTN =================
+// ================= AUTH BTN (FIX LOGIN NOT CLICKABLE) =================
+function guardButtonType(el) {
+  // kalau tombol ada di <form>, defaultnya submit → reload.
+  // ini "guard" agar tidak submit.
+  if (!el) return;
+  try {
+    if (!el.getAttribute("type")) el.setAttribute("type", "button");
+  } catch {}
+}
+
+guardButtonType(btnLogin);
+guardButtonType(btnRegister);
+guardButtonType(btnLogout);
+
 if (btnLogin) {
   btnLogin.addEventListener("click", async (e) => {
-    e.preventDefault();              // ⬅️ cegah form submit bawaan
+    e.preventDefault();
+    e.stopPropagation();
+
     try {
       clearRoleStorage();
 
       const email = (loginEmail?.value || "").trim();
       const pass = (loginPassword?.value || "").trim();
+
       if (!email || !pass) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
 
-      // (opsional) UX: disable tombol saat proses
       btnLogin.disabled = true;
-
       await signInWithEmailAndPassword(auth, email, pass);
       showToast("Login berhasil", "success");
     } catch (err) {
@@ -750,9 +740,12 @@ if (btnLogin) {
   });
 }
 
+// ✅ PATCH REGISTER: setDoc users/{uid}
 if (btnRegister) {
   btnRegister.addEventListener("click", async (e) => {
-    e.preventDefault();              // ⬅️ cegah form submit bawaan
+    e.preventDefault();
+    e.stopPropagation();
+
     try {
       const email = (registerEmail?.value || "").trim();
       const pass = (registerPassword?.value || "").trim();
@@ -766,11 +759,19 @@ if (btnRegister) {
       btnRegister.disabled = true;
 
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
+
       await setDoc(
         doc(db, "users", cred.user.uid),
-        { uid: cred.user.uid, email, role, createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
+        {
+          uid: cred.user.uid,
+          email,
+          role,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
         { merge: true }
       );
+
       saveRole(role);
       window.currentUserRole = role;
 
@@ -786,6 +787,18 @@ if (btnRegister) {
   });
 }
 
+if (btnLogout) {
+  btnLogout.addEventListener("click", async (e) => {
+    e.preventDefault();
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error(err);
+      showToast("Logout gagal: " + (err.message || err.code), "error");
+    }
+  });
+}
+
 // ================= LOAD PRODUCTS =================
 async function loadProducts() {
   try {
@@ -795,7 +808,6 @@ async function loadProducts() {
 
     saveSnapshot(SNAP_PRODUCTS_KEY, productsCache);
 
-    // ✅ render hanya fitur yang ON
     if (isEnabled("inventory")) renderProductTable();
     if (isEnabled("recipe")) renderRecipeTable();
     if (isEnabled("sales")) renderSaleMenu();
@@ -844,9 +856,7 @@ function renderProductTable() {
   const q = (inventorySearch?.value || "").trim().toLowerCase();
   if (q) {
     bahanList = bahanList.filter(
-      (p) =>
-        (p.name || "").toLowerCase().includes(q) ||
-        (p.category || "").toLowerCase().includes(q)
+      (p) => (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -859,7 +869,6 @@ function renderProductTable() {
 
   bahanList.forEach((p) => {
     const st = productStatus(p);
-
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.name || "-"}</td>
@@ -869,8 +878,8 @@ function renderProductTable() {
       <td>${Number(p.stock || 0).toLocaleString("id-ID")}</td>
       <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}">Edit</button>
-        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}">Hapus</button>
+        <button class="btn-table btn-table-edit" data-act="edit" data-id="${p.id}" type="button">Edit</button>
+        <button class="btn-table btn-table-delete" data-act="del" data-id="${p.id}" type="button">Hapus</button>
       </td>
     `;
     productTable.appendChild(tr);
@@ -926,11 +935,9 @@ async function deleteProduct(id) {
 }
 
 if (btnSaveProduct) {
-  btnSaveProduct.addEventListener("click", async () => {
-    if (!isEnabled("inventory")) {
-      showToast("Fitur inventory nonaktif", "info");
-      return;
-    }
+  btnSaveProduct.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!isEnabled("inventory")) return showToast("Fitur inventory nonaktif", "info");
 
     try {
       const name = (productName?.value || "").trim();
@@ -946,16 +953,9 @@ if (btnSaveProduct) {
         return;
       }
 
-      const payload = {
-        name,
-        type,
-        category,
-        price,
-        stock,
-        minStock,
-        unit,
-        updatedAt: serverTimestamp(),
-      };
+      const payload = { name, type, category, price, stock, minStock, unit, updatedAt: serverTimestamp() };
+
+      btnSaveProduct.disabled = true;
 
       if (editingProductId) {
         await updateDoc(doc(db, "products", editingProductId), payload);
@@ -975,6 +975,8 @@ if (btnSaveProduct) {
     } catch (err) {
       console.error(err);
       showToast("Gagal menyimpan produk", "error");
+    } finally {
+      btnSaveProduct.disabled = false;
     }
   });
 }
@@ -1011,9 +1013,9 @@ function addBomRow(selectedId = "", qty = 1) {
   const removeBtn = row.querySelector(".bom-remove");
 
   if (selectedBahan) {
-    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString(
-      "id-ID"
-    )} ${selectedBahan.unit || ""})`;
+    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString("id-ID")} ${
+      selectedBahan.unit || ""
+    })`;
   }
 
   function renderSuggest(keyword) {
@@ -1052,9 +1054,7 @@ function addBomRow(selectedId = "", qty = 1) {
       item.addEventListener("click", () => {
         const bahan = allBahan.find((b) => b.id === id);
         hiddenId.value = id;
-        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString(
-          "id-ID"
-        )} ${bahan.unit || ""})`;
+        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString("id-ID")} ${bahan.unit || ""})`;
         suggestBox.classList.add("hidden");
       });
     });
@@ -1062,9 +1062,7 @@ function addBomRow(selectedId = "", qty = 1) {
     if (list.length === 1) {
       const b = list[0];
       hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${
-        b.unit || ""
-      })`;
+      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})`;
       suggestBox.classList.add("hidden");
     }
   }
@@ -1073,10 +1071,7 @@ function addBomRow(selectedId = "", qty = 1) {
     hiddenId.value = "";
     renderSuggest(searchInput.value);
   });
-
-  searchInput.addEventListener("focus", () => {
-    renderSuggest(searchInput.value);
-  });
+  searchInput.addEventListener("focus", () => renderSuggest(searchInput.value));
 
   document.addEventListener("click", (e) => {
     if (!row.contains(e.target)) suggestBox.classList.add("hidden");
@@ -1086,7 +1081,8 @@ function addBomRow(selectedId = "", qty = 1) {
 }
 
 if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => {
+  btnAddBomRow.addEventListener("click", (e) => {
+    e.preventDefault();
     if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
     addBomRow();
   });
@@ -1115,9 +1111,7 @@ function openBomModal(menuId) {
       <div class="modal-section">
         <div class="modal-sec-title">Bahan per 1 porsi</div>
         <ul class="modal-bom-list">
-          ${m.bom
-            .map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`)
-            .join("")}
+          ${m.bom.map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`).join("")}
         </ul>
       </div>
     `;
@@ -1129,7 +1123,6 @@ function openBomModal(menuId) {
   bomModal.classList.remove("hidden");
 }
 
-// close modal
 if (bomModalClose && bomModal) {
   bomModalClose.addEventListener("click", () => bomModal.classList.add("hidden"));
   const backdrop = bomModal.querySelector(".modal-backdrop");
@@ -1146,13 +1139,10 @@ function renderRecipeTable() {
   recipeTable.innerHTML = "";
 
   let menus = productsCache.filter((p) => p.type === "menu");
-
   const q = (recipeSearch?.value || "").trim().toLowerCase();
   if (q) {
     menus = menus.filter(
-      (m) =>
-        (m.name || "").toLowerCase().includes(q) ||
-        (m.category || "").toLowerCase().includes(q)
+      (m) => (m.name || "").toLowerCase().includes(q) || (m.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -1170,13 +1160,13 @@ function renderRecipeTable() {
       <td>${m.category || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
       <td class="bom-eye-cell">
-        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
+        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom" type="button">
           <i class="lucide-eye"></i>
         </button>
       </td>
       <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
-        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
+        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe" type="button">Edit</button>
+        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe" type="button">Hapus</button>
       </td>
     `;
     recipeTable.appendChild(tr);
@@ -1233,425 +1223,9 @@ async function deleteRecipe(id) {
 }
 
 if (btnSaveRecipe) {
-  btnSaveRecipe.addEventListener("click", async () => {
-    if (!isEnabled("recipe")) {
-      showToast("Fitur recipe nonaktif", "info");
-      return;
-    }
-
-    try {
-      const name = (recipeName?.value || "").trim();
-      const category = recipeCategory?.value || "lainnya";
-      const price = cleanNumber(recipePrice?.value || 0);
-      const desc = (recipeDesc?.value || "").trim();
-
-      if (!name) return showToast("Nama menu wajib diisi", "error");
-      if (!price || price <= 0) return showToast("Harga jual wajib diisi", "error");
-
-      const bom = [];
-      if (bomList) {
-        bomList.querySelectorAll(".bom-row").forEach((row) => {
-          const idInput = row.querySelector(".bom-material-id");
-          const inp = row.querySelector(".bom-qty");
-          const materialId = idInput?.value || "";
-          const qty = Number(inp?.value || 0);
-          if (!materialId || qty <= 0) return;
-          const bahan = productsCache.find((p) => p.id === materialId);
-          bom.push({
-            materialId,
-            materialName: bahan?.name || "",
-            qty,
-            unit: bahan?.unit || "",
-          });
-        });
-      }
-
-      const payload = {
-        name,
-        type: "menu",
-        category,
-        price,
-        desc,
-        bom,
-        stock: 0,
-        minStock: 0,
-        updatedAt: serverTimestamp(),
-      };
-
-      if (editingRecipeId) {
-        await updateDoc(doc(db, "products", editingRecipeId), payload);
-        showToast("Resep diupdate", "success");
-      } else {
-        await addDoc(colProducts, { ...payload, createdAt: serverTimestamp() });
-        showToast("Resep ditambahkan", "success");
-      }
-
-      editingRecipeId = null;
-      if (recipeName) recipeName.value = "";
-      if (recipePrice) recipePrice.value = "";
-      if (recipeDesc) recipeDesc.value = "";
-      if (bomList) bomList.innerHTML = "";
-
-      await loadProducts();
-    } catch (err) {
-      console.error(err);
-      showToast("Gagal menyimpan resep", "error");
-    }
-  });
-}
-
-// ================= POS =================
-// ... (LANJUTAN POS / OPNAME / REPORT sama seperti file kamu)
-// Aku TIDAK ubah logic lain di bawah ini, hanya patch role & register di atas.
-
-// ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
-attachRupiahFormatter([
-  "saleVoucher",
-  "salePay",
-  "saleTotal",
-  "saleChange",
-  "productPrice",
-  "productStock",
-  "productMinStock",
-  "recipePrice",
-]);
-
-// ================= AUTH STATE =================
-onAuthStateChanged(auth, async (user) => {
-  currentUser = user || null;
-
-  if (user) {
-    if (authCard) authCard.classList.add("hidden");
-    if (appShell) appShell.classList.remove("hidden");
-
-    const role = await getUserRole(user.uid);
-    applyRoleUI(role);
-
-    // ✅ PATCH: jangan tampil kosong kalau role belum kebaca
-    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role || "memuat"})`;
-
-    if (welcomeBanner) welcomeBanner.classList.remove("hidden");
-
-    const needProducts =
-      isEnabled("inventory") || isEnabled("recipe") || isEnabled("opname") || isEnabled("dashboard");
-    const needSales = isEnabled("sales") || isEnabled("dashboard") || isEnabled("reports");
-    const needOpnameLogs = isEnabled("opname") || isEnabled("reports");
-
-    if (navigator.onLine) {
-      if (needProducts) await loadProducts();
-      if (needSales) await loadSales();
-      if (needOpnameLogs) await loadOpnameLogs();
-
-      if (isEnabled("sales")) syncOfflineSales();
-      if (isEnabled("opname")) syncOfflineOpname();
-    } else {
-      if (isEnabled("inventory")) renderProductTable();
-      if (isEnabled("recipe")) renderRecipeTable();
-      if (isEnabled("sales")) renderSaleMenu();
-
-      if (isEnabled("dashboard")) {
-        updateStockMetrics();
-        updateStockNotif();
-        updateCharts();
-        updateTopMenu();
-        updateHistoryTable();
-      }
-
-      if (isEnabled("opname")) renderOpnameTable();
-
-      showToast("Anda login dalam mode offline (pakai data cache).", "info");
-    }
-
-    ensureReportDateDefaults?.();
-    applyDisabledSidebarUI();
-
-    if (isEnabled("opname")) initMetricClickToOpname();
-
-    showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
-  } else {
-    currentRole = null;
-    productsCache = [];
-    salesCache = [];
-    opnameLogsCache = [];
-    currentCart = [];
-
-    if (authCard) authCard.classList.remove("hidden");
-    if (appShell) appShell.classList.add("hidden");
-    if (topbarEmail) topbarEmail.textContent = "–";
-  }
-});
-/* ===========================
-   SISANYA (RESEP, POS, OPNAME, REPORT, dll)
-   ===========================
-   ⚠️ Karena file kamu sangat panjang, bagian setelah ini tetap sama seperti yang kamu kirim.
-   Tidak ada perubahan logika selain PATCH ROLE di atas.
-
-   👉 Tempelkan “lanjutan kode kamu” mulai dari:
-   // ================= RESEP / BOM (MENU) =================
-   sampai akhir file, TANPA DIUBAH.
-
-   Kalau kamu mau aku kirim 100% full sampai baris terakhir juga (tanpa dipotong),
-   bilang: “kirim full lanjutannya dari RESEP sampai akhir” — nanti aku paste full lanjutannya rapih 1 file.
-*/
-// ================= RESEP / BOM (MENU) =================
-function addBomRow(selectedId = "", qty = 1) {
-  if (!isEnabled("recipe")) return;
-  if (!bomList) return;
-
-  const allBahan = productsCache.filter((p) => p.type === "bahan_baku");
-  if (!allBahan.length) {
-    showToast("Belum ada bahan baku di Inventory", "error");
-    return;
-  }
-
-  const selectedBahan = allBahan.find((b) => b.id === selectedId) || null;
-
-  const row = document.createElement("div");
-  row.className = "bom-row";
-  row.innerHTML = `
-    <div class="bom-row-material">
-      <input type="text" class="bom-search" placeholder="Cari bahan..." autocomplete="off" />
-      <div class="bom-suggest hidden"></div>
-      <input type="hidden" class="bom-material-id" value="${selectedId || ""}">
-    </div>
-    <input type="number" class="bom-qty" min="0" step="0.01" value="${qty}">
-    <button type="button" class="btn-table small bom-remove">x</button>
-  `;
-  bomList.appendChild(row);
-
-  const searchInput = row.querySelector(".bom-search");
-  const suggestBox = row.querySelector(".bom-suggest");
-  const hiddenId = row.querySelector(".bom-material-id");
-  const removeBtn = row.querySelector(".bom-remove");
-
-  if (selectedBahan) {
-    searchInput.value = `${selectedBahan.name} (${Number(selectedBahan.stock || 0).toLocaleString(
-      "id-ID"
-    )} ${selectedBahan.unit || ""})`;
-  }
-
-  function renderSuggest(keyword) {
-    const q = (keyword || "").trim().toLowerCase();
-    let list = allBahan;
-
-    if (q) {
-      list = allBahan.filter(
-        (b) =>
-          (b.name || "").toLowerCase().includes(q) ||
-          (b.category || "").toLowerCase().includes(q) ||
-          (b.unit || "").toLowerCase().includes(q)
-      );
-    }
-
-    if (!list.length) {
-      suggestBox.innerHTML = '<div class="bom-suggest-item empty">Tidak ada bahan</div>';
-      suggestBox.classList.remove("hidden");
-      return;
-    }
-
-    suggestBox.innerHTML = list
-      .map(
-        (b) => `
-      <div class="bom-suggest-item" data-id="${b.id}">
-        ${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${b.unit || ""})
-      </div>`
-      )
-      .join("");
-
-    suggestBox.classList.remove("hidden");
-
-    suggestBox.querySelectorAll(".bom-suggest-item").forEach((item) => {
-      const id = item.getAttribute("data-id");
-      if (!id) return;
-      item.addEventListener("click", () => {
-        const bahan = allBahan.find((b) => b.id === id);
-        hiddenId.value = id;
-        searchInput.value = `${bahan.name} (${Number(bahan.stock || 0).toLocaleString(
-          "id-ID"
-        )} ${bahan.unit || ""})`;
-        suggestBox.classList.add("hidden");
-      });
-    });
-
-    if (list.length === 1) {
-      const b = list[0];
-      hiddenId.value = b.id;
-      searchInput.value = `${b.name} (${Number(b.stock || 0).toLocaleString("id-ID")} ${
-        b.unit || ""
-      })`;
-      suggestBox.classList.add("hidden");
-    }
-  }
-
-  searchInput.addEventListener("input", () => {
-    hiddenId.value = "";
-    renderSuggest(searchInput.value);
-  });
-
-  searchInput.addEventListener("focus", () => {
-    renderSuggest(searchInput.value);
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!row.contains(e.target)) suggestBox.classList.add("hidden");
-  });
-
-  removeBtn.addEventListener("click", () => row.remove());
-}
-
-if (btnAddBomRow) {
-  btnAddBomRow.addEventListener("click", () => {
+  btnSaveRecipe.addEventListener("click", async (e) => {
+    e.preventDefault();
     if (!isEnabled("recipe")) return showToast("Fitur recipe nonaktif", "info");
-    addBomRow();
-  });
-}
-
-function openBomModal(menuId) {
-  if (!bomModal || !bomModalBody || !bomModalTitle) return;
-  const m = productsCache.find((x) => x.id === menuId && x.type === "menu");
-  if (!m) return;
-
-  bomModalTitle.textContent = `BOM: ${m.name || "-"}`;
-
-  const descHtml =
-    m.desc && String(m.desc).trim()
-      ? `
-    <div class="modal-section">
-      <div class="modal-sec-title">Deskripsi</div>
-      <p>${m.desc}</p>
-    </div>
-  `
-      : "";
-
-  let bomHtml = "";
-  if (Array.isArray(m.bom) && m.bom.length) {
-    bomHtml = `
-      <div class="modal-section">
-        <div class="modal-sec-title">Bahan per 1 porsi</div>
-        <ul class="modal-bom-list">
-          ${m.bom
-            .map((b) => `<li>${b.materialName || "?"} — ${b.qty} ${b.unit || ""}</li>`)
-            .join("")}
-        </ul>
-      </div>
-    `;
-  } else {
-    bomHtml = `<p class="modal-empty">Belum ada BOM untuk menu ini.</p>`;
-  }
-
-  bomModalBody.innerHTML = descHtml + bomHtml;
-  bomModal.classList.remove("hidden");
-}
-
-// close modal
-if (bomModalClose && bomModal) {
-  bomModalClose.addEventListener("click", () => bomModal.classList.add("hidden"));
-  const backdrop = bomModal.querySelector(".modal-backdrop");
-  if (backdrop) backdrop.addEventListener("click", () => bomModal.classList.add("hidden"));
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") bomModal.classList.add("hidden");
-  });
-}
-
-function renderRecipeTable() {
-  if (!isEnabled("recipe")) return;
-  if (!recipeTable) return;
-
-  recipeTable.innerHTML = "";
-
-  let menus = productsCache.filter((p) => p.type === "menu");
-
-  const q = (recipeSearch?.value || "").trim().toLowerCase();
-  if (q) {
-    menus = menus.filter(
-      (m) =>
-        (m.name || "").toLowerCase().includes(q) ||
-        (m.category || "").toLowerCase().includes(q)
-    );
-  }
-
-  if (!menus.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="5">Belum ada menu / resep.</td>';
-    recipeTable.appendChild(tr);
-    return;
-  }
-
-  menus.forEach((m) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${m.name || "-"}</td>
-      <td>${m.category || "-"}</td>
-      <td>${formatCurrency(m.price || 0)}</td>
-      <td class="bom-eye-cell">
-        <button class="btn-icon-eye" data-id="${m.id}" data-act="view-bom">
-          <i class="lucide-eye"></i>
-        </button>
-      </td>
-      <td class="table-actions">
-        <button class="btn-table btn-table-edit" data-id="${m.id}" data-act="edit-recipe">Edit</button>
-        <button class="btn-table btn-table-delete" data-id="${m.id}" data-act="del-recipe">Hapus</button>
-      </td>
-    `;
-    recipeTable.appendChild(tr);
-  });
-
-  recipeTable.querySelectorAll("button").forEach((btn) => {
-    const id = btn.getAttribute("data-id");
-    const act = btn.getAttribute("data-act");
-    if (act === "edit-recipe") btn.addEventListener("click", () => fillRecipeForm(id));
-    if (act === "del-recipe") btn.addEventListener("click", () => deleteRecipe(id));
-    if (act === "view-bom") btn.addEventListener("click", () => openBomModal(id));
-  });
-}
-
-if (recipeSearch) {
-  recipeSearch.addEventListener("input", () => {
-    if (!isEnabled("recipe")) return;
-    renderRecipeTable();
-  });
-}
-
-function fillRecipeForm(id) {
-  if (!isEnabled("recipe")) return;
-  const m = productsCache.find((x) => x.id === id && x.type === "menu");
-  if (!m) return;
-
-  editingRecipeId = id;
-  if (recipeName) recipeName.value = m.name || "";
-  if (recipeCategory) recipeCategory.value = m.category || "makanan";
-  if (recipePrice) recipePrice.value = formatRupiahInput(m.price || 0);
-  if (recipeDesc) recipeDesc.value = m.desc || "";
-
-  if (bomList) {
-    bomList.innerHTML = "";
-    (m.bom || []).forEach((b) => addBomRow(b.materialId, b.qty));
-  }
-}
-
-async function deleteRecipe(id) {
-  if (!isEnabled("recipe")) return;
-  const m = productsCache.find((x) => x.id === id && x.type === "menu");
-  if (!m) return;
-
-  if (!confirm(`Hapus resep/menu "${m.name}"?`)) return;
-
-  try {
-    await deleteDoc(doc(db, "products", id));
-    showToast("Resep dihapus", "success");
-    await loadProducts();
-  } catch (e) {
-    console.error(e);
-    showToast("Gagal menghapus resep", "error");
-  }
-}
-
-if (btnSaveRecipe) {
-  btnSaveRecipe.addEventListener("click", async () => {
-    if (!isEnabled("recipe")) {
-      showToast("Fitur recipe nonaktif", "info");
-      return;
-    }
 
     try {
       const name = (recipeName?.value || "").trim();
@@ -1692,6 +1266,8 @@ if (btnSaveRecipe) {
         updatedAt: serverTimestamp(),
       };
 
+      btnSaveRecipe.disabled = true;
+
       if (editingRecipeId) {
         await updateDoc(doc(db, "products", editingRecipeId), payload);
         showToast("Resep diupdate", "success");
@@ -1710,6 +1286,8 @@ if (btnSaveRecipe) {
     } catch (err) {
       console.error(err);
       showToast("Gagal menyimpan resep", "error");
+    } finally {
+      btnSaveRecipe.disabled = false;
     }
   });
 }
@@ -1721,6 +1299,7 @@ function renderSaleMenu() {
 
   saleMenuBody.innerHTML = "";
   let list = productsCache.filter((p) => p.type === "menu");
+
   const q = (saleSearch?.value || "").trim().toLowerCase();
   if (q) list = list.filter((m) => (m.name || "").toLowerCase().includes(q));
 
@@ -1729,7 +1308,7 @@ function renderSaleMenu() {
     tr.innerHTML = `
       <td>${m.name || "-"}</td>
       <td>${formatCurrency(m.price || 0)}</td>
-      <td><button class="btn-table small" data-id="${m.id}">Tambah</button></td>
+      <td><button class="btn-table small" data-id="${m.id}" type="button">Tambah</button></td>
     `;
     saleMenuBody.appendChild(tr);
   });
@@ -1779,7 +1358,7 @@ function renderCart() {
       <td>${it.name}</td>
       <td>${it.qty}</td>
       <td>${formatCurrency(it.subtotal)}</td>
-      <td><button class="btn-table small" data-idx="${idx}">x</button></td>
+      <td><button class="btn-table small" data-idx="${idx}" type="button">x</button></td>
     `;
     cartBody.appendChild(tr);
   });
@@ -1891,7 +1470,8 @@ function updatePrintAreaFromSale(saleDoc) {
 
 // ================= PRINT STRUK – JENDELA TERPISAH (THERMAL 58mm) =================
 if (btnPrint) {
-  btnPrint.addEventListener("click", () => {
+  btnPrint.addEventListener("click", (e) => {
+    e.preventDefault();
     if (!printArea) return;
 
     const receiptHtml = printArea.innerHTML.trim();
@@ -2028,8 +1608,10 @@ async function applyBomForSale(saleDoc) {
 
 // ================== SAVE SALE (ONLINE + OFFLINE) ==================
 if (btnSaveSale) {
-  btnSaveSale.addEventListener("click", async () => {
+  btnSaveSale.addEventListener("click", async (e) => {
+    e.preventDefault();
     if (!isEnabled("sales")) return showToast("Fitur sales nonaktif", "info");
+
     try {
       if (!currentCart.length) return showToast("Keranjang kosong", "error");
 
@@ -2065,6 +1647,8 @@ if (btnSaveSale) {
         createdByUid: currentUser?.uid || null,
       };
 
+      btnSaveSale.disabled = true;
+
       if (!navigator.onLine) {
         queueOfflineSale(saleDoc);
         showToast("Transaksi disimpan di perangkat (offline). Akan disinkron saat online.", "info", 4000);
@@ -2092,9 +1676,11 @@ if (btnSaveSale) {
 
       updatePrintAreaFromSale(saleDoc);
       await loadSales();
-    } catch (e) {
-      console.error(e);
+    } catch (e2) {
+      console.error(e2);
       showToast("Gagal menyimpan transaksi", "error");
+    } finally {
+      btnSaveSale.disabled = false;
     }
   });
 }
@@ -2171,7 +1757,6 @@ async function loadSales() {
 
     saveSnapshot(SNAP_SALES_KEY, salesCache);
 
-    // ✅ hanya kalau dashboard ON
     if (isEnabled("dashboard")) {
       updateCharts();
       updateTopMenu();
@@ -2227,7 +1812,7 @@ function updateCharts() {
   const src = getFilteredSales();
   const today = new Date();
 
-  // --- HARIAN: 7 hari terakhir ---
+  // harian 7 hari
   const dayLabels = [];
   const dayData = [];
   for (let i = 6; i >= 0; i--) {
@@ -2239,16 +1824,14 @@ function updateCharts() {
     dayData.push(sum);
   }
 
-  // --- BULANAN: 6 bulan terakhir ---
+  // bulanan 6 bulan
   const monthLabels = [];
   const monthData = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     monthLabels.push(d.toLocaleString("id-ID", { month: "short" }));
-    const sum = src
-      .filter((s) => (s.dateKey || "").startsWith(ym))
-      .reduce((n, s) => n + Number(s.total || 0), 0);
+    const sum = src.filter((s) => (s.dateKey || "").startsWith(ym)).reduce((n, s) => n + Number(s.total || 0), 0);
     monthData.push(sum);
   }
 
@@ -2363,9 +1946,18 @@ function updateHistoryTable() {
   });
 }
 
-if (btnFilterApply) btnFilterApply.addEventListener("click", () => isEnabled("dashboard") && (updateCharts(), updateTopMenu(), updateHistoryTable()));
+if (btnFilterApply)
+  btnFilterApply.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!isEnabled("dashboard")) return;
+    updateCharts();
+    updateTopMenu();
+    updateHistoryTable();
+  });
+
 if (btnFilterReset)
-  btnFilterReset.addEventListener("click", () => {
+  btnFilterReset.addEventListener("click", (e) => {
+    e.preventDefault();
     if (!isEnabled("dashboard")) return;
     if (filterStart) filterStart.value = "";
     if (filterEnd) filterEnd.value = "";
@@ -2373,6 +1965,7 @@ if (btnFilterReset)
     updateTopMenu();
     updateHistoryTable();
   });
+
 if (filterStart)
   filterStart.addEventListener("change", () => {
     if (!isEnabled("dashboard")) return;
@@ -2380,6 +1973,7 @@ if (filterStart)
     updateTopMenu();
     updateHistoryTable();
   });
+
 if (filterEnd)
   filterEnd.addEventListener("change", () => {
     if (!isEnabled("dashboard")) return;
@@ -2387,6 +1981,7 @@ if (filterEnd)
     updateTopMenu();
     updateHistoryTable();
   });
+
 if (historySearch) historySearch.addEventListener("input", () => isEnabled("dashboard") && updateHistoryTable());
 
 // ================= METRIC STOK =================
@@ -2424,9 +2019,7 @@ function renderOpnameTable() {
   const q = (opnameSearch?.value || "").trim().toLowerCase();
   if (q) {
     bahan = bahan.filter(
-      (p) =>
-        (p.name || "").toLowerCase().includes(q) ||
-        (p.category || "").toLowerCase().includes(q)
+      (p) => (p.name || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)
     );
   }
 
@@ -2450,18 +2043,16 @@ function renderOpnameTable() {
         </div>
       </td>
       <td>${Number(currentStock).toLocaleString("id-ID")} ${p.unit || ""}</td>
-      <!-- ✅ simpan stok sistem awal di data-system -->
       <td><input type="number" data-id="${p.id}" data-system="${currentStock}" value="${currentStock}"></td>
       <td><span data-id="${p.id}-diff">0</span></td>
       <td><span class="status-badge ${st.cls}">${st.label}</span></td>
       <td class="table-actions">
-        <button class="btn-table btn-table-delete small" data-id="${p.id}">Simpan</button>
+        <button class="btn-table btn-table-delete small" data-id="${p.id}" type="button">Simpan</button>
       </td>
     `;
     opnameTable.appendChild(tr);
   });
 
-  // ✅ diff selalu pakai data-system, bukan productsCache (biar nggak jadi 0 setelah offline update)
   opnameTable.querySelectorAll("input[type='number']").forEach((inp) => {
     const id = inp.getAttribute("data-id");
     const systemStock = Number(inp.getAttribute("data-system") || 0);
@@ -2488,10 +2079,7 @@ if (opnameSearch) {
 }
 
 async function saveOpnameRow(id) {
-  if (!isEnabled("opname")) {
-    showToast("Fitur opname nonaktif", "info");
-    return;
-  }
+  if (!isEnabled("opname")) return showToast("Fitur opname nonaktif", "info");
 
   try {
     const prod = productsCache.find((p) => p.id === id);
@@ -2501,8 +2089,6 @@ async function saveOpnameRow(id) {
     if (!inp) return;
 
     const fisik = Number(inp.value || 0);
-
-    // ✅ stok sistem pakai data-system
     const systemStock = Number(inp.getAttribute("data-system") || Number(prod.stock || 0));
     const selisih = fisik - systemStock;
 
@@ -2523,7 +2109,6 @@ async function saveOpnameRow(id) {
     if (!navigator.onLine) {
       queueOfflineOpname(opDoc);
 
-      // update cache supaya tabel inventory & notif sesuai stok fisik
       prod.stock = fisik;
 
       showToast(`Opname offline tersimpan untuk ${prod.name}. Akan disinkron saat online.`, "info", 3500);
@@ -2821,10 +2406,10 @@ if (reportType) {
     ensureReportDateDefaults();
   });
 }
-if (btnReportGenerate) btnReportGenerate.addEventListener("click", generateReport);
-if (btnReportDownload) btnReportDownload.addEventListener("click", downloadReportCSV);
+if (btnReportGenerate) btnReportGenerate.addEventListener("click", (e) => (e.preventDefault(), generateReport()));
+if (btnReportDownload) btnReportDownload.addEventListener("click", (e) => (e.preventDefault(), downloadReportCSV()));
 
-// ================= AKTIFKAN FORMAT RUPIAH DI INPUT =================
+// ================= AKTIFKAN FORMAT RUPIAH DI INPUT (ONCE) =================
 attachRupiahFormatter([
   "saleVoucher",
   "salePay",
@@ -2836,7 +2421,7 @@ attachRupiahFormatter([
   "recipePrice",
 ]);
 
-// ================= AUTH STATE =================
+// ================= AUTH STATE (SINGLE - NO DUPLICATE) =================
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
 
@@ -2847,7 +2432,7 @@ onAuthStateChanged(auth, async (user) => {
     const role = await getUserRole(user.uid);
     applyRoleUI(role);
 
-    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role})`;
+    if (topbarEmail) topbarEmail.textContent = `${user.email} (${role || "memuat"})`;
     if (welcomeBanner) welcomeBanner.classList.remove("hidden");
 
     const needProducts =
@@ -2882,7 +2467,6 @@ onAuthStateChanged(auth, async (user) => {
 
     ensureReportDateDefaults();
     applyDisabledSidebarUI();
-
     if (isEnabled("opname")) initMetricClickToOpname();
 
     showToast("Login berhasil. Semua fitur sedang dinonaktifkan.", "info", 2500);
