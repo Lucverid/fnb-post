@@ -724,9 +724,9 @@ if (productType) {
 
 // ================= AUTH BTN =================
 if (btnLogin) {
-  btnLogin.addEventListener("click", async () => {
+  btnLogin.addEventListener("click", async (e) => {
+    e.preventDefault();              // ⬅️ cegah form submit bawaan
     try {
-      // ✅ PATCH: buang role nyangkut sebelum login
       clearRoleStorage();
 
       const email = (loginEmail?.value || "").trim();
@@ -735,18 +735,24 @@ if (btnLogin) {
         showToast("Email & password wajib diisi", "error");
         return;
       }
+
+      // (opsional) UX: disable tombol saat proses
+      btnLogin.disabled = true;
+
       await signInWithEmailAndPassword(auth, email, pass);
       showToast("Login berhasil", "success");
     } catch (err) {
       console.error(err);
       showToast("Login gagal: " + (err.message || err.code), "error");
+    } finally {
+      btnLogin.disabled = false;
     }
   });
 }
 
-// ✅ PATCH REGISTER: setDoc users/{uid} (anti gagal karena doc belum ada)
 if (btnRegister) {
-  btnRegister.addEventListener("click", async () => {
+  btnRegister.addEventListener("click", async (e) => {
+    e.preventDefault();              // ⬅️ cegah form submit bawaan
     try {
       const email = (registerEmail?.value || "").trim();
       const pass = (registerPassword?.value || "").trim();
@@ -757,21 +763,14 @@ if (btnRegister) {
         return;
       }
 
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      btnRegister.disabled = true;
 
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
       await setDoc(
         doc(db, "users", cred.user.uid),
-        {
-          uid: cred.user.uid,
-          email,
-          role,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
+        { uid: cred.user.uid, email, role, createdAt: serverTimestamp(), updatedAt: serverTimestamp() },
         { merge: true }
       );
-
-      // optional: simpan role biar UI & warehouse.js langsung kebaca
       saveRole(role);
       window.currentUserRole = role;
 
@@ -781,17 +780,8 @@ if (btnRegister) {
     } catch (err) {
       console.error(err);
       showToast("Register gagal: " + (err.message || err.code), "error");
-    }
-  });
-}
-
-if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error(err);
-      showToast("Logout gagal: " + (err.message || err.code), "error");
+    } finally {
+      btnRegister.disabled = false;
     }
   });
 }
