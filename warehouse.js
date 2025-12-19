@@ -1,13 +1,13 @@
-// warehouse.js (FULL) — Role FIX (docId random OK) + Pack/Loose + Expiry + Anti init error
+// warehouse.js (FULL FINAL) — AUTH/ROLE dari script.js (ANTI “memuat terus”)
 // ========================================================
-// FIX UTAMA ROLE:
-// - resolve role dari window/localStorage/body dataset
-// - coba users/{uid} (kalau kamu pakai docId = uid)
-// - fallback query users where("uid"=="uid") (untuk docId random seperti data kamu sekarang)
+// INTI FIX:
+// - warehouse.js TIDAK boleh resolve role sendiri via Firestore/users
+// - warehouse.js TIDAK pakai onAuthStateChanged
+// - warehouse.js nunggu event AUTH_READY dari script.js
+//   (script.js yang set window.currentUser & window.currentUserRole)
 // ========================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import {
   getFirestore,
   collection,
@@ -25,7 +25,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 const app = getApp();
-const auth = getAuth(app);
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
@@ -92,59 +91,10 @@ function downloadText(filename, text, mime = "text/csv;charset=utf-8") {
   URL.revokeObjectURL(url);
 }
 
-// ===================== Role helper (ANTI ROLE NYANGKUT) =====================
-// sumber role yang mungkin
-function getRoleGuessRaw() {
-  const a = (window.currentUserRole || "").toString().toLowerCase().trim();
-  const b = (localStorage.getItem("role") || "").toString().toLowerCase().trim();
-  const c = (localStorage.getItem("userRole") || "").toString().toLowerCase().trim();
-  const d = (localStorage.getItem("currentUserRole") || "").toString().toLowerCase().trim();
-  const e = (document.body?.dataset?.role || "").toString().toLowerCase().trim();
-  return a || b || c || d || e || "";
-}
+// ===================== Role helper (dari script.js) =====================
 function isAdminRole(role) {
   const r = (role || "").toLowerCase().trim();
   return r === "admin" || r === "owner" || r === "superadmin";
-}
-function setRoleEverywhere(role) {
-  const r = (role || "").toLowerCase().trim();
-  window.currentUserRole = r;
-  if (document.body?.dataset) document.body.dataset.role = r;
-  try {
-    localStorage.setItem("role", r);
-    localStorage.setItem("userRole", r);
-    localStorage.setItem("currentUserRole", r);
-  } catch (_) {}
-}
-
-// resolve role: cache -> users/{uid} -> query where uid
-async function resolveUserRole(user) {
-  const guessed = getRoleGuessRaw();
-  if (guessed) return guessed;
-
-  // 1) coba docId = uid
-  try {
-    const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const role = String(snap.data()?.role || "").toLowerCase().trim();
-      if (role) return role;
-    }
-  } catch (_) {}
-
-  // 2) fallback: docId random, cari field uid
-  try {
-    const q = query(collection(db, "users"), where("uid", "==", user.uid), limit(3));
-    const qs = await getDocs(q);
-    let role = "";
-    qs.forEach((d) => {
-      if (!role) role = String(d.data()?.role || "").toLowerCase().trim();
-    });
-    if (role) return role;
-  } catch (_) {}
-
-  // kosong = non-admin (AMAN)
-  return "";
 }
 
 // ===================== Week Preset (Senin–Minggu) =====================
@@ -336,6 +286,8 @@ const btnWeekPrev2 = $("btnWeekPrev2");
 
 // ===================== State =====================
 let currentUser = null;
+let currentRole = "kasir";
+
 let items = [];
 let wasteLogs = [];
 let batchLogs = [];
@@ -752,6 +704,7 @@ function resetMasterForm() {
 
 async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const name = (whItemName?.value || "").trim();
   const unitBig = (whItemUnitBig?.value || "").trim();
@@ -834,6 +787,7 @@ async function createMasterItem() {
 
 async function updateMasterItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!id) return;
 
   const itOld = items.find((x) => x.id === id);
@@ -1015,6 +969,8 @@ function updateIssueInfo() {
 }
 async function issueFromW1Units() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
+
   const it = currentIssueItem();
   if (!it) return showToast("Pilih item dulu", "error");
 
@@ -1147,6 +1103,9 @@ function renderOpnameTable() {
     const tr = document.createElement("tr");
     tr.dataset.itemId = it.id;
 
+    // kalau non-admin => disable tombol action (tetap tampil)
+    const disabledAttr = isAdminRole(currentRole) ? "" : "disabled";
+
     tr.innerHTML = `
       <td>${escapeHtml(it.name || "-")}</td>
       <td>
@@ -1173,6 +1132,7 @@ function renderOpnameTable() {
           value="${inputValue}"
           style="min-width:110px;"
           placeholder="${escapeHtmlAttr(inputHint)}"
+          ${disabledAttr}
         />
         <div style="opacity:.7;font-size:12px;margin-top:4px;">${escapeHtml(inputHint)}</div>
       </td>
@@ -1187,7 +1147,14 @@ function renderOpnameTable() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-ibtn="${key}"] > button`);
-      if (el) el.addEventListener("click", fn);
+      if (!el) return;
+      if (!isAdminRole(currentRole)) {
+        el.disabled = true;
+        el.style.opacity = "0.5";
+        el.style.pointerEvents = "none";
+        return;
+      }
+      el.addEventListener("click", fn);
     };
 
     bind("saveOpname", async () => await saveOpname(it.id));
@@ -1204,6 +1171,7 @@ function renderOpnameTable() {
 
 async function saveOpname(itemId) {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const gudang = whOpnameGudang?.value || "w1";
   const inp = whOpnameTableBody?.querySelector(`input[data-opname-id="${itemId}"]`);
@@ -1298,6 +1266,7 @@ async function saveOpname(itemId) {
 
 async function saveOpnameAllVisible() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!whOpnameTableBody || !whOpnameGudang) return;
 
   const gudang = whOpnameGudang.value || "w1";
@@ -1407,6 +1376,8 @@ async function saveOpnameAllVisible() {
 
 async function deleteItem(id) {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
+
   const it = items.find((x) => x.id === id);
   const ok = confirm(`Hapus ${it?.name || "item ini"}?`);
   if (!ok) return;
@@ -1432,6 +1403,7 @@ async function deleteItem(id) {
 
 async function transferW1toW2() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const itemId = moveItemSelect?.value || "";
   const qtyPack = Number(moveQty?.value || 0);
@@ -1516,6 +1488,7 @@ function fillWasteFormFromRow(w) {
 }
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
 
   const itemName = (wasteItemSelect?.value || "").trim();
   if (!itemName) return showToast("Pilih item waste dulu", "error");
@@ -1555,6 +1528,7 @@ async function createWaste() {
 }
 async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
   if (!id) return;
 
   const itemName = (wasteItemSelect?.value || "").trim();
@@ -1672,6 +1646,8 @@ function renderWasteHistory() {
     const tr = document.createElement("tr");
     tr.dataset.wasteId = w.id;
 
+    const disabledAttr = isAdminRole(currentRole) ? "" : "disabled";
+
     tr.innerHTML = `
       <td>${escapeHtml(w.dateKey || "-")}</td>
       <td>${escapeHtml(w.itemName || "-")}</td>
@@ -1689,7 +1665,14 @@ function renderWasteHistory() {
 
     const bind = (key, fn) => {
       const el = tr.querySelector(`span[data-wbtn="${key}"] > button`);
-      if (el) el.addEventListener("click", fn);
+      if (!el) return;
+      if (!isAdminRole(currentRole)) {
+        el.disabled = true;
+        el.style.opacity = "0.5";
+        el.style.pointerEvents = "none";
+        return;
+      }
+      el.addEventListener("click", fn);
     };
 
     bind("edit", () => {
@@ -1705,6 +1688,8 @@ function renderWasteHistory() {
 }
 async function deleteWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
+  if (!isAdminRole(currentRole)) return showToast("Akses ditolak (admin only).", "error");
+
   const ok = confirm("Hapus data waste ini?");
   if (!ok) return;
 
@@ -1980,7 +1965,7 @@ function downloadLastReportCSV() {
   showToast("CSV didownload.", "success");
 }
 
-// ===================== Events =====================
+// ===================== Events (bind sekali, aman) =====================
 btnSaveItem?.addEventListener("click", saveOrUpdateMasterItem);
 
 btnMove?.addEventListener("click", transferW1toW2);
@@ -2034,7 +2019,6 @@ btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
 async function bootWarehouse() {
   ensureExpiryCards();
   bindStockCardClicks();
-  updateDashboard();
 
   ensureWasteDefaults();
   fillWasteSelectPreset();
@@ -2063,38 +2047,51 @@ async function bootWarehouse() {
   updateIssueInfo();
 }
 
-onAuthStateChanged(auth, async (u) => {
-  currentUser = u || null;
+// ===================== AUTH BRIDGE (dari script.js) =====================
+async function startWarehouseFromAuth(user, role) {
+  currentUser = user || null;
+  currentRole = (role || "kasir").toLowerCase();
+
   if (!currentUser) return;
 
-  // ====== ROLE RESOLVE (FIX) ======
-  const role = await resolveUserRole(currentUser);
-
-  // simpan role kalau ada
-  if (role) setRoleEverywhere(role);
-
-  // Kalau role kosong / bukan admin => JANGAN init warehouse
-  if (!isAdminRole(role)) {
-    ensureExpiryCards();
-    updateDashboard();
-    // showToast(`Warehouse nonaktif untuk role: ${role || "(unknown)"}`, "info", 2500);
-    return;
-  }
-
-  // admin => init normal
+  // selalu coba load item agar dashboard tidak kosong
   try {
-    await bootWarehouse();
-  } catch (e) {
-    console.error("WAREHOUSE INIT ERROR:", e);
-
-    const msg = errorText(e);
-    showToast("Warehouse gagal init: " + msg, "error", 7000);
-
-    ensureExpiryCards();
+    await loadWhItems();
     updateDashboard();
-
-    if (isPermissionError(e)) {
-      showToast("Kemungkinan Firestore rules melarang akses (cek rules admin).", "warning", 6000);
-    }
+  } catch (e) {
+    console.error("Load items error:", e);
+    if (isPermissionError(e)) showToast("Firestore rules menolak akses wh_items.", "warning", 6000);
   }
+
+  // admin => init full
+  if (isAdminRole(currentRole)) {
+    try {
+      await bootWarehouse();
+    } catch (e) {
+      console.error("WAREHOUSE INIT ERROR:", e);
+      showToast("Warehouse gagal init: " + errorText(e), "error", 7000);
+      if (isPermissionError(e)) showToast("Kemungkinan Firestore rules melarang akses (cek rules admin).", "warning", 6000);
+    }
+  } else {
+    // non-admin => tetap render UI read-only
+    renderOpnameTable();
+    updateMoveInfo();
+    updateIssueInfo();
+  }
+}
+
+window.addEventListener("AUTH_READY", (e) => {
+  const user = e?.detail?.user || window.currentUser || null;
+  const role = e?.detail?.role || window.currentUserRole || document.body?.dataset?.role || "kasir";
+  startWarehouseFromAuth(user, role);
 });
+
+// fallback kalau event keburu lewat
+setTimeout(() => {
+  if (!currentUser && window.currentUser) {
+    startWarehouseFromAuth(
+      window.currentUser,
+      window.currentUserRole || document.body?.dataset?.role || "kasir"
+    );
+  }
+}, 0);
