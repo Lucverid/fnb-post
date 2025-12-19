@@ -1443,11 +1443,13 @@ async function transferW1toW2() {
   }
 }
 
-// ===================== Waste =====================
+// ===================== Waste (FULL) — allow qty = 0, forbid negative =====================
+
 function setWasteButtonModeUpdate(on) {
   if (!btnSaveWaste) return;
   btnSaveWaste.textContent = on ? "Update Waste" : "Simpan Waste";
 }
+
 function resetWasteForm() {
   if (wasteItemSelect) wasteItemSelect.value = "";
   if (wasteQty) wasteQty.value = "";
@@ -1461,6 +1463,7 @@ function resetWasteForm() {
   editingWasteFormId = null;
   setWasteButtonModeUpdate(false);
 }
+
 function fillWasteFormFromRow(w) {
   if (!w) return;
   if (wasteItemSelect) wasteItemSelect.value = w.itemName || "";
@@ -1470,6 +1473,8 @@ function fillWasteFormFromRow(w) {
   if (wasteNote) wasteNote.value = w.note || "";
   setWasteButtonModeUpdate(true);
 }
+
+// ✅ CREATE: qty boleh 0, tidak boleh negatif
 async function createWaste() {
   if (!currentUser) return showToast("Harus login", "error");
 
@@ -1480,9 +1485,9 @@ async function createWaste() {
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
 
   const qty = Number(wasteQty?.value);
-if (!Number.isFinite(qty) || qty < 0) {
-  return showToast("Qty waste tidak boleh negatif", "error");
-}
+  if (!Number.isFinite(qty) || qty < 0) {
+    return showToast("Qty waste tidak boleh negatif", "error");
+  }
 
   const unit = (wasteUnit?.value || "unit").trim();
   const note = (wasteNote?.value || "").trim();
@@ -1491,7 +1496,7 @@ if (!Number.isFinite(qty) || qty < 0) {
     itemId: `preset:${itemName}`,
     itemName,
     dateKey: d,
-    qty,
+    qty, // boleh 0
     unit,
     note,
     createdBy: currentUser.email || "-",
@@ -1511,6 +1516,8 @@ if (!Number.isFinite(qty) || qty < 0) {
     showToast("Gagal simpan waste: " + errorText(e), "error", 6000);
   }
 }
+
+// ✅ UPDATE: samakan validasi qty (boleh 0, tidak boleh negatif)
 async function updateWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   if (!id) return;
@@ -1522,9 +1529,9 @@ async function updateWaste(id) {
   if (!d) return showToast("Tanggal waste wajib diisi", "error");
 
   const qty = Number(wasteQty?.value);
-if (!Number.isFinite(qty) || qty < 0) {
-  return showToast("Qty waste tidak boleh negatif", "error");
-}
+  if (!Number.isFinite(qty) || qty < 0) {
+    return showToast("Qty waste tidak boleh negatif", "error");
+  }
 
   const unit = (wasteUnit?.value || "unit").trim();
   const note = (wasteNote?.value || "").trim();
@@ -1534,7 +1541,7 @@ if (!Number.isFinite(qty) || qty < 0) {
       itemId: `preset:${itemName}`,
       itemName,
       dateKey: d,
-      qty,
+      qty, // boleh 0
       unit,
       note,
       updatedAt: serverTimestamp(),
@@ -1550,6 +1557,7 @@ if (!Number.isFinite(qty) || qty < 0) {
     showToast("Gagal update waste: " + errorText(e), "error", 6000);
   }
 }
+
 async function saveOrUpdateWaste() {
   if (editingWasteFormId) return await updateWaste(editingWasteFormId);
   return await createWaste();
@@ -1564,6 +1572,7 @@ function ensureWasteDefaults() {
   if (whReportStart && !whReportStart.value) whReportStart.value = val;
   if (whReportEnd && !whReportEnd.value) whReportEnd.value = val;
 }
+
 function fillWasteSelectPreset() {
   if (!wasteItemSelect) return;
   wasteItemSelect.innerHTML = `<option value="">Pilih item...</option>`;
@@ -1574,6 +1583,7 @@ function fillWasteSelectPreset() {
     wasteItemSelect.appendChild(opt);
   });
 }
+
 function fillWasteUnitOptions() {
   if (!wasteUnit) return;
   const units = ["gram", "ml", "pcs", "unit"];
@@ -1585,12 +1595,15 @@ function fillWasteUnitOptions() {
     wasteUnit.appendChild(opt);
   });
 }
+
 function getWasteFilterStart() {
   return parseDateOnly(wasteFilterStart?.value || "") || null;
 }
+
 function getWasteFilterEnd() {
   return parseDateOnly(wasteFilterEnd?.value || "") || null;
 }
+
 function sortWasteList(list) {
   const by = wasteSortByState;
   const dir = wasteSortDirState;
@@ -1605,6 +1618,7 @@ function sortWasteList(list) {
 
   return dir === "asc" ? sorted : sorted.reverse();
 }
+
 function renderWasteHistory() {
   if (!wasteHistoryBody) return;
 
@@ -1663,6 +1677,7 @@ function renderWasteHistory() {
     wasteHistoryBody.appendChild(tr);
   });
 }
+
 async function deleteWaste(id) {
   if (!currentUser) return showToast("Harus login", "error");
   const ok = confirm("Hapus data waste ini?");
