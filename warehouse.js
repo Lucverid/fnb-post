@@ -1826,16 +1826,61 @@ async function generateWarehouseReport() {
 
   try {
     if (type === "waste") {
-      const s = parseDateOnly(startKey);
-      const e = parseDateOnly(endKey);
-      await loadWasteLogs(s, e);
+  const s = parseDateOnly(startKey);
+  const e = parseDateOnly(endKey);
+  await loadWasteLogs(s, e);
 
-      header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
-      rows = wasteLogs
-        .slice()
-        .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
-        .map((w) => [w.dateKey || "", w.itemName || "", String(clampInt(w.qty, 0)), w.unit || "", w.note || "", w.createdBy || ""]);
-    } else if (type === "receiving") {
+  const useWeekly = isFullCalendarWeekRange(startKey, endKey);
+
+  if (useWeekly) {
+    // =====================
+    // WASTE REKAP MINGGUAN
+    // =====================
+    const grouped = {};
+
+    for (const w of wasteLogs) {
+      const itemName = w.itemName || "";
+      const unit = w.unit || "";
+      const key = itemName + "|" + unit;
+
+      if (!grouped[key]) {
+        grouped[key] = { itemName, unit, totalQty: 0 };
+      }
+
+      grouped[key].totalQty += clampInt(w.qty, 0);
+    }
+
+    header = ["Item", "Total Qty", "Satuan"];
+
+    rows = Object.values(grouped)
+      .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
+      .map((g) => [
+        g.itemName,
+        String(g.totalQty),
+        g.unit,
+      ]);
+  } else {
+    // =====================
+    // WASTE DETAIL HARIAN
+    // =====================
+    header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
+
+    rows = wasteLogs
+      .slice()
+      .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
+      .map((w) => [
+        w.dateKey || "",
+        w.itemName || "",
+        String(clampInt(w.qty, 0)),
+        w.unit || "",
+        w.note || "",
+        w.createdBy || "",
+      ]);
+  }
+}
+
+
+ else if (type === "receiving") {
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
       await loadBatchLogs(s, e);
