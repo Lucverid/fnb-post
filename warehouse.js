@@ -2023,8 +2023,8 @@ issueItemSelect?.addEventListener("change", updateIssueInfo);
 issueQty?.addEventListener("input", updateIssueInfo);
 
 whOpnameGudang?.addEventListener("change", () => {
-  if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) whStockFilter = null;
-  renderOpnameTable();
+if (whStockFilter && whStockFilter.gudang !== (whOpnameGudang.value || "w1")) whStockFilter = null;
+renderOpnameTable();
 });
 whOpnameSearch?.addEventListener("input", renderOpnameTable);
 whOpnameModeSmall?.addEventListener("change", renderOpnameTable);
@@ -2034,27 +2034,43 @@ btnOpnameSaveAll?.addEventListener("click", saveOpnameAllVisible);
 btnSaveWaste?.addEventListener("click", saveOrUpdateWaste);
 
 wasteFilterStart?.addEventListener("change", async () => {
-  await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-  renderWasteHistory();
+await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+renderWasteHistory();
 });
 wasteFilterEnd?.addEventListener("change", async () => {
-  await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
-  renderWasteHistory();
+await loadWasteLogs(getWasteFilterStart(), getWasteFilterEnd());
+renderWasteHistory();
 });
 wasteHistorySearch?.addEventListener("input", renderWasteHistory);
 
 wasteSortBy?.addEventListener("change", () => {
-  wasteSortByState = wasteSortBy.value || "dateKey";
-  renderWasteHistory();
+wasteSortByState = wasteSortBy.value || "dateKey";
+renderWasteHistory();
 });
 wasteSortDirBtn?.addEventListener("click", () => {
-  wasteSortDirState = wasteSortDirState === "asc" ? "desc" : "asc";
-  wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
-  renderWasteHistory();
+wasteSortDirState = wasteSortDirState === "asc" ? "desc" : "asc";
+wasteSortDirBtn.textContent = wasteSortDirState.toUpperCase();
+renderWasteHistory();
 });
 
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
+
+btnWeekThis?.addEventListener("click", () => {
+whReportAutoWeekly = true;
+setReportRangeByWeekOffset(0);
+});
+
+btnWeekLast?.addEventListener("click", () => {
+whReportAutoWeekly = true;
+setReportRangeByWeekOffset(1);
+});
+
+btnWeekPrev2?.addEventListener("click", () => {
+whReportAutoWeekly = true;
+setReportRangeByWeekOffset(2);
+});
+
 
 // ===================== REPORT WEEK BUTTON =====================
 btnWeekThis?.addEventListener("click", () => {
