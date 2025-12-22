@@ -306,6 +306,7 @@ let editingWasteFormId = null;
 
 let wasteSortByState = "dateKey";
 let wasteSortDirState = "asc";
+let whReportAutoWeekly = false;
 
 const WASTE_PRESET_ITEMS = [
   "Milktea",
@@ -1832,51 +1833,48 @@ async function generateWarehouseReport() {
 
   const useWeekly = isFullCalendarWeekRange(startKey, endKey);
 
-  if (useWeekly) {
-  // =====================
-  // WASTE REKAP MINGGUAN (AKUMULASI + CATATAN + USER)
-  // =====================
-  const grouped = {};
+  if (type === "waste") {
+  const s = parseDateOnly(startKey);
+  const e = parseDateOnly(endKey);
+  await loadWasteLogs(s, e);
 
-  for (const w of wasteLogs) {
-    const itemName = w.itemName || "";
-    const unit = w.unit || "";
-    const key = itemName + "|" + unit;
+  if (whReportAutoWeekly) {
+    // =====================
+    // REKAP MINGGUAN
+    // =====================
+    const grouped = {};
 
-    if (!grouped[key]) {
-      grouped[key] = {
-        itemName,
-        unit,
-        totalQty: 0,
-        notes: new Set(),
-        users: new Set(),
-      };
+    for (const w of wasteLogs) {
+      const key = (w.itemName || "") + "|" + (w.unit || "");
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          itemName: w.itemName || "",
+          unit: w.unit || "",
+          totalQty: 0,
+          notes: new Set(),
+          users: new Set(),
+        };
+      }
+
+      grouped[key].totalQty += clampInt(w.qty, 0);
+      if (w.note) grouped[key].notes.add(w.note);
+      if (w.createdBy) grouped[key].users.add(w.createdBy);
     }
 
-    grouped[key].totalQty += clampInt(w.qty, 0);
-
-    if (w.note) grouped[key].notes.add(w.note);
-    if (w.createdBy) grouped[key].users.add(w.createdBy);
-  }
-
-  header = ["Item", "Total Qty", "Satuan", "Catatan", "User"];
-
-  rows = Object.values(grouped)
-    .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
-    .map((g) => [
+    header = ["Item", "Total Qty", "Satuan", "Catatan", "User"];
+    rows = Object.values(grouped).map((g) => [
       g.itemName,
       String(g.totalQty),
       g.unit,
       Array.from(g.notes).join(" | "),
       Array.from(g.users).join(", "),
     ]);
-}
- else {
+  } else {
     // =====================
-    // WASTE DETAIL HARIAN
+    // DETAIL HARIAN
     // =====================
     header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
-
     rows = wasteLogs
       .slice()
       .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
@@ -2058,9 +2056,31 @@ wasteSortDirBtn?.addEventListener("click", () => {
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
-btnWeekThis?.addEventListener("click", () => setReportRangeByWeekOffset(0));
-btnWeekLast?.addEventListener("click", () => setReportRangeByWeekOffset(1));
-btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
+// ===================== REPORT WEEK BUTTON =====================
+btnWeekThis?.addEventListener("click", () => {
+  whReportAutoWeekly = true;
+  setReportRangeByWeekOffset(0);
+});
+
+btnWeekLast?.addEventListener("click", () => {
+  whReportAutoWeekly = true;
+  setReportRangeByWeekOffset(1);
+});
+
+btnWeekPrev2?.addEventListener("click", () => {
+  whReportAutoWeekly = true;
+  setReportRangeByWeekOffset(2);
+});
+
+// ===================== MANUAL DATE CHANGE =====================
+// kalau user ubah tanggal manual → balik ke detail harian
+whReportStart?.addEventListener("change", () => {
+  whReportAutoWeekly = false;
+});
+
+whReportEnd?.addEventListener("change", () => {
+  whReportAutoWeekly = false;
+});
 
 // ===================== Boot =====================
 async function bootWarehouse() {
