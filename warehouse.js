@@ -1833,33 +1833,45 @@ async function generateWarehouseReport() {
   const useWeekly = isFullCalendarWeekRange(startKey, endKey);
 
   if (useWeekly) {
-    // =====================
-    // WASTE REKAP MINGGUAN
-    // =====================
-    const grouped = {};
+  // =====================
+  // WASTE REKAP MINGGUAN (AKUMULASI + CATATAN + USER)
+  // =====================
+  const grouped = {};
 
-    for (const w of wasteLogs) {
-      const itemName = w.itemName || "";
-      const unit = w.unit || "";
-      const key = itemName + "|" + unit;
+  for (const w of wasteLogs) {
+    const itemName = w.itemName || "";
+    const unit = w.unit || "";
+    const key = itemName + "|" + unit;
 
-      if (!grouped[key]) {
-        grouped[key] = { itemName, unit, totalQty: 0 };
-      }
-
-      grouped[key].totalQty += clampInt(w.qty, 0);
+    if (!grouped[key]) {
+      grouped[key] = {
+        itemName,
+        unit,
+        totalQty: 0,
+        notes: new Set(),
+        users: new Set(),
+      };
     }
 
-    header = ["Item", "Total Qty", "Satuan"];
+    grouped[key].totalQty += clampInt(w.qty, 0);
 
-    rows = Object.values(grouped)
-      .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
-      .map((g) => [
-        g.itemName,
-        String(g.totalQty),
-        g.unit,
-      ]);
-  } else {
+    if (w.note) grouped[key].notes.add(w.note);
+    if (w.createdBy) grouped[key].users.add(w.createdBy);
+  }
+
+  header = ["Item", "Total Qty", "Satuan", "Catatan", "User"];
+
+  rows = Object.values(grouped)
+    .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
+    .map((g) => [
+      g.itemName,
+      String(g.totalQty),
+      g.unit,
+      Array.from(g.notes).join(" | "),
+      Array.from(g.users).join(", "),
+    ]);
+}
+ else {
     // =====================
     // WASTE DETAIL HARIAN
     // =====================
