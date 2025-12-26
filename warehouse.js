@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - Added Restock Feature & Report Logic Fix)
+// warehouse.js (FINAL FIX - Report Calculation Corrected & Waste Edit Added)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -15,6 +15,7 @@ const $ = (id) => document.getElementById(id);
 // ===================== STATE =====================
 let currentUser = null;
 let items = [];
+let editingWasteId = null; 
 let currentOpnameFilter = { status: null };
 
 const LOW_STOCK_LT = 2; 
@@ -101,6 +102,7 @@ function toTotalUnits(packs, loose, packQty) {
   return (clampInt(packs) * clampInt(packQty)) + clampInt(loose);
 }
 
+// Logic Normalisasi: Ubah Total Unit Kecil -> Pack + Loose
 function splitUnitsToPackLoose(total, packQty) {
   const pq = Math.max(1, clampInt(packQty));
   const t = Math.max(0, clampInt(total));
@@ -424,14 +426,14 @@ function renderOpnameTable() {
             </td>
             <td style="white-space:nowrap;">
                 ${iconBtn('💾', 'Simpan', 'btn-save')}
-                ${iconBtn('➕', 'Restock (Lapor Masuk)', 'btn-restock danger')} ${iconBtn('🗑️', 'Hapus', 'btn-del')}
+                ${iconBtn('➕', 'Restock', 'btn-restock danger')}
+                ${iconBtn('🗑️', 'Hapus', 'btn-del')}
             </td>
         `;
         
-        // Simpan (Opname/Adjustment)
         tr.querySelector(".btn-save").onclick = () => saveOpnameSingle(it, gudang, tr);
         
-        // RESTOCK (Fitur baru agar masuk Laporan Barang Masuk)
+        // Fitur Restock (Tambah Stok via Tombol Plus)
         tr.querySelector(".btn-restock").onclick = () => {
             const add = prompt(`Tambah stok (DUS/PACK) untuk ${it.name} di ${gudang}?`);
             if(add && Number(add) > 0) processRestockSingle(it, gudang, Number(add));
@@ -496,17 +498,17 @@ async function deleteItem(id) {
     } catch(e) { showToast(e.message, "error"); }
 }
 
-// ===================== WASTE =====================
-let editingWasteId = null;
-
+// ===================== WASTE (EDIT & DELETE FIX) =====================
 function fillWasteForm(w) {
     $("wasteItemSelect").value = w.itemName;
     $("wasteDate").value = w.dateKey;
     $("wasteUnit").value = w.unit;
     $("wasteQty").value = w.qty;
     $("wasteNote").value = w.note;
-    editingWasteId = w.id;
+    
+    editingWasteId = w.id; // Set ID yang sedang diedit
     $("btnSaveWaste").textContent = "Update Waste";
+    $("whWasteSection").scrollIntoView({behavior: "smooth"});
 }
 
 async function saveWaste() {
@@ -521,21 +523,27 @@ async function saveWaste() {
 
     try {
         if(editingWasteId) {
+            // MODE UPDATE
             await updateDoc(doc(db, "wh_waste", editingWasteId), {
-                itemName: name, qty, unit, dateKey: date, note, updatedAt: serverTimestamp()
+                itemName: name, qty, unit, dateKey: date, note,
+                updatedAt: serverTimestamp()
             });
             showToast("Waste diupdate", "success");
-            editingWasteId = null; $("btnSaveWaste").textContent = "Simpan Waste";
+            editingWasteId = null;
+            $("btnSaveWaste").textContent = "Simpan Waste";
         } else {
+            // MODE CREATE
             await addDoc(collection(db, "wh_waste"), {
-                itemId: 'manual', itemName: name, qty, unit, dateKey: date, note,
+                itemId: 'manual', itemName: name,
+                qty, unit, dateKey: date, note,
                 createdBy: currentUser.email, createdAt: serverTimestamp()
             });
             showToast("Waste tersimpan", "success");
         }
+        
         $("wasteQty").value = ""; $("wasteNote").value = "";
         loadWasteLogsAndRender();
-    } catch(e) { showToast(e.message, "error"); }
+    } catch(e) { showToast("Gagal: " + e.message, "error"); }
 }
 
 async function loadWasteLogsAndRender() {
@@ -549,6 +557,7 @@ async function loadWasteLogsAndRender() {
 
     const sKey = todayKey(start);
     const eKey = todayKey(end);
+
     const snap = await getDocs(query(collection(db, "wh_waste"), orderBy("createdAt", "desc"), limit(100)));
     
     snap.forEach(d => {
@@ -558,19 +567,21 @@ async function loadWasteLogsAndRender() {
             tr.innerHTML = `
                 <td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>
                 <td style="white-space:nowrap;">
-                    ${iconBtn('✏️', 'Edit', 'btn-edit')} ${iconBtn('❌', 'Hapus', 'btn-del')}
+                    ${iconBtn('✏️', 'Edit', 'btn-edit')} 
+                    ${iconBtn('❌', 'Hapus', 'btn-del')}
                 </td>
             `;
+            // Attach Event Listeners
             tr.querySelector(".btn-edit").onclick = () => fillWasteForm({id: d.id, ...w});
             tr.querySelector(".btn-del").onclick = async () => {
-                if(confirm("Hapus?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
+                if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
             };
             tbody.appendChild(tr);
         }
     });
 }
 
-// ===================== REPORT (FIXED) =====================
+// ===================== REPORT (FIXED LOGIC) =====================
 async function generateReport() {
     const head = $("whReportHead");
     const body = $("whReportBody");
@@ -587,15 +598,19 @@ async function generateReport() {
         head.innerHTML = `<th>Item</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th><th>Catatan Audit</th>`;
         items.forEach(it => {
             const pq = getPackQty(it);
+            // Hitung total fisik (Pack & Loose terpisah) dari semua gudang
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
             const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchenLoose||0);
-            const grand = toTotalUnits(tp, tl, pq);
-            const split = splitUnitsToPackLoose(grand, pq);
+            
+            // Konversi total loose yang berlebih menjadi pack (Normalisasi Tampilan)
+            const grandTotalSmall = toTotalUnits(tp, tl, pq);
+            const normalized = splitUnitsToPackLoose(grandTotalSmall, pq);
+            
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${it.name}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grand}</td><td>${escapeHtml(it.info||"-")}</td>`;
+            tr.innerHTML = `<td>${it.name}</td><td>${normalized.packs}</td><td>${normalized.loose}</td><td>${grandTotalSmall}</td><td>${escapeHtml(it.info||"-")}</td>`;
             body.appendChild(tr);
         });
-        showToast("Laporan Total Aset Siap (Realtime)", "success");
+        showToast("Laporan Total Aset Siap", "success");
 
     } else if (type === 'receiving') {
         const sKey = todayKey(start);
@@ -632,18 +647,21 @@ async function generateReport() {
 function downloadCSV() {
     const type = $("whReportType").value;
     let csv = "";
+    
     if(type === 'total_asset') {
         csv = "Item,TotalDus,TotalPcs,EstimasiPcs,CatatanAudit\n";
         items.forEach(it => {
             const pq = getPackQty(it);
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
-            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchenLoose||0);
+            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             const grand = toTotalUnits(tp, tl, pq);
-            const split = splitUnitsToPackLoose(grand, pq);
-            csv += `"${it.name}",${split.packs},${split.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
+            const normalized = splitUnitsToPackLoose(grand, pq);
+            csv += `"${it.name}",${normalized.packs},${normalized.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
         });
         downloadText("total_aset.csv", csv);
-    } else { showToast("Download CSV tipe ini manual.", "info"); }
+    } else {
+        showToast("Fitur download CSV ini menyusul.", "info");
+    }
 }
 
 // ===================== AUTH INIT =====================
