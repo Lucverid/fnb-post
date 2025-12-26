@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>F&B POS — Multi Gudang (Fixed)</title>
+  <title>F&B POS — Warehouse Final</title>
 
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6a00ff" />
@@ -11,14 +11,12 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css">
   
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
 
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('./service-worker.js')
-          .catch(err => console.log('SW fail', err));
+        navigator.serviceWorker.register('./service-worker.js').catch(console.error);
       });
     }
   </script>
@@ -30,48 +28,29 @@
   <div id="auth-card" class="auth-card">
     <div class="auth-box">
       <h2>Login</h2>
-      <label>Email</label>
-      <input id="loginEmail" type="email">
-      <label>Password</label>
-      <input id="loginPassword" type="password">
+      <label>Email</label><input id="loginEmail" type="email">
+      <label>Password</label><input id="loginPassword" type="password">
       <button id="btnLogin" class="btn-primary" type="button">Login</button>
       <hr>
       <h2>Register</h2>
-      <label>Email</label>
-      <input id="registerEmail" type="email">
-      <label>Password</label>
-      <input id="registerPassword" type="password">
+      <label>Email</label><input id="registerEmail" type="email">
+      <label>Password</label><input id="registerPassword" type="password">
       <label>Role</label>
-      <select id="registerRole">
-        <option value="admin">Admin</option>
-        <option value="kasir">Kasir</option>
-      </select>
+      <select id="registerRole"><option value="admin">Admin</option><option value="kasir">Kasir</option></select>
       <button id="btnRegister" class="btn-secondary" type="button">Daftar Baru</button>
     </div>
   </div>
 
   <div id="app-shell" class="app-shell hidden">
-    
     <header class="app-header glass">
       <div class="header-left">
         <div class="logo">F&amp;B</div>
-        <div class="user-info">
-          <div id="topbarEmail">–</div>
-          <div id="connectionStatus" class="connection">Offline</div>
-        </div>
+        <div class="user-info"><div id="topbarEmail">–</div><div id="connectionStatus" class="connection">Offline</div></div>
       </div>
       <div class="header-right">
-        <div id="notifBtn" class="notif-btn">
-          <i class="lucide-bell"></i>
-          <span id="notifBadge" class="notif-count">0</span>
-        </div>
-        <div id="notifPanel" class="notif-panel hidden">
-          <div class="notif-title">Notifikasi</div>
-          <ul id="notifList"></ul>
-        </div>
-        <button id="burgerBtn" class="burger-btn" type="button">
-          <span></span><span></span><span></span>
-        </button>
+        <div id="notifBtn" class="notif-btn"><i class="lucide-bell"></i><span id="notifBadge" class="notif-count">0</span></div>
+        <div id="notifPanel" class="notif-panel hidden"><div class="notif-title">Notifikasi</div><ul id="notifList"></ul></div>
+        <button id="burgerBtn" class="burger-btn" type="button"><span></span><span></span><span></span></button>
       </div>
     </header>
 
@@ -79,27 +58,13 @@
       <nav>
         <div class="sidebar-group">
           <div style="margin:10px 0 6px; font-size:12px; opacity:.7;">WAREHOUSE</div>
-          
-          <button id="navWhDashboard" class="side-item active" type="button">
-            <i class="lucide-layout-dashboard"></i> <span>Dashboard</span>
-          </button>
-          
-          <button id="navWhOpname" class="side-item" type="button">
-            <i class="lucide-arrow-right-left"></i> <span>Stok & Transfer</span>
-          </button>
-          
-          <button id="navWhWaste" class="side-item" type="button">
-            <i class="lucide-trash-2"></i> <span>Input Waste</span>
-          </button>
-          
-          <button id="navWhReport" class="side-item" type="button">
-            <i class="lucide-file-text"></i> <span>Laporan Pusat</span>
-          </button>
+          <button id="navWhDashboard" class="side-item active" type="button"><i class="lucide-layout-dashboard"></i> <span>Dashboard</span></button>
+          <button id="navWhOpname" class="side-item" type="button"><i class="lucide-arrow-right-left"></i> <span>Stok & Transfer</span></button>
+          <button id="navWhWaste" class="side-item" type="button"><i class="lucide-trash-2"></i> <span>Input Waste</span></button>
+          <button id="navWhReport" class="side-item" type="button"><i class="lucide-file-text"></i> <span>Laporan Pusat</span></button>
         </div>
         <div class="sidebar-footer">
-          <button id="btnLogout" class="logout-btn" type="button">
-            <i class="lucide-log-out"></i> Logout
-          </button>
+          <button id="btnLogout" class="logout-btn" type="button"><i class="lucide-log-out"></i> Logout</button>
         </div>
       </nav>
     </aside>
@@ -107,35 +72,35 @@
     <main class="app-main">
       <section id="welcomeBanner" class="welcome-banner hidden">
         <h2>Selamat datang, <span id="bannerRole"></span></h2>
-        <p>Sistem Multi-Gudang (W1, W2, Istirahat, Bar, Kitchen).</p>
+        <p>Sistem Multi-Gudang Terintegrasi.</p>
       </section>
 
       <section id="whDashboardSection" class="section">
         <h2>Dashboard Stok</h2>
-        <p style="opacity:.8;margin-top:-6px;">Pantauan stok real-time.</p>
+        <p style="opacity:.8;margin-top:-6px;">Klik kartu untuk melihat detail item di tabel.</p>
 
         <h4 style="margin:10px 0 5px; opacity:.7;">Gudang 1 (Utama)</h4>
         <div class="metric-row">
-          <div id="cardW1Habis" class="metric-card red"><i class="lucide-x-circle"></i><div><b id="w1Habis">0</b> Habis</div></div>
-          <div id="cardW1Lumayan" class="metric-card yellow"><i class="lucide-alert-triangle"></i><div><b id="w1Lumayan">0</b> Low &lt; 2</div></div>
-          <div id="cardW1Banyak" class="metric-card green"><i class="lucide-check-circle"></i><div><b id="w1Banyak">0</b> Aman</div></div>
+          <div id="cardW1Habis" class="metric-card red" style="cursor:pointer;"><i class="lucide-x-circle"></i><div><b id="w1Habis">0</b> Habis (0)</div></div>
+          <div id="cardW1Lumayan" class="metric-card yellow" style="cursor:pointer;"><i class="lucide-alert-triangle"></i><div><b id="w1Lumayan">0</b> Low (1)</div></div>
+          <div id="cardW1Banyak" class="metric-card green" style="cursor:pointer;"><i class="lucide-check-circle"></i><div><b id="w1Banyak">0</b> Aman (2+)</div></div>
         </div>
 
         <h4 style="margin:15px 0 5px; opacity:.7;">Gudang Istirahat</h4>
         <div class="metric-row">
-          <div id="cardRestHabis" class="metric-card red"><i class="lucide-x-circle"></i><div><b id="restHabis">0</b> Habis</div></div>
-          <div id="cardRestLumayan" class="metric-card yellow"><i class="lucide-alert-triangle"></i><div><b id="restLumayan">0</b> Low &lt; 2</div></div>
-          <div id="cardRestBanyak" class="metric-card green"><i class="lucide-check-circle"></i><div><b id="restBanyak">0</b> Aman</div></div>
+          <div id="cardRestHabis" class="metric-card red" style="cursor:pointer;"><i class="lucide-x-circle"></i><div><b id="restHabis">0</b> Habis</div></div>
+          <div id="cardRestLumayan" class="metric-card yellow" style="cursor:pointer;"><i class="lucide-alert-triangle"></i><div><b id="restLumayan">0</b> Low</div></div>
+          <div id="cardRestBanyak" class="metric-card green" style="cursor:pointer;"><i class="lucide-check-circle"></i><div><b id="restBanyak">0</b> Aman</div></div>
         </div>
 
-        <h4 style="margin:15px 0 5px; opacity:.7;">Gudang 2 (Kitchen/Transit)</h4>
+        <h4 style="margin:15px 0 5px; opacity:.7;">Gudang 2 (Kitchen)</h4>
         <div class="metric-row">
-          <div id="cardW2Habis" class="metric-card red"><i class="lucide-x-circle"></i><div><b id="w2Habis">0</b> Habis</div></div>
-          <div id="cardW2Lumayan" class="metric-card yellow"><i class="lucide-alert-triangle"></i><div><b id="w2Lumayan">0</b> Low &lt; 2</div></div>
-          <div id="cardW2Banyak" class="metric-card green"><i class="lucide-check-circle"></i><div><b id="w2Banyak">0</b> Aman</div></div>
+          <div id="cardW2Habis" class="metric-card red" style="cursor:pointer;"><i class="lucide-x-circle"></i><div><b id="w2Habis">0</b> Habis</div></div>
+          <div id="cardW2Lumayan" class="metric-card yellow" style="cursor:pointer;"><i class="lucide-alert-triangle"></i><div><b id="w2Lumayan">0</b> Low</div></div>
+          <div id="cardW2Banyak" class="metric-card green" style="cursor:pointer;"><i class="lucide-check-circle"></i><div><b id="w2Banyak">0</b> Aman</div></div>
         </div>
         
-        <h4 style="margin:15px 0 5px; opacity:.7;">Status Kedaluwarsa (EXP)</h4>
+        <h4 style="margin:15px 0 5px; opacity:.7;">Status Expired</h4>
         <div id="whExpiryWrap" class="metric-row" style="margin-top:5px;"></div> 
       </section>
 
@@ -150,24 +115,29 @@
               <div><label>Unit Besar</label><input id="whItemUnitBig" type="text" placeholder="Dus"></div>
               <div><label>Unit Kecil</label><input id="whItemUnitSmall" type="text" placeholder="Pcs"></div>
             </div>
-            <div style="margin-bottom:10px;"><label>Isi/Dus</label><input id="whItemPackQty" type="number" min="0" placeholder="24"></div>
+            <div style="margin-bottom:10px;"><label>Isi per Dus</label><input id="whItemPackQty" type="number" min="0" placeholder="24"></div>
 
-            <details style="background:rgba(0,0,0,0.03); border:1px solid var(--border); border-radius:8px; margin-bottom:10px;">
-                <summary style="padding:10px; cursor:pointer; font-weight:600; color:var(--primary);">Klik Input Stok Awal</summary>
-                <div style="padding:0 10px 10px;">
-                    <div class="grid-2" style="gap:10px;">
-                        <div><label>Stok W1 (Dus)</label><input id="whItemInitStockW1" type="number" min="0" placeholder="0"></div>
-                        <div><label>Stok Istirahat (Dus)</label><input id="whItemInitStockRest" type="number" min="0" placeholder="0"></div>
+            <div style="background:rgba(0,0,0,0.03); border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:10px;">
+                <label style="color:var(--primary); font-weight:600; margin-bottom:8px;">Stok Awal Masuk Ke:</label>
+                <div class="grid-2" style="gap:10px;">
+                    <div>
+                        <select id="whItemInitLoc">
+                            <option value="w1">Gudang 1 (Utama)</option>
+                            <option value="rest">Gudang Istirahat</option>
+                        </select>
+                    </div>
+                    <div>
+                        <input id="whItemInitQty" type="number" min="0" placeholder="Jumlah (Dus)">
                     </div>
                 </div>
-            </details>
+            </div>
 
             <div class="grid-2" style="gap:10px;">
               <div><label>Tgl Terima</label><input id="whItemReceivedAt" type="date"></div>
               <div><label>Supplier</label><input id="whItemSupplier" type="text"></div>
             </div>
             <label>EXP Date</label><input id="whItemExp" type="date">
-            <label>Info (Audit)</label><textarea id="whItemInfo" rows="2"></textarea>
+            <label>Info / Catatan Audit</label><textarea id="whItemInfo" rows="2" placeholder="Catatan khusus untuk laporan audit..."></textarea>
             <button id="btnSaveItem" class="btn-primary" type="button" style="margin-top:10px;">Simpan Item</button>
           </div>
 
@@ -190,7 +160,7 @@
             <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">Proses Transfer</button>
             <hr style="margin:16px 0; opacity:.2;">
             
-            <h3 style="margin:0 0 10px;">Tabel Stok</h3>
+            <h3 style="margin:0 0 10px;">Tabel Stok (Opname)</h3>
             <div class="grid-2" style="gap:10px;">
                 <div>
                     <label>Lokasi</label>
@@ -208,6 +178,9 @@
               <input id="whOpnameModeSmall" type="checkbox" style="width:auto;">
               <span style="font-size:13px;">Tampilkan Unit Kecil</span>
             </label>
+            <button id="btnResetFilter" class="btn-secondary small ghost" type="button" style="margin-top:10px; width:100%; display:none;">
+                Tampilkan Semua (Hapus Filter Dashboard)
+            </button>
           </div>
         </div>
 
