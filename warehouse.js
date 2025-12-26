@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - Click Filter + Fixed Form + Report)
+// warehouse.js (FINAL - CRUD + Reporting + Filtering)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -15,7 +15,6 @@ const $ = (id) => document.getElementById(id);
 // ===================== STATE =====================
 let currentUser = null;
 let items = [];
-// Filter state untuk Opname Table (triggered dari Dashboard)
 let currentOpnameFilter = { status: null }; 
 
 const LOW_STOCK_LT = 2; 
@@ -127,12 +126,11 @@ function normalizeItemStock(it) {
   };
 }
 
-// Logic Status Stok
 function getBucket(packEq) {
-    if (packEq <= 0.001) return 'habis'; // 0
-    if (packEq < LOW_STOCK_LT) return 'low'; // 1 (jika LT=2)
-    if (packEq > HIGH_STOCK_GT) return 'high'; // >50
-    return 'mid'; // 2-50
+    if (packEq <= 0.001) return 'habis';
+    if (packEq < LOW_STOCK_LT) return 'low';
+    if (packEq > HIGH_STOCK_GT) return 'high';
+    return 'mid';
 }
 
 // ===================== UI UPDATE =====================
@@ -148,7 +146,7 @@ function updateDashboard() {
         const pq = getPackQty(it);
         
         const s1 = getBucket(toTotalUnits(it.stockW1, it.stockW1Loose, pq) / pq);
-        if(s1 === 'habis') cW1.h++; else if(s1 === 'low') cW1.l++; else if(s1 === 'high') cW1.ok++; else cW1.ok++; // Mid masuk ke OK/Aman
+        if(s1 === 'habis') cW1.h++; else if(s1 === 'low') cW1.l++; else if(s1 === 'high') cW1.ok++; else cW1.ok++;
 
         const s2 = getBucket(toTotalUnits(it.stockW2, it.stockW2Loose, pq) / pq);
         if(s2 === 'habis') cW2.h++; else if(s2 === 'low') cW2.l++; else if(s2 === 'high') cW2.ok++; else cW2.ok++;
@@ -190,7 +188,7 @@ async function loadWhItems() {
   });
 }
 
-// ===================== BIND EVENTS (DASHBOARD CLICK FILTER) =====================
+// ===================== BIND EVENTS =====================
 window.addEventListener('DOMContentLoaded', () => {
     console.log("Binding Events...");
 
@@ -206,7 +204,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if(navs.dash) navs.dash.onclick = () => { go('dash'); updateDashboard(); };
-    if(navs.op) navs.op.onclick = () => { go('op'); currentOpnameFilter.status=null; renderOpnameTable(); }; // Reset filter
+    if(navs.op) navs.op.onclick = () => { go('op'); currentOpnameFilter.status=null; renderOpnameTable(); };
     if(navs.waste) navs.waste.onclick = () => { go('waste'); loadWasteLogsAndRender(); };
     if(navs.rep) navs.rep.onclick = () => { go('rep'); };
 
@@ -231,31 +229,22 @@ window.addEventListener('DOMContentLoaded', () => {
     $("btnWhReport")?.addEventListener("click", generateReport);
     $("btnWhReportDownload")?.addEventListener("click", downloadCSV);
 
-    // CLICK FILTER LOGIC
     function bindFilter(cardId, gudang, status) {
         const card = $(cardId);
         if(card) {
             card.onclick = () => {
-                go('op'); // Pindah ke tab Opname
-                $("whOpnameGudang").value = gudang; // Set dropdown gudang
-                currentOpnameFilter = { status }; // Set filter status
-                renderOpnameTable(); // Render ulang
+                go('op'); 
+                $("whOpnameGudang").value = gudang;
+                currentOpnameFilter = { status };
+                renderOpnameTable();
                 showToast(`Filter: ${gudang.toUpperCase()} - ${status.toUpperCase()}`, "info");
             }
         }
     }
 
-    bindFilter("cardW1Habis", "w1", "habis");
-    bindFilter("cardW1Lumayan", "w1", "low");
-    bindFilter("cardW1Banyak", "w1", "ok");
-
-    bindFilter("cardRestHabis", "rest", "habis");
-    bindFilter("cardRestLumayan", "rest", "low");
-    bindFilter("cardRestBanyak", "rest", "ok");
-
-    bindFilter("cardW2Habis", "w2", "habis");
-    bindFilter("cardW2Lumayan", "w2", "low");
-    bindFilter("cardW2Banyak", "w2", "ok");
+    bindFilter("cardW1Habis", "w1", "habis"); bindFilter("cardW1Lumayan", "w1", "low"); bindFilter("cardW1Banyak", "w1", "ok");
+    bindFilter("cardRestHabis", "rest", "habis"); bindFilter("cardRestLumayan", "rest", "low"); bindFilter("cardRestBanyak", "rest", "ok");
+    bindFilter("cardW2Habis", "w2", "habis"); bindFilter("cardW2Lumayan", "w2", "low"); bindFilter("cardW2Banyak", "w2", "ok");
 });
 
 // ===================== CRUD LOGIC =====================
@@ -265,9 +254,8 @@ async function createMasterItem() {
   
   if (!name) return showToast("Nama item wajib diisi", "error");
 
-  // Logic Baru: Baca dropdown lokasi stok awal
-  const initLoc = $("whItemInitLoc").value; // w1 atau rest
-  const initQty = clampInt($("whItemInitQty").value); // jumlah
+  const initLoc = $("whItemInitLoc").value; // w1 or rest
+  const initQty = clampInt($("whItemInitQty").value);
 
   let stW1 = 0, stRest = 0;
   if(initLoc === 'w1') stW1 = initQty;
@@ -291,7 +279,6 @@ async function createMasterItem() {
         createdAt: serverTimestamp()
     });
 
-    // Log Barang Masuk
     if(initQty > 0) {
         await addDoc(collection(db, "wh_batches"), {
             itemId: docRef.id, itemName: name,
@@ -397,7 +384,6 @@ function renderOpnameTable() {
     const showSmall = $("whOpnameModeSmall")?.checked;
     const btnReset = $("btnResetFilter");
 
-    // Filter Logic (Status)
     if(currentOpnameFilter.status) {
         btnReset.style.display = 'block';
         btnReset.textContent = `Filter Aktif: ${currentOpnameFilter.status.toUpperCase()} (Klik untuk Reset)`;
@@ -410,16 +396,13 @@ function renderOpnameTable() {
         const stock = getItemStock(it, gudang);
         const totalUnits = toTotalUnits(stock.packs, stock.loose, pq);
         
-        // Cek Filter Status dari Dashboard
         if(currentOpnameFilter.status) {
             const bucket = getBucket(totalUnits / pq);
-            // Mapping: 'habis', 'low', 'ok' (high/mid -> ok)
             let statusMatch = false;
             if(currentOpnameFilter.status === 'habis' && bucket === 'habis') statusMatch = true;
             if(currentOpnameFilter.status === 'low' && bucket === 'low') statusMatch = true;
             if(currentOpnameFilter.status === 'ok' && (bucket === 'high' || bucket === 'mid')) statusMatch = true;
-            
-            if(!statusMatch) return; // Skip if not match
+            if(!statusMatch) return;
         }
 
         const display = showSmall 
@@ -438,9 +421,13 @@ function renderOpnameTable() {
                  <input type="number" class="op-l" value="${stock.loose}" style="width:50px">
                </div>
             </td>
-            <td>${iconBtn('💾', 'Simpan', 'btn-save')}</td>
+            <td>
+                ${iconBtn('💾', 'Simpan', 'btn-save')}
+                ${iconBtn('🗑️', 'Hapus', 'btn-del danger')}
+            </td>
         `;
         tr.querySelector(".btn-save").onclick = () => saveOpnameSingle(it, gudang, tr);
+        tr.querySelector(".btn-del").onclick = () => deleteItem(it.id);
         tbody.appendChild(tr);
     });
 }
@@ -462,6 +449,15 @@ async function saveOpnameSingle(it, gudang, tr) {
     await loadWhItems(); updateDashboard();
 }
 
+async function deleteItem(id) {
+    if(!confirm("Hapus item ini dari database?")) return;
+    try {
+        await deleteDoc(doc(db, "wh_items", id));
+        showToast("Item dihapus", "success");
+        await loadWhItems(); renderOpnameTable(); updateDashboard();
+    } catch(e) { showToast(e.message, "error"); }
+}
+
 async function saveWaste() {
     try {
         await addDoc(collection(db, "wh_waste"), {
@@ -470,7 +466,6 @@ async function saveWaste() {
             qty: clampInt($("wasteQty").value),
             unit: $("wasteUnit").value,
             note: $("wasteNote").value,
-            createdBy: currentUser.email,
             createdAt: serverTimestamp()
         });
         showToast("Waste saved", "success");
@@ -505,19 +500,19 @@ async function loadWasteLogsAndRender() {
     });
 }
 
-// ===================== REPORT (FIXED AUDIT NOTES) =====================
 async function generateReport() {
-    const body = $("whReportBody");
     const head = $("whReportHead");
+    const body = $("whReportBody");
+    if(!head || !body) return;
     const type = $("whReportType").value;
     const start = parseDateOnly($("whReportStart").value);
     const end = parseDateOnly($("whReportEnd").value);
 
-    if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih tanggal", "error");
+    if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih rentang tanggal dulu", "error");
 
     head.innerHTML = ""; body.innerHTML = "";
 
-    if(type === 'total_asset') {
+    if (type === 'total_asset') {
         head.innerHTML = `<th>Item</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th><th>Catatan (Audit)</th>`;
         items.forEach(it => {
             const pq = getPackQty(it);
@@ -527,42 +522,43 @@ async function generateReport() {
             const split = splitUnitsToPackLoose(grand, pq);
             
             const tr = document.createElement("tr");
-            // Menampilkan Info Item di Kolom Catatan Audit
+            // Info / Catatan Audit dari it.info
             tr.innerHTML = `<td>${it.name}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grand}</td><td>${escapeHtml(it.info||"-")}</td>`;
             body.appendChild(tr);
         });
-        showToast("Laporan Total Aset Siap", "success");
-
-    } else if (type === 'receiving') {
-        // Report Barang Masuk (Fixed Logic)
-        const sKey = todayKey(start);
-        const eKey = todayKey(end);
-        const snap = await getDocs(query(collection(db, "wh_batches"), orderBy("createdAt", "desc"), limit(500)));
-        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Supplier</th><th>Qty (Dus)</th><th>Catatan</th>`;
-        snap.forEach(d => {
-            const b = d.data();
-            if((b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey) {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `<td>${b.receivedAt}</td><td>${escapeHtml(b.itemName)}</td><td>${escapeHtml(b.supplier)}</td><td>${b.qtyPack}</td><td>${escapeHtml(b.note)}</td>`;
-                body.appendChild(tr);
-            }
-        });
-        showToast("Laporan Barang Masuk Siap", "success");
+        showToast("Laporan Total Aset Selesai", "success");
 
     } else if (type === 'waste') {
         const sKey = todayKey(start);
         const eKey = todayKey(end);
         const snap = await getDocs(query(collection(db, "wh_waste"), orderBy("createdAt", "desc"), limit(500)));
-        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Keterangan</th>`;
+        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Catatan</th>`;
         snap.forEach(d => {
             const w = d.data();
             if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
                 const tr = document.createElement("tr");
+                // Note / Catatan Waste
                 tr.innerHTML = `<td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>`;
                 body.appendChild(tr);
             }
         });
-        showToast("Laporan Waste Siap", "success");
+        showToast("Laporan Waste Selesai", "success");
+
+    } else if (type === 'receiving') {
+        const sKey = todayKey(start);
+        const eKey = todayKey(end);
+        const snap = await getDocs(query(collection(db, "wh_batches"), orderBy("createdAt", "desc"), limit(500)));
+        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Supplier</th><th>Qty</th><th>Catatan</th>`;
+        snap.forEach(d => {
+            const b = d.data();
+            if((b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey) {
+                const tr = document.createElement("tr");
+                // Note / Catatan Receiving
+                tr.innerHTML = `<td>${b.receivedAt}</td><td>${b.itemName}</td><td>${b.supplier}</td><td>${b.qtyPack}</td><td>${escapeHtml(b.note)}</td>`;
+                body.appendChild(tr);
+            }
+        });
+        showToast("Laporan Barang Masuk Selesai", "success");
     }
 }
 
@@ -595,7 +591,7 @@ onAuthStateChanged(auth, async (u) => {
         fillSelects();
         updateDashboard();
         renderOpnameTable();
-        setReportRangeByWeekOffset(0);
+        setReportRangeByWeekOffset(0); 
     } catch(e) { console.error("Init Error", e); }
   }
 });
