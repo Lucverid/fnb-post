@@ -1,5 +1,5 @@
-// warehouse.js (FIXED NAV + ALL INDICATORS)
-// =====================================================================================
+// warehouse.js (FINAL FIX) - Dropdown Stok Awal + Laporan Audit
+// ===========================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
@@ -11,20 +11,6 @@ const app = getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = (id) => document.getElementById(id);
-
-// ===================== STATE & CONFIG =====================
-let currentUser = null;
-let items = [];
-let wasteLogs = [];
-let batchLogs = [];
-
-const LOW_STOCK_LT = 2; // Dibawah 2 = Low
-const HIGH_STOCK_GT = 50; // Diatas 50 = Banyak
-const EXP_SOON_DAYS = 7;
-
-const WASTE_PRESET_ITEMS = [
-  "Milktea", "Teh Hijau", "Teh Hitam", "Teh Blooming", "Teh oolong", "Boba", "Susu", "Pudding", "Kopi", "Crystal jelly"
-];
 
 // ===================== UTILS =====================
 function showToast(msg, type = "info", time = 3000) {
@@ -104,9 +90,19 @@ function setReportRangeByWeekOffset(weekOffset = 0) {
   
   if ($("wasteFilterStart")) $("wasteFilterStart").value = toDateInputValue(start);
   if ($("wasteFilterEnd")) $("wasteFilterEnd").value = toDateInputValue(end);
+
+  showToast(weekOffset === 0 ? "Minggu Ini" : weekOffset === 1 ? "Minggu Lalu" : "2 Minggu Lalu", "info");
 }
 
 // ===================== CORE LOGIC =====================
+const LOW_STOCK_LT = 2;
+const HIGH_STOCK_GT = 50;
+const EXP_SOON_DAYS = 7;
+
+const WASTE_PRESET_ITEMS = [
+  "Milktea", "Teh Hijau", "Teh Hitam", "Teh Blooming", "Teh oolong", "Boba", "Susu", "Pudding", "Kopi", "Crystal jelly"
+];
+
 function getPackQty(it) {
   const pq = clampInt(it?.packQty, 0);
   return pq > 0 ? pq : 1;
@@ -150,14 +146,15 @@ const colWhOpname = collection(db, "wh_opname_logs");
 const colWhWaste = collection(db, "wh_waste");
 const colWhBatches = collection(db, "wh_batches");
 
-// ===================== DASHBOARD LOGIC (FIXED) =====================
+// ===================== UI RENDERING =====================
+
 function updateDashboard() {
     const w1Habis = $("w1Habis");
     if(!w1Habis) return;
     
     let cW1 = { habis: 0, low: 0, high: 0 };
     let cW2 = { habis: 0, low: 0, high: 0 };
-    let cRest = { habis: 0, low: 0, high: 0 }; // Indikator Gudang Istirahat
+    let cRest = { habis: 0, low: 0, high: 0 };
     let expOk = 0, expSoon = 0, expBad = 0;
     const now = new Date();
 
@@ -171,47 +168,28 @@ function updateDashboard() {
     items.forEach(it => {
         const pq = getPackQty(it);
         
-        // Calc W1
-        const unitsW1 = toTotalUnits(it.stockW1, it.stockW1Loose, pq);
-        const s1 = getBucket(unitsW1 / pq);
-        if(s1 === 'habis') cW1.habis++;
-        else if(s1 === 'low') cW1.low++;
-        else if(s1 === 'high') cW1.high++;
+        const s1 = getBucket(toTotalUnits(it.stockW1, it.stockW1Loose, pq) / pq);
+        if(s1 === 'habis') cW1.habis++; else if(s1 === 'low') cW1.low++; else if(s1 === 'high') cW1.high++;
 
-        // Calc W2
-        const unitsW2 = toTotalUnits(it.stockW2, it.stockW2Loose, pq);
-        const s2 = getBucket(unitsW2 / pq);
-        if(s2 === 'habis') cW2.habis++;
-        else if(s2 === 'low') cW2.low++;
-        else if(s2 === 'high') cW2.high++;
+        const s2 = getBucket(toTotalUnits(it.stockW2, it.stockW2Loose, pq) / pq);
+        if(s2 === 'habis') cW2.habis++; else if(s2 === 'low') cW2.low++; else if(s2 === 'high') cW2.high++;
 
-        // Calc Rest (Istirahat)
-        const unitsRest = toTotalUnits(it.stockRest, it.stockRestLoose, pq);
-        const sRest = getBucket(unitsRest / pq);
-        if(sRest === 'habis') cRest.habis++;
-        else if(sRest === 'low') cRest.low++;
-        else if(sRest === 'high') cRest.high++;
+        const sRest = getBucket(toTotalUnits(it.stockRest, it.stockRestLoose, pq) / pq);
+        if(sRest === 'habis') cRest.habis++; else if(sRest === 'low') cRest.low++; else if(sRest === 'high') cRest.high++;
 
-        // Expiry
         if(it.expDate) {
             const exp = parseDateOnly(it.expDate);
             if(exp) {
                 const diff = Math.floor((exp - now) / (1000 * 60 * 60 * 24));
-                if(diff < 0) expBad++;
-                else if(diff <= EXP_SOON_DAYS) expSoon++;
-                else expOk++;
+                if(diff < 0) expBad++; else if(diff <= EXP_SOON_DAYS) expSoon++; else expOk++;
             } else expOk++;
         } else expOk++;
     });
 
-    // Update DOM W1
     $("w1Habis").textContent = cW1.habis; $("w1Lumayan").textContent = cW1.low; $("w1Banyak").textContent = cW1.high;
-    // Update DOM W2
     $("w2Habis").textContent = cW2.habis; $("w2Lumayan").textContent = cW2.low; $("w2Banyak").textContent = cW2.high;
-    // Update DOM Rest
     $("restHabis").textContent = cRest.habis; $("restLumayan").textContent = cRest.low; $("restBanyak").textContent = cRest.high;
 
-    // Render Expiry
     const expiryWrap = $("whExpiryWrap");
     if(expiryWrap) {
         expiryWrap.innerHTML = `
@@ -235,45 +213,10 @@ async function loadWhItems() {
   });
 }
 
-async function loadWasteLogsAndRender() {
-    const historyBody = $("wasteHistoryBody");
-    if(!historyBody) return;
-    
-    const start = parseDateOnly($("wasteFilterStart").value);
-    const end = parseDateOnly($("wasteFilterEnd").value);
-    if(!start || !end) return;
-
-    const sKey = todayKey(start);
-    const eKey = todayKey(end);
-    
-    const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(100)));
-    historyBody.innerHTML = "";
-    
-    snap.forEach(d => {
-        const w = d.data();
-        if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${w.dateKey}</td>
-                <td>${escapeHtml(w.itemName)}</td>
-                <td>${w.qty}</td>
-                <td>${w.unit}</td>
-                <td>${escapeHtml(w.note)}</td>
-                <td>${iconBtn('<i class="lucide-trash-2"></i>', "Hapus", "btn-del-waste")}</td>
-            `;
-            tr.querySelector(".btn-del-waste").addEventListener("click", async () => {
-                if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
-            });
-            historyBody.appendChild(tr);
-        }
-    });
-}
-
-// ===================== EVENT LISTENER BINDING (FIXED) =====================
+// ===================== EVENT LISTENER BINDING =====================
 function bindWarehouseEvents() {
     console.log("Binding warehouse events...");
 
-    // 1. Navigation
     const navDashboard = $("navWhDashboard");
     const navOpname = $("navWhOpname");
     const navWaste = $("navWhWaste");
@@ -286,63 +229,40 @@ function bindWarehouseEvents() {
         });
         const target = $(id);
         if(target) target.classList.remove("hidden");
-        
         [navDashboard, navOpname, navWaste, navReport].forEach(btn => btn?.classList.remove("active"));
     };
 
     if(navDashboard) {
-        navDashboard.onclick = () => {
-            switchSection("whDashboardSection");
-            navDashboard.classList.add("active");
-            updateDashboard();
-        };
+        navDashboard.onclick = () => { switchSection("whDashboardSection"); navDashboard.classList.add("active"); updateDashboard(); };
     }
-
     if(navOpname) {
-        navOpname.onclick = () => {
-            switchSection("whOpnameSection");
-            navOpname.classList.add("active");
-            renderOpnameTable();
-        };
+        navOpname.onclick = () => { switchSection("whOpnameSection"); navOpname.classList.add("active"); renderOpnameTable(); };
     }
-
     if(navWaste) {
-        navWaste.onclick = () => {
-            switchSection("whWasteSection");
-            navWaste.classList.add("active");
+        navWaste.onclick = () => { 
+            switchSection("whWasteSection"); navWaste.classList.add("active"); 
             if(!$("wasteFilterStart").value) setReportRangeByWeekOffset(0);
             loadWasteLogsAndRender();
         };
     }
-
     if(navReport) {
-        navReport.onclick = () => {
-            switchSection("whReportSection");
-            navReport.classList.add("active");
+        navReport.onclick = () => { 
+            switchSection("whReportSection"); navReport.classList.add("active"); 
             if(!$("whReportStart").value) setReportRangeByWeekOffset(0);
         };
     }
 
-    // 2. Master Item
     $("btnSaveItem")?.addEventListener("click", createMasterItem);
-
-    // 3. Transfer
     $("moveSearch")?.addEventListener("input", () => fillMoveSelect($("moveSearch").value));
     $("moveItemSelect")?.addEventListener("change", updateMoveInfo);
     $("transferType")?.addEventListener("change", updateMoveInfo);
     $("btnMove")?.addEventListener("click", processTransfer);
-
-    // 4. Opname Filters
     $("whOpnameGudang")?.addEventListener("change", renderOpnameTable);
     $("whOpnameSearch")?.addEventListener("input", renderOpnameTable);
     $("whOpnameModeSmall")?.addEventListener("change", renderOpnameTable);
-
-    // 5. Waste
     $("btnSaveWaste")?.addEventListener("click", saveWaste);
     $("wasteFilterStart")?.addEventListener("change", loadWasteLogsAndRender);
     $("wasteFilterEnd")?.addEventListener("change", loadWasteLogsAndRender);
-
-    // 6. Report
     $("btnWeekThis")?.addEventListener("click", () => setReportRangeByWeekOffset(0));
     $("btnWeekLast")?.addEventListener("click", () => setReportRangeByWeekOffset(1));
     $("btnWhReport")?.addEventListener("click", generateReport);
@@ -350,7 +270,6 @@ function bindWarehouseEvents() {
 }
 
 // ===================== CRUD LOGIC =====================
-
 async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
   const name = ($("whItemName")?.value || "").trim();
@@ -387,7 +306,6 @@ async function createMasterItem() {
   } catch (e) { showToast("Gagal: " + e.message, "error"); }
 }
 
-// --- TRANSFER ---
 function fillSelects() {
     const moveSel = $("moveItemSelect");
     if(!moveSel) return;
@@ -426,7 +344,6 @@ function updateMoveInfo() {
     const id = $("moveItemSelect")?.value;
     const moveInfo = $("moveInfo");
     if(!id || !moveInfo) return;
-    
     const it = items.find(x => x.id === id);
     if(it) moveInfo.textContent = `Stok W1: ${it.stockW1} | Rest: ${it.stockRest} | W2: ${it.stockW2}`;
 }
@@ -553,6 +470,40 @@ async function saveWaste() {
     } catch(e) { showToast("Gagal: " + e.message, "error"); }
 }
 
+async function loadWasteLogsAndRender() {
+    const historyBody = $("wasteHistoryBody");
+    if(!historyBody) return;
+    
+    const start = parseDateOnly($("wasteFilterStart").value);
+    const end = parseDateOnly($("wasteFilterEnd").value);
+    if(!start || !end) return;
+
+    const sKey = todayKey(start);
+    const eKey = todayKey(end);
+    
+    const snap = await getDocs(query(colWhWaste, orderBy("createdAt", "desc"), limit(100)));
+    historyBody.innerHTML = "";
+    
+    snap.forEach(d => {
+        const w = d.data();
+        if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${w.dateKey}</td>
+                <td>${escapeHtml(w.itemName)}</td>
+                <td>${w.qty}</td>
+                <td>${w.unit}</td>
+                <td>${escapeHtml(w.note)}</td>
+                <td>${iconBtn('<i class="lucide-trash-2"></i>', "Hapus", "btn-del-waste")}</td>
+            `;
+            tr.querySelector(".btn-del-waste").addEventListener("click", async () => {
+                if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
+            });
+            historyBody.appendChild(tr);
+        }
+    });
+}
+
 // --- REPORT ---
 async function generateReport() {
     const head = $("whReportHead");
@@ -563,14 +514,13 @@ async function generateReport() {
     const start = parseDateOnly($("whReportStart").value);
     const end = parseDateOnly($("whReportEnd").value);
 
-    // Validasi Tanggal (Kecuali laporan Total Aset)
     if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih rentang tanggal dulu", "error");
 
     head.innerHTML = "";
     body.innerHTML = "";
 
     if (type === 'total_asset') {
-        head.innerHTML = `<th>Item</th><th>Isi/Dus</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th>`;
+        head.innerHTML = `<th>Item</th><th>Isi/Dus</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th><th>Catatan (Audit)</th>`;
         items.forEach(it => {
             const pq = getPackQty(it);
             const totalPacks = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
@@ -579,7 +529,7 @@ async function generateReport() {
             const split = splitUnitsToPackLoose(grandTotal, pq);
 
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${it.name}</td><td>${pq}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grandTotal}</td>`;
+            tr.innerHTML = `<td>${it.name}</td><td>${pq}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grandTotal}</td><td>${escapeHtml(it.info || "-")}</td>`;
             body.appendChild(tr);
         });
         showToast("Laporan Total Aset Selesai", "success");
@@ -591,7 +541,6 @@ async function generateReport() {
         
         head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Ket</th>`;
         let count = 0;
-        
         snap.forEach(d => {
             const w = d.data();
             if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
@@ -611,14 +560,14 @@ function downloadCSV() {
     let csv = "";
 
     if (type === 'total_asset') {
-        csv = "Item,IsiPerDus,TotalDus,TotalPcs,TotalUnitKecil\n";
+        csv = "Item,IsiPerDus,TotalDus,TotalPcs,TotalUnitKecil,CatatanAudit\n";
         items.forEach(it => {
             const pq = getPackQty(it);
             const totalPacks = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
             const totalLoose = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchenLoose||0);
             const grandTotalUnits = toTotalUnits(totalPacks, totalLoose, pq);
             const split = splitUnitsToPackLoose(grandTotalUnits, pq);
-            csv += `"${it.name}",${pq},${split.packs},${split.loose},${grandTotalUnits}\n`;
+            csv += `"${it.name}",${pq},${split.packs},${split.loose},${grandTotalUnits},"${(it.info||"").replace(/"/g, '""')}"\n`;
         });
         downloadText(`Total_Asset_${todayKey()}.csv`, csv);
 
@@ -637,6 +586,6 @@ onAuthStateChanged(auth, async (u) => {
     updateDashboard();
     renderOpnameTable();
     setReportRangeByWeekOffset(0); 
-    bindWarehouseEvents(); // <--- KUNCI AGAR TOMBOL BERFUNGSI
+    bindWarehouseEvents(); 
   }
 });
