@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - NORMALISASI LAPORAN & EDIT WASTE)
+// warehouse.js (FINAL - FIXED REPORT LOGIC)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -577,7 +577,7 @@ async function loadWasteLogsAndRender() {
     });
 }
 
-// ===================== REPORT (LOGIC NORMALISASI) =====================
+// ===================== REPORT (LOGIC FIXED: Exclude Rest & Rename Columns) =====================
 async function generateReport() {
     const head = $("whReportHead");
     const body = $("whReportBody");
@@ -586,29 +586,38 @@ async function generateReport() {
     const start = parseDateOnly($("whReportStart").value);
     const end = parseDateOnly($("whReportEnd").value);
 
+    // Validasi Tanggal (kecuali Total Asset karena itu snapshot)
     if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih tanggal", "error");
 
     head.innerHTML = ""; body.innerHTML = "";
 
     if (type === 'total_asset') {
-        head.innerHTML = `<th>Item</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th><th>Catatan Audit</th>`;
+        // MODIFIKASI: Nama kolom lebih jelas
+        head.innerHTML = `<th>Item</th><th>Jml Dus</th><th>Sisa (Pcs)</th><th>Total Aset (Unit Kecil)</th><th>Catatan Audit</th>`;
+        
         items.forEach(it => {
             const pq = getPackQty(it);
-            // Hitung Grand Total dari semua gudang (dalam unit kecil)
-            const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
-            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
+            
+            // MODIFIKASI: Hanya menjumlahkan W1, W2, Bar, Kitchen. (stockRest DIHAPUS dari penjumlahan)
+            const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockBar||0) + (it.stockKitchen||0);
+            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             
             const grandTotalSmall = toTotalUnits(tp, tl, pq);
             
-            // NORMALISASI: Pecah kembali menjadi Dus & Pcs yang logis
-            // Contoh: 201 Pcs (Isi 200) -> Menjadi 1 Dus, 1 Pcs.
+            // Normalisasi kembali agar tampil rapi sebagai Dus + Sisa
             const normalized = splitUnitsToPackLoose(grandTotalSmall, pq);
             
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${it.name}</td><td>${normalized.packs}</td><td>${normalized.loose}</td><td>${grandTotalSmall}</td><td>${escapeHtml(it.info||"-")}</td>`;
+            tr.innerHTML = `
+                <td>${escapeHtml(it.name)}</td>
+                <td>${normalized.packs}</td>
+                <td>${normalized.loose}</td>
+                <td>${grandTotalSmall}</td>
+                <td>${escapeHtml(it.info||"-")}</td>
+            `;
             body.appendChild(tr);
         });
-        showToast("Laporan Total Aset Siap", "success");
+        showToast("Laporan Total Aset (Tanpa Istirahat) Siap", "success");
 
     } else if (type === 'receiving') {
         const sKey = todayKey(start);
@@ -647,18 +656,22 @@ function downloadCSV() {
     let csv = "";
     
     if(type === 'total_asset') {
-        csv = "Item,TotalDus,TotalPcs,EstimasiPcs,CatatanAudit\n";
+        // MODIFIKASI: Header CSV
+        csv = "Item,JmlDus,SisaPcs,GrandTotalUnitKecil,CatatanInfo\n";
+        
         items.forEach(it => {
             const pq = getPackQty(it);
-            const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
-            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
+            
+            // MODIFIKASI: Rumus penjumlahan konsisten (Tanpa Rest)
+            const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockBar||0) + (it.stockKitchen||0);
+            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             
             const grand = toTotalUnits(tp, tl, pq);
             const normalized = splitUnitsToPackLoose(grand, pq);
             
-            csv += `"${it.name}",${normalized.packs},${normalized.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
+            csv += `"${(it.name||"").replace(/"/g, '""')}",${normalized.packs},${normalized.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
         });
-        downloadText("total_aset.csv", csv);
+        downloadText("total_aset_exclude_rest.csv", csv);
     } else {
         showToast("Download CSV tipe ini menyusul.", "info");
     }
