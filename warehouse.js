@@ -1,4 +1,4 @@
-// warehouse.js (FINAL FIX - Report Calculation Corrected & Waste Edit Added)
+// warehouse.js (FINAL - NORMALISASI LAPORAN & EDIT WASTE)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -93,7 +93,7 @@ function setReportRangeByWeekOffset(weekOffset = 0) {
   if ($("wasteFilterEnd")) $("wasteFilterEnd").value = endStr;
 }
 
-// ===================== LOGIC =====================
+// ===================== LOGIC UTAMA (NORMALISASI) =====================
 function getPackQty(it) {
   return (it?.packQty > 0) ? it.packQty : 1;
 }
@@ -102,7 +102,7 @@ function toTotalUnits(packs, loose, packQty) {
   return (clampInt(packs) * clampInt(packQty)) + clampInt(loose);
 }
 
-// Logic Normalisasi: Ubah Total Unit Kecil -> Pack + Loose
+// FUNGSI PENTING: Memecah Total Unit Kecil menjadi Dus & Pcs yang rapi
 function splitUnitsToPackLoose(total, packQty) {
   const pq = Math.max(1, clampInt(packQty));
   const t = Math.max(0, clampInt(total));
@@ -147,6 +147,7 @@ function updateDashboard() {
     items.forEach(it => {
         const pq = getPackQty(it);
         
+        // Hitung total unit fisik per gudang untuk menentukan status
         const s1 = getBucket(toTotalUnits(it.stockW1, it.stockW1Loose, pq) / pq);
         if(s1 === 'habis') cW1.h++; else if(s1 === 'low') cW1.l++; else if(s1 === 'high') cW1.ok++; else cW1.ok++;
 
@@ -282,7 +283,6 @@ async function createMasterItem() {
     });
 
     if(initQty > 0) {
-        // LOG KE WH_BATCHES (AGAR MUNCUL DI LAPORAN BARANG MASUK)
         await addDoc(collection(db, "wh_batches"), {
             itemId: docRef.id, itemName: name,
             receivedAt: $("whItemReceivedAt")?.value || todayKey(),
@@ -433,7 +433,7 @@ function renderOpnameTable() {
         
         tr.querySelector(".btn-save").onclick = () => saveOpnameSingle(it, gudang, tr);
         
-        // Fitur Restock (Tambah Stok via Tombol Plus)
+        // RESTOCK: Tambah stok dan catat ke Barang Masuk
         tr.querySelector(".btn-restock").onclick = () => {
             const add = prompt(`Tambah stok (DUS/PACK) untuk ${it.name} di ${gudang}?`);
             if(add && Number(add) > 0) processRestockSingle(it, gudang, Number(add));
@@ -444,7 +444,6 @@ function renderOpnameTable() {
     });
 }
 
-// LOGIC BARU: RESTOCK BUTTON
 async function processRestockSingle(it, gudang, qtyPack) {
     let fP;
     if(gudang === 'w1') fP = 'stockW1';
@@ -453,11 +452,10 @@ async function processRestockSingle(it, gudang, qtyPack) {
 
     try {
         const payload = { updatedAt: serverTimestamp() };
-        payload[fP] = (it[fP] || 0) + qtyPack; // Tambah stok
+        payload[fP] = (it[fP] || 0) + qtyPack; 
         
         await updateDoc(doc(db, "wh_items", it.id), payload);
         
-        // LOG KE WH_BATCHES (Agar muncul di Laporan Barang Masuk)
         await addDoc(collection(db, "wh_batches"), {
             itemId: it.id, itemName: it.name,
             receivedAt: todayKey(),
@@ -467,7 +465,7 @@ async function processRestockSingle(it, gudang, qtyPack) {
             createdAt: serverTimestamp()
         });
 
-        showToast("Restock berhasil & tercatat di laporan!", "success");
+        showToast("Restock berhasil & tercatat!", "success");
         await loadWhItems(); updateDashboard(); renderOpnameTable();
     } catch(e) { showToast(e.message, "error"); }
 }
@@ -506,7 +504,7 @@ function fillWasteForm(w) {
     $("wasteQty").value = w.qty;
     $("wasteNote").value = w.note;
     
-    editingWasteId = w.id; // Set ID yang sedang diedit
+    editingWasteId = w.id; 
     $("btnSaveWaste").textContent = "Update Waste";
     $("whWasteSection").scrollIntoView({behavior: "smooth"});
 }
@@ -523,7 +521,6 @@ async function saveWaste() {
 
     try {
         if(editingWasteId) {
-            // MODE UPDATE
             await updateDoc(doc(db, "wh_waste", editingWasteId), {
                 itemName: name, qty, unit, dateKey: date, note,
                 updatedAt: serverTimestamp()
@@ -532,7 +529,6 @@ async function saveWaste() {
             editingWasteId = null;
             $("btnSaveWaste").textContent = "Simpan Waste";
         } else {
-            // MODE CREATE
             await addDoc(collection(db, "wh_waste"), {
                 itemId: 'manual', itemName: name,
                 qty, unit, dateKey: date, note,
@@ -571,7 +567,7 @@ async function loadWasteLogsAndRender() {
                     ${iconBtn('❌', 'Hapus', 'btn-del')}
                 </td>
             `;
-            // Attach Event Listeners
+            // Attach Events
             tr.querySelector(".btn-edit").onclick = () => fillWasteForm({id: d.id, ...w});
             tr.querySelector(".btn-del").onclick = async () => {
                 if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
@@ -581,7 +577,7 @@ async function loadWasteLogsAndRender() {
     });
 }
 
-// ===================== REPORT (FIXED LOGIC) =====================
+// ===================== REPORT (LOGIC NORMALISASI) =====================
 async function generateReport() {
     const head = $("whReportHead");
     const body = $("whReportBody");
@@ -598,12 +594,14 @@ async function generateReport() {
         head.innerHTML = `<th>Item</th><th>Total Dus</th><th>Total Pcs</th><th>Estimasi Pcs</th><th>Catatan Audit</th>`;
         items.forEach(it => {
             const pq = getPackQty(it);
-            // Hitung total fisik (Pack & Loose terpisah) dari semua gudang
+            // Hitung Grand Total dari semua gudang (dalam unit kecil)
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
-            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchenLoose||0);
+            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             
-            // Konversi total loose yang berlebih menjadi pack (Normalisasi Tampilan)
             const grandTotalSmall = toTotalUnits(tp, tl, pq);
+            
+            // NORMALISASI: Pecah kembali menjadi Dus & Pcs yang logis
+            // Contoh: 201 Pcs (Isi 200) -> Menjadi 1 Dus, 1 Pcs.
             const normalized = splitUnitsToPackLoose(grandTotalSmall, pq);
             
             const tr = document.createElement("tr");
@@ -654,13 +652,15 @@ function downloadCSV() {
             const pq = getPackQty(it);
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
             const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
+            
             const grand = toTotalUnits(tp, tl, pq);
             const normalized = splitUnitsToPackLoose(grand, pq);
+            
             csv += `"${it.name}",${normalized.packs},${normalized.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
         });
         downloadText("total_aset.csv", csv);
     } else {
-        showToast("Fitur download CSV ini menyusul.", "info");
+        showToast("Download CSV tipe ini menyusul.", "info");
     }
 }
 
