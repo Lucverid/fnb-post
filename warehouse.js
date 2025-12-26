@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - CRUD + Reporting + Filtering)
+// warehouse.js (FINAL - Added Waste Edit Feature)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -16,6 +16,7 @@ const $ = (id) => document.getElementById(id);
 let currentUser = null;
 let items = [];
 let currentOpnameFilter = { status: null }; 
+let editingWasteId = null; // State untuk Edit Waste
 
 const LOW_STOCK_LT = 2; 
 const HIGH_STOCK_GT = 50; 
@@ -458,19 +459,54 @@ async function deleteItem(id) {
     } catch(e) { showToast(e.message, "error"); }
 }
 
+// ===================== WASTE (EDIT & DELETE) =====================
 async function saveWaste() {
+    if (!currentUser) return showToast("Harus login", "error");
+    const name = $("wasteItemSelect")?.value;
+    const qty = clampInt($("wasteQty")?.value);
+    const unit = $("wasteUnit")?.value;
+    const date = $("wasteDate")?.value;
+    const note = $("wasteNote")?.value || "";
+    
+    if(!name || !date || qty <= 0) return showToast("Data waste tidak valid", "error");
+
     try {
-        await addDoc(collection(db, "wh_waste"), {
-            dateKey: $("wasteDate").value,
-            itemName: $("wasteItemSelect").value,
-            qty: clampInt($("wasteQty").value),
-            unit: $("wasteUnit").value,
-            note: $("wasteNote").value,
-            createdAt: serverTimestamp()
-        });
-        showToast("Waste saved", "success");
+        if(editingWasteId) {
+            // MODE UPDATE
+            await updateDoc(doc(db, "wh_waste", editingWasteId), {
+                itemName: name, qty, unit, dateKey: date, note,
+                updatedAt: serverTimestamp()
+            });
+            showToast("Waste diupdate", "success");
+            editingWasteId = null;
+            $("btnSaveWaste").textContent = "Simpan Waste";
+        } else {
+            // MODE CREATE
+            await addDoc(collection(db, "wh_waste"), {
+                itemId: 'manual', itemName: name,
+                qty, unit, dateKey: date, note,
+                createdBy: currentUser.email, createdAt: serverTimestamp()
+            });
+            showToast("Waste tersimpan", "success");
+        }
+        
+        // Reset Form
+        $("wasteQty").value = ""; $("wasteNote").value = "";
         loadWasteLogsAndRender();
-    } catch(e) { showToast(e.message, "error"); }
+    } catch(e) { showToast("Gagal: " + e.message, "error"); }
+}
+
+function fillWasteForm(w) {
+    $("wasteItemSelect").value = w.itemName;
+    $("wasteDate").value = w.dateKey;
+    $("wasteUnit").value = w.unit;
+    $("wasteQty").value = w.qty;
+    $("wasteNote").value = w.note;
+    
+    editingWasteId = w.id;
+    $("btnSaveWaste").textContent = "Update Waste";
+    // Scroll ke atas (form)
+    $("whWasteSection").scrollIntoView({behavior: "smooth"});
 }
 
 async function loadWasteLogsAndRender() {
@@ -491,15 +527,25 @@ async function loadWasteLogsAndRender() {
         const w = d.data();
         if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
             const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td><td><button class="del-w">X</button></td>`;
-            tr.querySelector(".del-w").onclick = async () => {
-                if(confirm("Hapus?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
+            tr.innerHTML = `
+                <td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>
+                <td>
+                    ${iconBtn('✏️', 'Edit', 'btn-edit')}
+                    ${iconBtn('❌', 'Hapus', 'btn-del danger')}
+                </td>
+            `;
+            // Edit Action
+            tr.querySelector(".btn-edit").onclick = () => fillWasteForm({id: d.id, ...w});
+            // Delete Action
+            tr.querySelector(".btn-del").onclick = async () => {
+                if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
             };
             tbody.appendChild(tr);
         }
     });
 }
 
+// ===================== REPORT (FIXED NOTES) =====================
 async function generateReport() {
     const head = $("whReportHead");
     const body = $("whReportBody");
@@ -508,7 +554,7 @@ async function generateReport() {
     const start = parseDateOnly($("whReportStart").value);
     const end = parseDateOnly($("whReportEnd").value);
 
-    if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih rentang tanggal dulu", "error");
+    if(type !== 'total_asset' && (!start || !end)) return showToast("Pilih tanggal", "error");
 
     head.innerHTML = ""; body.innerHTML = "";
 
@@ -522,11 +568,26 @@ async function generateReport() {
             const split = splitUnitsToPackLoose(grand, pq);
             
             const tr = document.createElement("tr");
-            // Info / Catatan Audit dari it.info
+            // NOTE: Kolom Terakhir Mengambil Info Item untuk Audit
             tr.innerHTML = `<td>${it.name}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grand}</td><td>${escapeHtml(it.info||"-")}</td>`;
             body.appendChild(tr);
         });
-        showToast("Laporan Total Aset Selesai", "success");
+        showToast("Laporan Total Aset Siap", "success");
+
+    } else if (type === 'receiving') {
+        const sKey = todayKey(start);
+        const eKey = todayKey(end);
+        const snap = await getDocs(query(collection(db, "wh_batches"), orderBy("createdAt", "desc"), limit(500)));
+        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Supplier</th><th>Qty (Dus)</th><th>Catatan</th>`;
+        snap.forEach(d => {
+            const b = d.data();
+            if((b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey) {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${b.receivedAt}</td><td>${escapeHtml(b.itemName)}</td><td>${escapeHtml(b.supplier)}</td><td>${b.qtyPack}</td><td>${escapeHtml(b.note)}</td>`;
+                body.appendChild(tr);
+            }
+        });
+        showToast("Laporan Barang Masuk Siap", "success");
 
     } else if (type === 'waste') {
         const sKey = todayKey(start);
@@ -537,28 +598,11 @@ async function generateReport() {
             const w = d.data();
             if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
                 const tr = document.createElement("tr");
-                // Note / Catatan Waste
                 tr.innerHTML = `<td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>`;
                 body.appendChild(tr);
             }
         });
-        showToast("Laporan Waste Selesai", "success");
-
-    } else if (type === 'receiving') {
-        const sKey = todayKey(start);
-        const eKey = todayKey(end);
-        const snap = await getDocs(query(collection(db, "wh_batches"), orderBy("createdAt", "desc"), limit(500)));
-        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Supplier</th><th>Qty</th><th>Catatan</th>`;
-        snap.forEach(d => {
-            const b = d.data();
-            if((b.receivedAt || "") >= sKey && (b.receivedAt || "") <= eKey) {
-                const tr = document.createElement("tr");
-                // Note / Catatan Receiving
-                tr.innerHTML = `<td>${b.receivedAt}</td><td>${b.itemName}</td><td>${b.supplier}</td><td>${b.qtyPack}</td><td>${escapeHtml(b.note)}</td>`;
-                body.appendChild(tr);
-            }
-        });
-        showToast("Laporan Barang Masuk Selesai", "success");
+        showToast("Laporan Waste Siap", "success");
     }
 }
 
@@ -578,7 +622,7 @@ function downloadCSV() {
         });
         downloadText("total_aset.csv", csv);
     } else {
-        showToast("Download CSV untuk tipe ini belum didukung penuh. Gunakan Copy-Paste dari tabel.", "info");
+        showToast("Fitur download CSV ini menyusul.", "info");
     }
 }
 
