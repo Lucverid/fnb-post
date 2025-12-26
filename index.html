@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>F&B POS — Multi Gudang Final</title>
+  <title>F&B POS — Multi Gudang (Fixed)</title>
 
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6a00ff" />
@@ -11,15 +11,14 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css">
   
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
           .register('./service-worker.js')
-          .then(reg => console.log('SW registered', reg.scope))
-          .catch(err => console.error('SW registration failed', err));
+          .catch(err => console.log('SW fail', err));
       });
     }
   </script>
@@ -80,15 +79,19 @@
       <nav>
         <div class="sidebar-group">
           <div style="margin:10px 0 6px; font-size:12px; opacity:.7;">WAREHOUSE</div>
+          
           <button id="navWhDashboard" class="side-item active" type="button">
             <i class="lucide-layout-dashboard"></i> <span>Dashboard</span>
           </button>
+          
           <button id="navWhOpname" class="side-item" type="button">
             <i class="lucide-arrow-right-left"></i> <span>Stok & Transfer</span>
           </button>
+          
           <button id="navWhWaste" class="side-item" type="button">
             <i class="lucide-trash-2"></i> <span>Input Waste</span>
           </button>
+          
           <button id="navWhReport" class="side-item" type="button">
             <i class="lucide-file-text"></i> <span>Laporan Pusat</span>
           </button>
@@ -132,8 +135,8 @@
           <div id="cardW2Banyak" class="metric-card green"><i class="lucide-check-circle"></i><div><b id="w2Banyak">0</b> Aman</div></div>
         </div>
         
-        <h4 style="margin:15px 0 5px; opacity:.7;">Status Expired</h4>
-        <div id="whExpiryWrap"></div>
+        <h4 style="margin:15px 0 5px; opacity:.7;">Status Kedaluwarsa (EXP)</h4>
+        <div id="whExpiryWrap" class="metric-row" style="margin-top:5px;"></div> 
       </section>
 
       <section id="whOpnameSection" class="section hidden">
@@ -164,7 +167,7 @@
               <div><label>Supplier</label><input id="whItemSupplier" type="text"></div>
             </div>
             <label>EXP Date</label><input id="whItemExp" type="date">
-            <label>Info (Catatan Audit)</label><textarea id="whItemInfo" rows="2" placeholder="Catatan khusus..."></textarea>
+            <label>Info (Audit)</label><textarea id="whItemInfo" rows="2"></textarea>
             <button id="btnSaveItem" class="btn-primary" type="button" style="margin-top:10px;">Simpan Item</button>
           </div>
 
@@ -211,9 +214,7 @@
         <div class="card glass" style="padding:12px;">
           <div style="overflow:auto;">
             <table class="table">
-              <thead>
-                <tr><th>Item</th><th>Spek</th><th>Lokasi</th><th>Sistem</th><th>Input Fisik</th><th style="text-align:right;">Aksi</th></tr>
-              </thead>
+              <thead><tr><th>Item</th><th>Spek</th><th>Lokasi</th><th>Sistem</th><th>Input Fisik</th><th style="text-align:right;">Aksi</th></tr></thead>
               <tbody id="whOpnameTableBody"></tbody>
             </table>
           </div>
