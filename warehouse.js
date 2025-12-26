@@ -1,4 +1,4 @@
-// warehouse.js (FULL) — FIX Double Counting Dashboard + Report Mode + Low Limit 2
+// warehouse.js (FULL) — STRICT Fix Double Counting + Low Stock 2 + Report Logic
 // =====================================================================================
 // NOTE:
 // - Semua user yang sudah login akan bisa akses Warehouse.
@@ -444,24 +444,27 @@ function getExpStatus(expStr) {
   return "ok";
 }
 
-// ===================== Stock bucket (FIXED LOGIC) =====================
+// ===================== Stock bucket (STRICT LOGIC) =====================
 function packsEquivalent(it, gudang) {
   const pq = getPackQty(it);
   const units = getUnitsW(it, gudang);
   return units / pq;
 }
+
+// Gunakan if - else if agar status mutually exclusive
 function stockBucketCount(packEqFloat) {
   const n = Number(packEqFloat || 0);
   
-  // Gunakan batas toleransi agar desimal kecil tidak lolos
-  if (n <= 0.001) return "habis"; 
-
-  // Jika n > 0.001 tapi < LOW_STOCK_LT, maka masuk low
-  if (n < LOW_STOCK_LT) return "low"; 
-
-  // Sisanya
-  if (n > HIGH_STOCK_GT) return "high";
-  return "mid";
+  if (n <= 0.001) {
+    return "habis";
+  } else if (n < LOW_STOCK_LT) {
+    // n sudah pasti > 0.001 karena lolos dari check pertama
+    return "low";
+  } else if (n > HIGH_STOCK_GT) {
+    return "high";
+  } else {
+    return "mid";
+  }
 }
 
 // ===================== Dashboard expiry cards =====================
@@ -579,7 +582,7 @@ function updateWarehouseNotif() {
   notifBadge.textContent = String(count);
 }
 
-// ===================== Dashboard Update (FIXED DOUBLE COUNTING) =====================
+// ===================== Dashboard Update (STRICT ELSE-IF) =====================
 function updateDashboard() {
   ensureExpiryCards();
 
@@ -587,11 +590,10 @@ function updateDashboard() {
   let w2 = { habis: 0, low: 0, high: 0 };
 
   items.forEach((it) => {
-    // Hitung status stok W1 dan W2
     const s1 = stockBucketCount(packsEquivalent(it, "w1"));
     const s2 = stockBucketCount(packsEquivalent(it, "w2"));
 
-    // Logic W1 (Pakai ELSE IF agar tidak double counting)
+    // Logic W1 - Menggunakan ELSE IF agar tidak double counting
     if (s1 === "habis") {
       w1.habis++;
     } else if (s1 === "low") {
@@ -600,11 +602,10 @@ function updateDashboard() {
       w1.high++;
     }
 
-    // Logic W2 (Pakai ELSE IF agar tidak double counting)
+    // Logic W2 - Menggunakan ELSE IF agar tidak double counting
     if (s2 === "habis") {
       w2.habis++;
     } else if (s2 === "low") {
-      // Jika sudah masuk sini (stok 1), dia TIDAK AKAN masuk ke 'habis'
       w2.low++;
     } else if (s2 === "high") {
       w2.high++;
@@ -1770,7 +1771,7 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
   return await getWeeklySnapshotItems(weekKey, gudang);
 }
 
-// ===================== REPORT =====================
+// ===================== REPORT (FIXED MODE LOGIC) =====================
 function reportTypeLabel(type) {
   if (type === "opname_w1") return "Opname Gudang 1 (Snapshot)";
   if (type === "opname_w2") return "Opname Gudang 2 (Snapshot)";
