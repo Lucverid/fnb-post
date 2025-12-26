@@ -294,8 +294,8 @@ let wasteLogs = [];
 let batchLogs = [];
 let opnameLogs = [];
 
-const LOW_STOCK_LT = 10;
-const HIGH_STOCK_GT = 50;
+const LOW_STOCK_LT = 1;
+const HIGH_STOCK_GT = 10;
 const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
