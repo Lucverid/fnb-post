@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>F&B POS — Multi Gudang Complete</title>
+  <title>F&B POS — Multi Gudang v7</title>
 
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6a00ff" />
@@ -36,7 +36,9 @@
       <label>Password</label>
       <input id="loginPassword" type="password">
       <button id="btnLogin" class="btn-primary" type="button">Login</button>
+
       <hr>
+
       <h2>Register</h2>
       <label>Email</label>
       <input id="registerEmail" type="email">
@@ -61,15 +63,18 @@
           <div id="connectionStatus" class="connection">Offline</div>
         </div>
       </div>
+
       <div class="header-right">
         <div id="notifBtn" class="notif-btn">
           <i class="lucide-bell"></i>
           <span id="notifBadge" class="notif-count">0</span>
         </div>
+
         <div id="notifPanel" class="notif-panel hidden">
           <div class="notif-title">Notifikasi</div>
           <ul id="notifList"></ul>
         </div>
+
         <button id="burgerBtn" class="burger-btn" type="button">
           <span></span><span></span><span></span>
         </button>
@@ -80,19 +85,24 @@
       <nav>
         <div class="sidebar-group">
           <div style="margin:10px 0 6px; font-size:12px; opacity:.7;">WAREHOUSE</div>
+
           <button id="navWhDashboard" class="side-item active" type="button">
             <i class="lucide-layout-dashboard"></i> <span>Dashboard</span>
           </button>
+
           <button id="navWhOpname" class="side-item" type="button">
             <i class="lucide-arrow-right-left"></i> <span>Stok & Transfer</span>
           </button>
+
           <button id="navWhWaste" class="side-item" type="button">
             <i class="lucide-trash-2"></i> <span>Input Waste</span>
           </button>
+
           <button id="navWhReport" class="side-item" type="button">
-            <i class="lucide-file-text"></i> <span>Laporan</span>
+            <i class="lucide-file-text"></i> <span>Laporan Pusat</span>
           </button>
         </div>
+
         <div class="sidebar-footer">
           <button id="btnLogout" class="logout-btn" type="button">
             <i class="lucide-log-out"></i> Logout
@@ -109,7 +119,7 @@
 
       <section id="whDashboardSection" class="section">
         <h2>Dashboard Stok</h2>
-        <p style="opacity:.8;margin-top:-6px;">Pantauan stok di semua gudang utama & status expired.</p>
+        <p style="opacity:.8;margin-top:-6px;">Pantauan stok di semua gudang & status expired.</p>
 
         <h4 style="margin:10px 0 5px; opacity:.7;">Gudang 1 (Utama)</h4>
         <div class="metric-row">
@@ -167,35 +177,77 @@
         <h2>Manajemen Stok</h2>
 
         <div class="grid-2" style="gap:12px; margin:12px 0;">
+          
           <div class="card glass" style="padding:12px;">
-            <h3 style="margin:0 0 10px;">Tambah Master Item</h3>
+            <h3 style="margin:0 0 10px; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:6px;">Tambah Master Item</h3>
+
             <label>Nama Item</label>
             <input id="whItemName" type="text" placeholder="Contoh: Kopi Arabica">
+
             <div class="grid-2" style="gap:10px;">
-              <div><label>Unit Besar</label><input id="whItemUnitBig" type="text" placeholder="Dus"></div>
-              <div><label>Unit Kecil</label><input id="whItemUnitSmall" type="text" placeholder="Pcs"></div>
+              <div>
+                <label>Unit Besar (Pack/Dus)</label>
+                <input id="whItemUnitBig" type="text" placeholder="cth: Dus">
+              </div>
+              <div>
+                <label>Unit Kecil (Pcs/Gram)</label>
+                <input id="whItemUnitSmall" type="text" placeholder="cth: Pcs">
+              </div>
             </div>
-            <div class="grid-2" style="gap:10px;">
-              <div><label>Isi/Dus</label><input id="whItemPackQty" type="number" min="0" placeholder="24"></div>
-              <div><label>Stok Awal W1</label><input id="whItemInitStockW1" type="number" min="0" placeholder="0"></div>
-            </div>
+
             <div style="margin-bottom:10px;">
-               <label>Stok Awal Istirahat</label>
-               <input id="whItemInitStockRest" type="number" min="0" placeholder="0">
+              <label>Isi per Dus</label>
+              <input id="whItemPackQty" type="number" min="0" step="1" placeholder="cth: 24">
             </div>
+
+            <details style="background: rgba(0,0,0,0.03); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border);">
+                <summary style="padding: 10px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--primary);">
+                   Input Stok Awal? (Klik disini)
+                </summary>
+                <div style="padding: 0 10px 10px 10px;">
+                    <div class="grid-2" style="gap:10px;">
+                        <div>
+                            <label>Gudang Utama (W1)</label>
+                            <input id="whItemInitStockW1" type="number" min="0" placeholder="0">
+                        </div>
+                        <div>
+                            <label>Gudang Istirahat</label>
+                            <input id="whItemInitStockRest" type="number" min="0" placeholder="0">
+                        </div>
+                    </div>
+                    <small style="opacity:0.6; font-size:11px;">*Masukkan jumlah dalam satuan Besar (Dus)</small>
+                </div>
+            </details>
+
             <div class="grid-2" style="gap:10px;">
-              <div><label>Tgl Terima</label><input id="whItemReceivedAt" type="date"></div>
-              <div><label>Supplier</label><input id="whItemSupplier" type="text"></div>
+              <div>
+                <label>Tanggal Terima</label>
+                <input id="whItemReceivedAt" type="date">
+              </div>
+              <div>
+                <label>Supplier</label>
+                <input id="whItemSupplier" type="text" placeholder="Nama Supplier">
+              </div>
             </div>
-            <label>EXP Date</label><input id="whItemExp" type="date">
-            <label>Info</label><textarea id="whItemInfo" rows="1"></textarea>
-            <button id="btnSaveItem" class="btn-primary" type="button" style="margin-top:10px;">Simpan Item</button>
+            
+            <label>EXP Date</label>
+            <input id="whItemExp" type="date">
+
+            <label>Info / Catatan Audit</label>
+            <textarea id="whItemInfo" rows="2" placeholder="Contoh: Barang titipan, Aset tetap..."></textarea>
+
+            <button id="btnSaveItem" class="btn-primary" type="button" style="margin-top:10px;">Simpan Item Baru</button>
           </div>
 
           <div class="card glass" style="padding:12px;">
-            <h3 style="margin:0 0 10px;">Transfer Stok</h3>
-            <label>Cari Item</label><input id="moveSearch" type="text" placeholder="Ketik nama...">
-            <label>Pilih Item</label><select id="moveItemSelect"></select>
+            <h3 style="margin:0 0 10px; border-bottom:1px solid rgba(0,0,0,0.1); padding-bottom:6px;">Transfer Stok</h3>
+
+            <label>Cari Item</label>
+            <input id="moveSearch" type="text" placeholder="Ketik nama item...">
+
+            <label>Pilih Item (Lihat Stok)</label>
+            <select id="moveItemSelect"></select>
+
             <label>Rute Transfer</label>
             <select id="transferType" style="font-weight:600; color:var(--primary);">
               <option value="w1_to_w2">Gudang 1 ➡ Gudang 2</option>
@@ -203,31 +255,47 @@
               <option value="rest_to_bar">Gudang Istirahat ➡ Bar</option>
               <option value="w2_to_kitchen">Gudang 2 ➡ Kitchen</option>
             </select>
+
             <div class="grid-2" style="gap:10px;">
-              <div><label>Jml Dus</label><input id="moveQtyPack" type="number" min="0"></div>
-              <div><label>Jml Pcs</label><input id="moveQtyLoose" type="number" min="0"></div>
+              <div>
+                 <label>Jml Dus/Pack</label>
+                 <input id="moveQtyPack" type="number" min="0" placeholder="0">
+              </div>
+              <div>
+                 <label>Jml Pcs/Loose</label>
+                 <input id="moveQtyLoose" type="number" min="0" placeholder="0">
+              </div>
             </div>
-            <div id="moveInfo" style="margin-top:8px; font-size:12px; color:var(--text-muted);"></div>
-            <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">Proses Transfer</button>
-            <hr style="margin:16px 0; opacity:.2;">
+
+            <div id="moveInfo" style="margin-top:8px; font-size:12px; color:var(--text-muted); min-height:18px;"></div>
+
+            <button id="btnMove" class="btn-secondary" type="button" style="margin-top:10px;">
+              Proses Transfer
+            </button>
             
-            <h3 style="margin:0 0 10px;">Filter Tabel</h3>
+            <hr style="margin:16px 0; opacity:.2;">
+
+            <h3 style="margin:0 0 10px;">Tabel Stok (Opname)</h3>
             <div class="grid-2" style="gap:10px;">
                 <div>
-                    <label>Lokasi</label>
+                    <label>Lokasi Gudang</label>
                     <select id="whOpnameGudang">
-                      <option value="w1">Gudang 1</option>
+                      <option value="w1">Gudang 1 (Utama)</option>
                       <option value="w2">Gudang 2</option>
-                      <option value="rest">Istirahat</option>
+                      <option value="rest">Gudang Istirahat</option>
                       <option value="bar">Bar</option>
                       <option value="kitchen">Kitchen</option>
                     </select>
                 </div>
-                <div><label>Cari</label><input id="whOpnameSearch" type="text" placeholder="..."></div>
+                <div>
+                    <label>Cari Nama Item</label>
+                    <input id="whOpnameSearch" type="text" placeholder="...">
+                </div>
             </div>
+            
             <label style="display:flex; gap:8px; align-items:center; margin-top:10px;">
               <input id="whOpnameModeSmall" type="checkbox" style="width:auto;">
-              <span style="font-size:13px;">Tampilkan Unit Kecil</span>
+              <span style="font-size:13px;">Tampilkan total dalam unit kecil (pcs)</span>
             </label>
           </div>
         </div>
@@ -237,12 +305,12 @@
             <table class="table">
               <thead>
                 <tr>
-                  <th>Item</th>
-                  <th>Spek</th>
-                  <th>Lokasi</th>
-                  <th>Stok Sistem</th>
-                  <th>Input Fisik</th>
-                  <th style="text-align:right;">Aksi</th>
+                  <th style="width:25%;">Item</th>
+                  <th style="width:15%;">Spek</th>
+                  <th style="width:15%;">Lokasi</th>
+                  <th style="width:20%;">Stok Sistem</th>
+                  <th style="width:15%;">Input Fisik</th>
+                  <th style="text-align:right;">Simpan</th>
                 </tr>
               </thead>
               <tbody id="whOpnameTableBody"></tbody>
@@ -253,27 +321,60 @@
 
       <section id="whWasteSection" class="section hidden">
         <h2>Input Waste</h2>
+
         <div class="card glass" style="padding:12px; max-width:640px;">
-          <label>Pilih Item</label><select id="wasteItemSelect"></select>
+          <label>Pilih Item</label>
+          <select id="wasteItemSelect"></select>
+
           <div class="grid-2" style="gap:10px;">
-            <div><label>Tanggal</label><input id="wasteDate" type="date"></div>
-            <div><label>Satuan</label><select id="wasteUnit"></select></div>
+            <div>
+              <label>Tanggal</label>
+              <input id="wasteDate" type="date">
+            </div>
+            <div>
+              <label>Satuan</label>
+              <select id="wasteUnit"></select>
+            </div>
           </div>
-          <label>Qty</label><input id="wasteQty" type="number" min="0">
-          <label>Catatan</label><textarea id="wasteNote" rows="2"></textarea>
-          <button id="btnSaveWaste" class="btn-primary" type="button" style="margin-top:10px;">Simpan Waste</button>
+
+          <label>Qty (gram/ml/pcs)</label>
+          <input id="wasteQty" type="number" min="0" step="1" placeholder="contoh: 250">
+
+          <label>Catatan</label>
+          <textarea id="wasteNote" rows="3" placeholder="Alasan waste..."></textarea>
+
+          <button id="btnSaveWaste" class="btn-primary" type="button" style="margin-top:10px;">
+            Simpan Waste
+          </button>
         </div>
 
         <div class="card glass" style="padding:12px; margin-top:16px;">
-          <h3 style="margin:0 0 10px;">History Waste</h3>
-          <div class="grid-2" style="gap:10px;">
-            <div><label>Dari</label><input id="wasteFilterStart" type="date"></div>
-            <div><label>Sampai</label><input id="wasteFilterEnd" type="date"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+            <h3 style="margin:0;">History Waste (Log)</h3>
           </div>
+
+          <div class="grid-2" style="gap:10px;">
+            <div>
+              <label>Tanggal Mulai</label>
+              <input id="wasteFilterStart" type="date">
+            </div>
+            <div>
+              <label>Tanggal Akhir</label>
+              <input id="wasteFilterEnd" type="date">
+            </div>
+          </div>
+
           <div style="overflow:auto; margin-top:10px;">
             <table class="table">
               <thead>
-                <tr><th>Tgl</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Ket</th><th>Aksi</th></tr>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Satuan</th>
+                  <th>Catatan</th>
+                  <th style="text-align:right;">Aksi</th>
+                </tr>
               </thead>
               <tbody id="wasteHistoryBody"></tbody>
             </table>
@@ -282,45 +383,76 @@
       </section>
 
       <section id="whReportSection" class="section hidden">
-        <h2>Laporan</h2>
+        <h2>Laporan & Analisis</h2>
+
         <div class="card glass wh-report-card" style="padding:12px; max-width:760px;">
           <div class="wh-report-grid" style="display:grid; gap:12px;">
+
             <div class="wh-report-field">
               <label>Tipe Laporan</label>
               <select id="whReportType" style="font-weight:600; color:var(--primary);">
-                <option value="total_asset">Total Aset (Semua Gudang)</option>
+                <option value="total_asset">Total Aset (Snapshot Semua Gudang)</option>
                 <option value="waste">Laporan Waste (Per Tanggal)</option>
-                <option value="receiving">Barang Masuk</option>
+                <option value="receiving">Barang Masuk (Per Tanggal)</option>
               </select>
             </div>
+
             <div class="wh-week-preset" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
               <button id="btnWeekThis" class="btn-secondary" type="button">Minggu Ini</button>
               <button id="btnWeekLast" class="btn-secondary" type="button">Minggu Lalu</button>
+              <button id="btnWeekPrev2" class="btn-secondary ghost" type="button" style="grid-column:1 / -1;">
+                2 Minggu Lalu
+              </button>
             </div>
+
             <div class="grid-2" style="gap:10px;">
-              <div class="wh-report-field"><label>Mulai</label><input id="whReportStart" type="date"></div>
-              <div class="wh-report-field"><label>Sampai</label><input id="whReportEnd" type="date"></div>
+              <div class="wh-report-field">
+                <label>Tanggal Mulai</label>
+                <input id="whReportStart" type="date">
+              </div>
+              <div class="wh-report-field">
+                <label>Tanggal Akhir</label>
+                <input id="whReportEnd" type="date">
+              </div>
             </div>
+
             <div class="wh-report-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
-              <button id="btnWhReport" class="btn-primary" type="button">Generate</button>
-              <button id="btnWhReportDownload" class="btn-secondary" type="button">Download CSV</button>
+              <button id="btnWhReport" class="btn-primary" type="button">
+                Generate Laporan
+              </button>
+              <button id="btnWhReportDownload" class="btn-secondary" type="button">
+                Download CSV
+              </button>
             </div>
           </div>
         </div>
+
         <div class="card glass wh-report-table" style="padding:12px; margin-top:12px;">
           <div class="table-wrap">
             <table class="table">
-              <thead><tr id="whReportHead"></tr></thead>
+              <thead>
+                <tr id="whReportHead"></tr>
+              </thead>
               <tbody id="whReportBody"></tbody>
             </table>
           </div>
         </div>
       </section>
 
+      <div id="bomModal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3 id="bomModalTitle">Detail</h3>
+            <button id="bomModalClose" class="btn-icon-close" type="button">&times;</button>
+          </div>
+          <div id="bomModalBody" class="modal-body"></div>
+        </div>
+      </div>
     </main>
   </div>
 
-  <script src="script.js" type="module"></script>
   <script src="warehouse.js" type="module"></script>
+  <script src="script.js" type="module"></script>
 </body>
 </html>
