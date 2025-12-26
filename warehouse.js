@@ -294,8 +294,14 @@ let wasteLogs = [];
 let batchLogs = [];
 let opnameLogs = [];
 
-const LOW_STOCK_LT = 1;
-const HIGH_STOCK_GT = 10;
+// PERBAIKAN DI SINI:
+// Sebelumnya 10, diubah jadi 2 agar item dengan stok 1 masuk kategori "Low/Lumayan",
+// tapi stok 2 ke atas sudah dianggap aman (Mid).
+const LOW_STOCK_LT = 2;  
+
+// Opsional: Batas "Banyak" bisa disesuaikan juga (misal jadi 20), 
+// tapi defaultnya 50.
+const HIGH_STOCK_GT = 5; 
 const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
