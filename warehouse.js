@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - Added Waste Edit Feature)
+// warehouse.js (FINAL FIX - WITH WASTE EDIT)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -15,8 +15,8 @@ const $ = (id) => document.getElementById(id);
 // ===================== STATE =====================
 let currentUser = null;
 let items = [];
-let currentOpnameFilter = { status: null }; 
-let editingWasteId = null; // State untuk Edit Waste
+let editingWasteId = null; // State untuk menyimpan ID waste yang sedang diedit
+let currentOpnameFilter = { status: null };
 
 const LOW_STOCK_LT = 2; 
 const HIGH_STOCK_GT = 50; 
@@ -248,7 +248,7 @@ window.addEventListener('DOMContentLoaded', () => {
     bindFilter("cardW2Habis", "w2", "habis"); bindFilter("cardW2Lumayan", "w2", "low"); bindFilter("cardW2Banyak", "w2", "ok");
 });
 
-// ===================== CRUD LOGIC =====================
+// ===================== CRUD LOGIC (ITEM & TRANSFER) =====================
 async function createMasterItem() {
   if (!currentUser) return showToast("Harus login", "error");
   const name = ($("whItemName")?.value || "").trim();
@@ -460,6 +460,21 @@ async function deleteItem(id) {
 }
 
 // ===================== WASTE (EDIT & DELETE) =====================
+function fillWasteForm(w) {
+    $("wasteItemSelect").value = w.itemName;
+    $("wasteDate").value = w.dateKey;
+    $("wasteUnit").value = w.unit;
+    $("wasteQty").value = w.qty;
+    $("wasteNote").value = w.note;
+    
+    editingWasteId = w.id;
+    $("btnSaveWaste").textContent = "Update Waste";
+    $("btnSaveWaste").classList.add("btn-secondary"); // Visual cue
+    
+    // Scroll ke form
+    $("whWasteSection").scrollIntoView({behavior: "smooth"});
+}
+
 async function saveWaste() {
     if (!currentUser) return showToast("Harus login", "error");
     const name = $("wasteItemSelect")?.value;
@@ -472,7 +487,7 @@ async function saveWaste() {
 
     try {
         if(editingWasteId) {
-            // MODE UPDATE
+            // EDIT MODE
             await updateDoc(doc(db, "wh_waste", editingWasteId), {
                 itemName: name, qty, unit, dateKey: date, note,
                 updatedAt: serverTimestamp()
@@ -480,8 +495,9 @@ async function saveWaste() {
             showToast("Waste diupdate", "success");
             editingWasteId = null;
             $("btnSaveWaste").textContent = "Simpan Waste";
+            $("btnSaveWaste").classList.remove("btn-secondary");
         } else {
-            // MODE CREATE
+            // CREATE MODE
             await addDoc(collection(db, "wh_waste"), {
                 itemId: 'manual', itemName: name,
                 qty, unit, dateKey: date, note,
@@ -490,23 +506,10 @@ async function saveWaste() {
             showToast("Waste tersimpan", "success");
         }
         
-        // Reset Form
+        // Reset
         $("wasteQty").value = ""; $("wasteNote").value = "";
         loadWasteLogsAndRender();
     } catch(e) { showToast("Gagal: " + e.message, "error"); }
-}
-
-function fillWasteForm(w) {
-    $("wasteItemSelect").value = w.itemName;
-    $("wasteDate").value = w.dateKey;
-    $("wasteUnit").value = w.unit;
-    $("wasteQty").value = w.qty;
-    $("wasteNote").value = w.note;
-    
-    editingWasteId = w.id;
-    $("btnSaveWaste").textContent = "Update Waste";
-    // Scroll ke atas (form)
-    $("whWasteSection").scrollIntoView({behavior: "smooth"});
 }
 
 async function loadWasteLogsAndRender() {
@@ -529,14 +532,13 @@ async function loadWasteLogsAndRender() {
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>
-                <td>
+                <td style="white-space:nowrap;">
                     ${iconBtn('✏️', 'Edit', 'btn-edit')}
                     ${iconBtn('❌', 'Hapus', 'btn-del danger')}
                 </td>
             `;
-            // Edit Action
+            // Attach Events
             tr.querySelector(".btn-edit").onclick = () => fillWasteForm({id: d.id, ...w});
-            // Delete Action
             tr.querySelector(".btn-del").onclick = async () => {
                 if(confirm("Hapus waste ini?")) { await deleteDoc(doc(db, "wh_waste", d.id)); loadWasteLogsAndRender(); }
             };
@@ -568,7 +570,6 @@ async function generateReport() {
             const split = splitUnitsToPackLoose(grand, pq);
             
             const tr = document.createElement("tr");
-            // NOTE: Kolom Terakhir Mengambil Info Item untuk Audit
             tr.innerHTML = `<td>${it.name}</td><td>${split.packs}</td><td>${split.loose}</td><td>${grand}</td><td>${escapeHtml(it.info||"-")}</td>`;
             body.appendChild(tr);
         });
@@ -615,7 +616,7 @@ function downloadCSV() {
         items.forEach(it => {
             const pq = getPackQty(it);
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockRest||0) + (it.stockBar||0) + (it.stockKitchen||0);
-            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchenLoose||0);
+            const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockRestLoose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             const grand = toTotalUnits(tp, tl, pq);
             const split = splitUnitsToPackLoose(grand, pq);
             csv += `"${it.name}",${split.packs},${split.loose},${grand},"${(it.info||"").replace(/"/g, '""')}"\n`;
