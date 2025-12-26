@@ -1,9 +1,8 @@
-// warehouse.js (FULL) — ALL ACCESS (Kasir/Admin bisa akses semuanya) + Pack/Loose + Expiry + Anti init error
+// warehouse.js (FULL) — ALL ACCESS + Fix Low Stock Limit + Fix Waste Report Mode
 // =====================================================================================
 // NOTE:
-// - Semua user yang sudah login akan bisa akses Warehouse (tanpa cek role).
-// - Data akan muncul kalau Firestore Rules mengizinkan READ koleksi:
-//   wh_items, wh_waste, wh_batches, wh_tx, wh_opname_logs, wh_weekly_snapshot_items
+// - Semua user yang sudah login akan bisa akses Warehouse.
+// - Data akan muncul kalau Firestore Rules mengizinkan READ koleksi.
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -294,14 +293,11 @@ let wasteLogs = [];
 let batchLogs = [];
 let opnameLogs = [];
 
-// PERBAIKAN DI SINI:
-// Sebelumnya 10, diubah jadi 2 agar item dengan stok 1 masuk kategori "Low/Lumayan",
-// tapi stok 2 ke atas sudah dianggap aman (Mid).
-const LOW_STOCK_LT = 2;  
+// [FIX] LOW STOCK LIMIT
+// Set ke 2 agar: Stok 0=Habis, Stok 1=Low (Warning), Stok 2=Aman
+const LOW_STOCK_LT = 2; 
 
-// Opsional: Batas "Banyak" bisa disesuaikan juga (misal jadi 20), 
-// tapi defaultnya 50.
-const HIGH_STOCK_GT = 5; 
+const HIGH_STOCK_GT = 50;
 const EXP_SOON_DAYS = 7;
 
 let whExpiryFilter = null; // null | ok | soon | expired
@@ -312,6 +308,11 @@ let editingWasteFormId = null;
 
 let wasteSortByState = "dateKey";
 let wasteSortDirState = "asc";
+
+// [FIX] REPORT MODE
+// "detail" (default) = Rincian per hari
+// "grouped" = Akumulasi per item (aktif via tombol minggu)
+let reportWasteMode = "detail"; 
 
 const WASTE_PRESET_ITEMS = [
   "Milktea",
@@ -455,7 +456,7 @@ function packsEquivalent(it, gudang) {
 function stockBucketCount(packEqFloat) {
   const n = Number(packEqFloat || 0);
   if (n <= 0) return "habis";
-  if (n < LOW_STOCK_LT) return "low";
+  if (n < LOW_STOCK_LT) return "low"; // Jika n < 2 (misal 1), return low
   if (n > HIGH_STOCK_GT) return "high";
   return "mid";
 }
@@ -1753,7 +1754,7 @@ async function ensureWeeklySnapshot(weekKey, gudang) {
   return await getWeeklySnapshotItems(weekKey, gudang);
 }
 
-// ===================== REPORT =====================
+// ===================== REPORT (FIXED MODE LOGIC) =====================
 function reportTypeLabel(type) {
   if (type === "opname_w1") return "Opname Gudang 1 (Snapshot)";
   if (type === "opname_w2") return "Opname Gudang 2 (Snapshot)";
@@ -1814,6 +1815,7 @@ function validateReportRange(startKey, endKey) {
   return null;
 }
 
+// [FIX] REPORT GENERATION LOGIC
 async function generateWarehouseReport() {
   if (!currentUser) return showToast("Harus login", "error");
   if (!whReportType) return showToast("Elemen laporan tidak lengkap (whReportType).", "error");
@@ -1832,73 +1834,69 @@ async function generateWarehouseReport() {
 
   try {
     if (type === "waste") {
-  const s = parseDateOnly(startKey);
-  const e = parseDateOnly(endKey);
-  await loadWasteLogs(s, e);
+      const s = parseDateOnly(startKey);
+      const e = parseDateOnly(endKey);
+      await loadWasteLogs(s, e);
 
-  const useWeekly = isFullCalendarWeekRange(startKey, endKey);
+      // CEK MODE: Apakah user tadi klik tombol (grouped) atau manual (detail)?
+      if (reportWasteMode === "grouped") {
+        // =====================
+        // MODE AKUMULASI (RINGKASAN)
+        // =====================
+        const grouped = {};
 
-  if (useWeekly) {
-  // =====================
-  // WASTE REKAP MINGGUAN (AKUMULASI + CATATAN + USER)
-  // =====================
-  const grouped = {};
+        for (const w of wasteLogs) {
+          const itemName = w.itemName || "";
+          const unit = w.unit || "";
+          const key = itemName + "|" + unit;
 
-  for (const w of wasteLogs) {
-    const itemName = w.itemName || "";
-    const unit = w.unit || "";
-    const key = itemName + "|" + unit;
+          if (!grouped[key]) {
+            grouped[key] = {
+              itemName,
+              unit,
+              totalQty: 0,
+              notes: new Set(),
+              users: new Set(),
+            };
+          }
 
-    if (!grouped[key]) {
-      grouped[key] = {
-        itemName,
-        unit,
-        totalQty: 0,
-        notes: new Set(),
-        users: new Set(),
-      };
-    }
+          grouped[key].totalQty += clampInt(w.qty, 0);
+          if (w.note) grouped[key].notes.add(w.note);
+          if (w.createdBy) grouped[key].users.add(w.createdBy);
+        }
 
-    grouped[key].totalQty += clampInt(w.qty, 0);
+        header = ["Item", "Total Qty", "Satuan", "Catatan (Gabungan)", "User (Gabungan)"];
 
-    if (w.note) grouped[key].notes.add(w.note);
-    if (w.createdBy) grouped[key].users.add(w.createdBy);
-  }
+        rows = Object.values(grouped)
+          .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
+          .map((g) => [
+            g.itemName,
+            String(g.totalQty),
+            g.unit,
+            Array.from(g.notes).join(" | "),
+            Array.from(g.users).join(", "),
+          ]);
 
-  header = ["Item", "Total Qty", "Satuan", "Catatan", "User"];
+      } else {
+        // =====================
+        // MODE DETAIL (HARIAN/MANUAL)
+        // =====================
+        header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
 
-  rows = Object.values(grouped)
-    .sort((a, b) => (a.itemName || "").localeCompare(b.itemName || ""))
-    .map((g) => [
-      g.itemName,
-      String(g.totalQty),
-      g.unit,
-      Array.from(g.notes).join(" | "),
-      Array.from(g.users).join(", "),
-    ]);
-}
- else {
-    // =====================
-    // WASTE DETAIL HARIAN
-    // =====================
-    header = ["Tanggal", "Item", "Qty", "Satuan", "Catatan", "User"];
+        rows = wasteLogs
+          .slice()
+          .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
+          .map((w) => [
+            w.dateKey || "",
+            w.itemName || "",
+            String(clampInt(w.qty, 0)),
+            w.unit || "",
+            w.note || "",
+            w.createdBy || "",
+          ]);
+      }
 
-    rows = wasteLogs
-      .slice()
-      .sort((a, b) => (a.dateKey || "").localeCompare(b.dateKey || ""))
-      .map((w) => [
-        w.dateKey || "",
-        w.itemName || "",
-        String(clampInt(w.qty, 0)),
-        w.unit || "",
-        w.note || "",
-        w.createdBy || "",
-      ]);
-  }
-}
-
-
- else if (type === "receiving") {
+    } else if (type === "receiving") {
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
       await loadBatchLogs(s, e);
@@ -1907,7 +1905,15 @@ async function generateWarehouseReport() {
       rows = batchLogs
         .slice()
         .sort((a, b) => (a.receivedAt || "").localeCompare(b.receivedAt || ""))
-        .map((b) => [b.receivedAt || "", b.itemName || "", b.supplier || "", b.expDate || "", String(clampInt(b.qtyPack, 0)), b.note || "", b.createdBy || ""]);
+        .map((b) => [
+          b.receivedAt || "",
+          b.itemName || "",
+          b.supplier || "",
+          b.expDate || "",
+          String(clampInt(b.qtyPack, 0)),
+          b.note || "",
+          b.createdBy || "",
+        ]);
     } else if (type === "opname_history_w1" || type === "opname_history_w2") {
       const s = parseDateOnly(startKey);
       const e = parseDateOnly(endKey);
@@ -2064,9 +2070,32 @@ wasteSortDirBtn?.addEventListener("click", () => {
 btnWhReport?.addEventListener("click", generateWarehouseReport);
 btnWhReportDownload?.addEventListener("click", downloadLastReportCSV);
 
-btnWeekThis?.addEventListener("click", () => setReportRangeByWeekOffset(0));
-btnWeekLast?.addEventListener("click", () => setReportRangeByWeekOffset(1));
-btnWeekPrev2?.addEventListener("click", () => setReportRangeByWeekOffset(2));
+// [FIX] REPORT BUTTONS (Set mode grouped/akumulasi)
+btnWeekThis?.addEventListener("click", () => {
+  setReportRangeByWeekOffset(0);
+  reportWasteMode = "grouped";
+  showToast("Mode Laporan: Ringkasan Mingguan (Diakumulasi)", "info");
+});
+
+btnWeekLast?.addEventListener("click", () => {
+  setReportRangeByWeekOffset(1);
+  reportWasteMode = "grouped";
+  showToast("Mode Laporan: Ringkasan Mingguan (Diakumulasi)", "info");
+});
+
+btnWeekPrev2?.addEventListener("click", () => {
+  setReportRangeByWeekOffset(2);
+  reportWasteMode = "grouped";
+  showToast("Mode Laporan: Ringkasan Mingguan (Diakumulasi)", "info");
+});
+
+// [FIX] MANUAL DATE CHANGE (Set mode detail/harian)
+whReportStart?.addEventListener("change", () => {
+  reportWasteMode = "detail";
+});
+whReportEnd?.addEventListener("change", () => {
+  reportWasteMode = "detail";
+});
 
 // ===================== Boot =====================
 async function bootWarehouse() {
