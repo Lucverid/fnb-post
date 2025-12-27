@@ -1,4 +1,4 @@
-// warehouse.js (FINAL - FIXED REPORT LOGIC)
+// warehouse.js (FINAL - FIXED WASTE ACCUMULATION)
 // =====================================================================================
 
 import { getApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
@@ -17,6 +17,9 @@ let currentUser = null;
 let items = [];
 let editingWasteId = null; 
 let currentOpnameFilter = { status: null };
+
+// STATE BARU: Untuk membedakan mode laporan waste (Akumulasi vs Rinci)
+let isWasteAccumulated = false; 
 
 const LOW_STOCK_LT = 2; 
 const HIGH_STOCK_GT = 50; 
@@ -89,6 +92,8 @@ function setReportRangeByWeekOffset(weekOffset = 0) {
 
   if ($("whReportStart")) $("whReportStart").value = startStr;
   if ($("whReportEnd")) $("whReportEnd").value = endStr;
+  
+  // Update filter di tab waste management juga (opsional)
   if ($("wasteFilterStart")) $("wasteFilterStart").value = startStr;
   if ($("wasteFilterEnd")) $("wasteFilterEnd").value = endStr;
 }
@@ -102,7 +107,6 @@ function toTotalUnits(packs, loose, packQty) {
   return (clampInt(packs) * clampInt(packQty)) + clampInt(loose);
 }
 
-// FUNGSI PENTING: Memecah Total Unit Kecil menjadi Dus & Pcs yang rapi
 function splitUnitsToPackLoose(total, packQty) {
   const pq = Math.max(1, clampInt(packQty));
   const t = Math.max(0, clampInt(total));
@@ -147,7 +151,6 @@ function updateDashboard() {
     items.forEach(it => {
         const pq = getPackQty(it);
         
-        // Hitung total unit fisik per gudang untuk menentukan status
         const s1 = getBucket(toTotalUnits(it.stockW1, it.stockW1Loose, pq) / pq);
         if(s1 === 'habis') cW1.h++; else if(s1 === 'low') cW1.l++; else if(s1 === 'high') cW1.ok++; else cW1.ok++;
 
@@ -227,8 +230,23 @@ window.addEventListener('DOMContentLoaded', () => {
     $("wasteFilterStart")?.addEventListener("change", loadWasteLogsAndRender);
     $("wasteFilterEnd")?.addEventListener("change", loadWasteLogsAndRender);
 
-    $("btnWeekThis")?.addEventListener("click", () => setReportRangeByWeekOffset(0));
-    $("btnWeekLast")?.addEventListener("click", () => setReportRangeByWeekOffset(1));
+    // --- REVISI LOGIK REPORT WEEK ---
+    $("btnWeekThis")?.addEventListener("click", () => {
+        setReportRangeByWeekOffset(0);
+        isWasteAccumulated = true; // Set mode Akumulasi
+        generateReport(); // Auto generate
+    });
+    
+    $("btnWeekLast")?.addEventListener("click", () => {
+        setReportRangeByWeekOffset(1);
+        isWasteAccumulated = true; // Set mode Akumulasi
+        generateReport(); // Auto generate
+    });
+
+    // Jika user ubah tanggal manual, matikan mode akumulasi (balik ke rinci)
+    $("whReportStart")?.addEventListener("change", () => { isWasteAccumulated = false; });
+    $("whReportEnd")?.addEventListener("change", () => { isWasteAccumulated = false; });
+    
     $("btnWhReport")?.addEventListener("click", generateReport);
     $("btnWhReportDownload")?.addEventListener("click", downloadCSV);
 
@@ -433,7 +451,6 @@ function renderOpnameTable() {
         
         tr.querySelector(".btn-save").onclick = () => saveOpnameSingle(it, gudang, tr);
         
-        // RESTOCK: Tambah stok dan catat ke Barang Masuk
         tr.querySelector(".btn-restock").onclick = () => {
             const add = prompt(`Tambah stok (DUS/PACK) untuk ${it.name} di ${gudang}?`);
             if(add && Number(add) > 0) processRestockSingle(it, gudang, Number(add));
@@ -577,7 +594,7 @@ async function loadWasteLogsAndRender() {
     });
 }
 
-// ===================== REPORT (LOGIC FIXED: Exclude Rest & Rename Columns) =====================
+// ===================== REPORT (FIXED: Waste Accumulation vs Detailed) =====================
 async function generateReport() {
     const head = $("whReportHead");
     const body = $("whReportBody");
@@ -592,19 +609,15 @@ async function generateReport() {
     head.innerHTML = ""; body.innerHTML = "";
 
     if (type === 'total_asset') {
-        // MODIFIKASI: Nama kolom lebih jelas
         head.innerHTML = `<th>Item</th><th>Jml Dus</th><th>Sisa (Pcs)</th><th>Total Aset (Unit Kecil)</th><th>Catatan Audit</th>`;
         
         items.forEach(it => {
             const pq = getPackQty(it);
-            
-            // MODIFIKASI: Hanya menjumlahkan W1, W2, Bar, Kitchen. (stockRest DIHAPUS dari penjumlahan)
+            // Stock W1 + W2 + Bar + Kitchen
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockBar||0) + (it.stockKitchen||0);
             const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             
             const grandTotalSmall = toTotalUnits(tp, tl, pq);
-            
-            // Normalisasi kembali agar tampil rapi sebagai Dus + Sisa
             const normalized = splitUnitsToPackLoose(grandTotalSmall, pq);
             
             const tr = document.createElement("tr");
@@ -637,17 +650,55 @@ async function generateReport() {
     } else if (type === 'waste') {
         const sKey = todayKey(start);
         const eKey = todayKey(end);
+        
+        // Ambil data (limit 500 cukup aman untuk per minggu)
         const snap = await getDocs(query(collection(db, "wh_waste"), orderBy("createdAt", "desc"), limit(500)));
-        head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Catatan</th>`;
-        snap.forEach(d => {
-            const w = d.data();
-            if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
+        
+        if (isWasteAccumulated) {
+            // === MODE AKUMULASI (Untuk "Minggu Ini/Lalu") ===
+            head.innerHTML = `<th>Item</th><th>Total Qty</th><th>Satuan</th><th>Periode</th>`;
+            
+            // Map untuk menampung total: "NamaItem|Satuan" -> TotalQty
+            const aggregation = {};
+
+            snap.forEach(d => {
+                const w = d.data();
+                if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
+                    const key = `${w.itemName}__${w.unit}`; // Gabung nama & satuan biar gram tidak campur ml
+                    if(!aggregation[key]) aggregation[key] = 0;
+                    aggregation[key] += Number(w.qty);
+                }
+            });
+
+            // Render hasil akumulasi
+            Object.keys(aggregation).forEach(key => {
+                const [itemName, unit] = key.split("__");
+                const total = aggregation[key];
+                
                 const tr = document.createElement("tr");
-                tr.innerHTML = `<td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>`;
+                tr.innerHTML = `
+                    <td><b>${escapeHtml(itemName)}</b></td>
+                    <td style="font-weight:bold; color:#d9534f;">${total}</td>
+                    <td>${unit}</td>
+                    <td>${sKey} s/d ${eKey}</td>
+                `;
                 body.appendChild(tr);
-            }
-        });
-        showToast("Laporan Waste Siap", "success");
+            });
+            showToast("Laporan Waste (Akumulasi) Siap", "success");
+
+        } else {
+            // === MODE RINCI (Untuk Filter Tanggal Manual/Kalender) ===
+            head.innerHTML = `<th>Tanggal</th><th>Item</th><th>Qty</th><th>Satuan</th><th>Catatan</th>`;
+            snap.forEach(d => {
+                const w = d.data();
+                if((w.dateKey || "") >= sKey && (w.dateKey || "") <= eKey) {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td>${w.dateKey}</td><td>${w.itemName}</td><td>${w.qty}</td><td>${w.unit}</td><td>${escapeHtml(w.note)}</td>`;
+                    body.appendChild(tr);
+                }
+            });
+            showToast("Laporan Waste (Rinci) Siap", "success");
+        }
     }
 }
 
@@ -656,13 +707,9 @@ function downloadCSV() {
     let csv = "";
     
     if(type === 'total_asset') {
-        // MODIFIKASI: Header CSV
         csv = "Item,JmlDus,SisaPcs,GrandTotalUnitKecil,CatatanInfo\n";
-        
         items.forEach(it => {
             const pq = getPackQty(it);
-            
-            // MODIFIKASI: Rumus penjumlahan konsisten (Tanpa Rest)
             const tp = (it.stockW1||0) + (it.stockW2||0) + (it.stockBar||0) + (it.stockKitchen||0);
             const tl = (it.stockW1Loose||0) + (it.stockW2Loose||0) + (it.stockBarLoose||0) + (it.stockKitchen||0);
             
